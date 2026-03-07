@@ -3,12 +3,14 @@ import TopBar from "./shared/TopBar";
 import Dashboard from "./Dashboard";
 import QuestionBuilder from "./QuestionBuilder";
 import PDFImporter from "./PDFImporter";
+import TestBuilder from "./TestBuilder";
 import { TEACHER_CODE, S } from "./shared/constants";
 
 const TOOLS = [
   { id:"dashboard", icon:"📊", label:"Live Dashboard",     sub:"Scores & item analysis" },
   { id:"builder",   icon:"🔨", label:"Question Builder",   sub:"Build & edit questions"  },
   { id:"importer",  icon:"📄", label:"PDF Importer",       sub:"Extract from PDFs"       },
+  { id:"testbuilder",icon:"🚀", label:"Test Builder",       sub:"Select & activate tests"  },
 ];
 
 function TeacherLogin({ onEnter, onBack }) {
@@ -87,6 +89,7 @@ function TeacherApp({ onBack }) {
           {tool==="dashboard" && <Dashboard />}
           {tool==="builder"   && <div style={{flex:1,overflowY:"auto"}}><QuestionBuilder /></div>}
           {tool==="importer"  && <div style={{flex:1,overflowY:"auto"}}><PDFImporter /></div>}
+          {tool==="testbuilder" && <TestBuilder />}
         </div>
       </div>
     </div>
