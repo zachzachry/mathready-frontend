@@ -164,8 +164,7 @@ export default function TestBuilder() {
   const [bank, setBank]               = useState([]);
   const [selected, setSelected]       = useState([]);
   const [loading, setLoading]         = useState(true);
-  const [activating, setActivating]   = useState(false);
-  const [activated, setActivated]     = useState(false);
+
   const [testTitle, setTestTitle]     = useState("Grade 5 Math — Practice");
   const [editingQ, setEditingQ]       = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -230,16 +229,6 @@ export default function TestBuilder() {
   }
 
   function handleSaveEdit(updated) { setBank(b=>b.map(q=>q.id===updated.id?updated:q)); setEditingQ(null); }
-
-  async function activateTest() {
-    if(selected.length===0) return;
-    setActivating(true);
-    try {
-      await fetch(`${API}/test/activate`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({questions:selectedQuestions,title:testTitle})});
-      setActivated(true); setTimeout(()=>setActivated(false),3000);
-    } catch {}
-    setActivating(false);
-  }
 
   async function saveTest(name, code) {
     try {
@@ -393,15 +382,16 @@ export default function TestBuilder() {
               )}
             </div>
 
-            <div style={{padding:"0.85rem 1rem",borderTop:"2px solid #c8d3dd",background:"#fff",flexShrink:0,display:"flex",gap:"0.5rem"}}>
+            <div style={{padding:"0.85rem 1rem",borderTop:"2px solid #c8d3dd",background:"#fff",flexShrink:0}}>
               <button onClick={()=>setShowSaveModal(true)} disabled={selected.length===0}
-                style={{flex:1,background:selected.length===0?"#e8edf2":"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"0.65rem",fontSize:"0.82rem",fontWeight:700,color:selected.length===0?"#aaa":"#003865",cursor:selected.length===0?"not-allowed":"pointer"}}>
-                💾 Save to Library
+                style={{width:"100%",background:selected.length===0?"#c8d3dd":"#003865",border:"none",borderRadius:"4px",padding:"0.8rem",fontSize:"0.95rem",fontWeight:700,color:"#fff",cursor:selected.length===0?"not-allowed":"pointer"}}>
+                💾 Save to Library & Get Code
               </button>
-              <button onClick={activateTest} disabled={activating||selected.length===0}
-                style={{flex:2,background:activated?"#1a6e2e":selected.length===0?"#c8d3dd":"#003865",border:"none",borderRadius:"4px",padding:"0.65rem",fontSize:"0.9rem",fontWeight:700,color:"#fff",cursor:selected.length===0?"not-allowed":"pointer",transition:"background .2s"}}>
-                {activated?"✓ Activated!":activating?"Activating…":`🚀 Activate (${selected.length} Qs)`}
-              </button>
+              {selected.length>0&&(
+                <div style={{fontSize:"0.7rem",color:"#888",textAlign:"center",marginTop:"5px"}}>
+                  Students use the code to access this test
+                </div>
+              )}
             </div>
           </>
         )}
