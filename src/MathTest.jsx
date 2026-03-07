@@ -1,41 +1,75 @@
 import { useState, useEffect } from "react";
 import MathText from "./shared/MathText";
 import TopBar from "./shared/TopBar";
-import { STUDENT_CODE, QUESTIONS as FALLBACK_QUESTIONS, START_SECS, LETTERS, S, pct, lvl, lvlC, lvlBg, lvlBd, fmtTime, now, saveSession, sendHeartbeat, API } from "./shared/constants";
+import { QUESTIONS as FALLBACK_QUESTIONS, START_SECS, LETTERS, S, pct, lvl, lvlC, lvlBg, lvlBd, fmtTime, now, saveSession, sendHeartbeat, API } from "./shared/constants";
 
 // ── Student Login ──────────────────────────────────────────
-function StudentLogin({ onStart, onBack, questionCount }) {
-  const [first,setFirst]=useState(""); const [last,setLast]=useState("");
-  const [code,setCode]=useState(""); const [err,setErr]=useState("");
-  const [step,setStep]=useState("form");
+function StudentLogin({ onStart, onBack }) {
+  const [first, setFirst]   = useState("");
+  const [last,  setLast]    = useState("");
+  const [code,  setCode]    = useState("");
+  const [err,   setErr]     = useState("");
+  const [step,  setStep]    = useState("form");
+  const [loading, setLoading] = useState(false);
+  const [testInfo, setTestInfo] = useState(null); // { title, questions }
 
-  function submit() {
-    if (!first.trim()||!last.trim()){setErr("Please enter your first and last name.");return;}
-    if (code.trim().toUpperCase()!==STUDENT_CODE){setErr("Invalid test code. Check with your teacher.");return;}
-    setErr(""); setStep("confirm");
+  async function submit() {
+    if (!first.trim() || !last.trim()) { setErr("Please enter your first and last name."); return; }
+    const c = code.trim().toUpperCase();
+    if (!c) { setErr("Please enter the test code from your teacher."); return; }
+    setLoading(true); setErr("");
+    try {
+      const r = await fetch(`${API}/test/code/${encodeURIComponent(c)}`);
+      const data = await r.json();
+      if (!data.found || !data.questions?.length) {
+        setErr("Invalid test code. Check with your teacher.");
+        setLoading(false); return;
+      }
+      setTestInfo(data);
+      setStep("confirm");
+    } catch {
+      setErr("Could not connect to server. Check your internet and try again.");
+    }
+    setLoading(false);
   }
 
-  if (step==="confirm") return (
-    <div style={S.page}>
-      <div style={S.card}>
-        <div style={S.hdr}><div style={S.hdrSub}>STUDENT SIGN IN</div><div style={S.hdrTitle}>Confirm Your Information</div></div>
-        <div style={{padding:"1.75rem 2rem"}}>
-          <div style={S.confirmBox}>
-            {[["STUDENT NAME",`${first} ${last}`],["TEST","Grade 5 Mathematics — Practice"],["TIME LIMIT","30 Minutes"],["QUESTIONS",String(questionCount)],["CALCULATOR","Not Permitted"]].map(([k,v],i,a)=>(
-              <div key={k} style={{...S.confirmRow,borderBottom:i<a.length-1?"1px solid #eef1f4":"none"}}><span style={S.confirmK}>{k}</span><span style={S.confirmV}>{v}</span></div>
-            ))}
+  if (step === "confirm" && testInfo) {
+    const count = testInfo.questions.length;
+    return (
+      <div style={S.page}>
+        <div style={S.card}>
+          <div style={S.hdr}>
+            <div style={S.hdrSub}>STUDENT SIGN IN</div>
+            <div style={S.hdrTitle}>Confirm Your Information</div>
           </div>
-          <div style={{background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"3px",padding:"0.65rem 1rem",marginBottom:"1.25rem",fontSize:"0.8rem",color:"#7a4e00"}}>
-            ⚠ Once you click <strong>Begin Test</strong>, your timer starts immediately.
-          </div>
-          <div style={{display:"flex",gap:"0.75rem"}}>
-            <button onClick={()=>setStep("form")} style={S.btnSec}>← Go Back</button>
-            <button onClick={()=>onStart(`${first} ${last}`)} style={S.btnPri}>Begin Test →</button>
+          <div style={{ padding:"1.75rem 2rem" }}>
+            <div style={S.confirmBox}>
+              {[
+                ["STUDENT NAME", `${first} ${last}`],
+                ["TEST", testInfo.title || "Grade 5 Mathematics"],
+                ["TEST CODE", code.toUpperCase()],
+                ["TIME LIMIT", "30 Minutes"],
+                ["QUESTIONS", String(count)],
+                ["CALCULATOR", "Not Permitted"],
+              ].map(([k,v],i,a) => (
+                <div key={k} style={{...S.confirmRow, borderBottom:i<a.length-1?"1px solid #eef1f4":"none"}}>
+                  <span style={S.confirmK}>{k}</span>
+                  <span style={{...S.confirmV, fontFamily:k==="TEST CODE"?"monospace":"inherit", letterSpacing:k==="TEST CODE"?"0.18em":"inherit"}}>{v}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"3px",padding:"0.65rem 1rem",marginBottom:"1.25rem",fontSize:"0.8rem",color:"#7a4e00"}}>
+              ⚠ Once you click <strong>Begin Test</strong>, your timer starts immediately.
+            </div>
+            <div style={{display:"flex",gap:"0.75rem"}}>
+              <button onClick={()=>setStep("form")} style={S.btnSec}>← Go Back</button>
+              <button onClick={()=>onStart(`${first} ${last}`, testInfo.questions)} style={S.btnPri}>Begin Test →</button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   return (
     <div style={S.page}>
@@ -45,22 +79,27 @@ function StudentLogin({ onStart, onBack, questionCount }) {
       </div>
       <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem 1rem",width:"100%"}}>
         <div style={S.card}>
-          <div style={S.hdr}><div style={S.hdrSub}>STUDENT SIGN IN</div><div style={S.hdrTitle}>Grade 5 Mathematics</div></div>
+          <div style={S.hdr}>
+            <div style={S.hdrSub}>STUDENT SIGN IN</div>
+            <div style={S.hdrTitle}>Grade 5 Mathematics</div>
+          </div>
           <div style={{padding:"1.75rem 2rem"}}>
             <div style={{display:"flex",gap:"0.75rem",marginBottom:"1rem"}}>
               {[["FIRST NAME",first,setFirst,"First name"],["LAST NAME",last,setLast,"Last name"]].map(([lbl,val,set,ph])=>(
                 <div key={lbl} style={{flex:1}}>
                   <label style={S.lbl}>{lbl}</label>
-                  <input style={S.inp} value={val} onChange={e=>{set(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder={ph} />
+                  <input style={S.inp} value={val} onChange={e=>{set(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder={ph}/>
                 </div>
               ))}
             </div>
             <div style={{marginBottom:"1.25rem"}}>
-              <label style={S.lbl}>TEST CODE</label>
-              <input style={{...S.inp,fontFamily:"monospace",fontSize:"1.05rem",letterSpacing:"0.18em",textTransform:"uppercase"}} value={code} onChange={e=>{setCode(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="e.g. MATH2025" maxLength={12} />
+              <label style={S.lbl}>TEST CODE — given to you by your teacher</label>
+              <input style={{...S.inp,fontFamily:"monospace",fontSize:"1.1rem",letterSpacing:"0.2em",textTransform:"uppercase",fontWeight:700}} value={code} onChange={e=>{setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,""));setErr("");}} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="e.g. ABC123" maxLength={8}/>
             </div>
-            {err&&<div style={S.errBox}>⚠ {err}</div>}
-            <button onClick={submit} style={{...S.btnPri,width:"100%",marginTop:"1rem"}}>Continue →</button>
+            {err && <div style={S.errBox}>⚠ {err}</div>}
+            <button onClick={submit} disabled={loading} style={{...S.btnPri,width:"100%",marginTop:"1rem",opacity:loading?0.7:1}}>
+              {loading ? "Checking code…" : "Continue →"}
+            </button>
           </div>
         </div>
       </div>
@@ -71,14 +110,14 @@ function StudentLogin({ onStart, onBack, questionCount }) {
 // ── Student Test ───────────────────────────────────────────
 function StudentTest({ studentName, questions, onFinish }) {
   const TOTAL = questions.length;
-  const [cur,setCur]    = useState(0);
-  const [ans,setAns]    = useState({});
-  const [flg,setFlg]    = useState({});
-  const [secs,setSecs]  = useState(START_SECS);
-  const [modal,setModal]= useState(false);
-  const [nav,setNav]    = useState(window.innerWidth > 640);
+  const [cur,   setCur]   = useState(0);
+  const [ans,   setAns]   = useState({});
+  const [flg,   setFlg]   = useState({});
+  const [secs,  setSecs]  = useState(START_SECS);
+  const [modal, setModal] = useState(false);
+  const [nav,   setNav]   = useState(window.innerWidth > 640);
 
-  useEffect(()=>{const t=setInterval(()=>setSecs(s=>s>0?s-1:0),1000);return()=>clearInterval(t);},[]);
+  useEffect(()=>{ const t=setInterval(()=>setSecs(s=>s>0?s-1:0),1000); return()=>clearInterval(t); },[]);
   useEffect(()=>{
     sendHeartbeat(studentName,cur);
     const t=setInterval(()=>sendHeartbeat(studentName,cur),30000);
@@ -160,7 +199,7 @@ function StudentTest({ studentName, questions, onFinish }) {
           <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"1.25rem 1.5rem"}}>
             <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"0.65rem"}}>QUESTION</div>
             <p style={{fontSize:"1.05rem",fontFamily:"Georgia,serif",color:"#0f0f0f",lineHeight:1.72,margin:0}}><MathText text={q.question}/></p>
-            {q.questionImage && <img src={q.questionImage} alt="diagram" style={{maxWidth:"100%",maxHeight:"200px",marginTop:"0.75rem",borderRadius:"3px",display:"block"}}/>}
+            {q.questionImage&&<img src={q.questionImage} alt="diagram" style={{maxWidth:"100%",maxHeight:"200px",marginTop:"0.75rem",borderRadius:"3px",display:"block"}}/>}
           </div>
           <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"1.1rem 1.5rem"}}>
             <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"0.9rem"}}>SELECT ONE ANSWER</div>
@@ -172,7 +211,7 @@ function StudentTest({ studentName, questions, onFinish }) {
                     <span style={{fontSize:"0.7rem",fontWeight:700,color:chosen?"#fff":"#667"}}>{LETTERS[i]}</span>
                   </div>
                   <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color:"#0f0f0f"}}><MathText text={choice}/></span>
-                  {q.choiceImages?.[i] && <img src={q.choiceImages[i]} alt="" style={{maxHeight:"60px",maxWidth:"150px",marginLeft:"0.5rem",borderRadius:"2px"}}/>}
+                  {q.choiceImages?.[i]&&<img src={q.choiceImages[i]} alt="" style={{maxHeight:"60px",maxWidth:"150px",marginLeft:"0.5rem",borderRadius:"2px"}}/>}
                 </label>;
               })}
             </div>
@@ -261,25 +300,23 @@ function StudentResults({ session, questions, onReset }) {
 
 // ── Main shell ─────────────────────────────────────────────
 export default function MathTest({ onBack }) {
-  const [screen,setScreen]             = useState("login");
-  const [studentName,setStudentName]   = useState("");
-  const [finalSession,setFinalSession] = useState(null);
-  const [questions,setQuestions]       = useState(FALLBACK_QUESTIONS);
+  const [screen,       setScreen]       = useState("login");
+  const [studentName,  setStudentName]  = useState("");
+  const [finalSession, setFinalSession] = useState(null);
+  const [questions,    setQuestions]    = useState(FALLBACK_QUESTIONS);
 
-  // Load active test from backend — fall back to built-in questions if none set
-  useEffect(()=>{
-    fetch(`${API}/test/active`)
-      .then(r=>r.json())
-      .then(t=>{ if (t?.questions?.length > 0) setQuestions(t.questions); })
-      .catch(()=>{});
-  },[]);
+  function handleStart(name, qs) {
+    setStudentName(name);
+    if (qs?.length) setQuestions(qs);
+    setScreen("test");
+  }
 
-  if (screen==="login")
-    return <StudentLogin onStart={n=>{setStudentName(n);setScreen("test");}} onBack={onBack} questionCount={questions.length}/>;
+  if (screen === "login")
+    return <StudentLogin onStart={handleStart} onBack={onBack}/>;
 
-  if (screen==="test")
+  if (screen === "test")
     return <StudentTest studentName={studentName} questions={questions} onFinish={s=>{setFinalSession(s);setScreen("results");}}/>;
 
-  if (screen==="results")
+  if (screen === "results")
     return <StudentResults session={finalSession} questions={questions} onReset={()=>{setStudentName("");setFinalSession(null);setScreen("login");onBack();}}/>;
 }
