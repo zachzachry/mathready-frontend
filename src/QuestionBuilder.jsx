@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import MathText from "./shared/MathText";
+import { API } from "./shared/constants";
 
 
 // ── Math snippet toolbar ───────────────────────────────────
@@ -393,6 +394,29 @@ export default function QuestionBuilder() {
     setCopied(true); setTimeout(()=>setCopied(false), 2500);
   }
 
+  const [saving, setSaving]   = useState(false);
+  const [savedCount, setSavedCount] = useState(0);
+
+  async function saveToBank() {
+    const complete_qs = questions.filter(q => q.question && q.choices.filter(c=>c).length===4 && q.correct && q.standard && q.dok);
+    if (complete_qs.length === 0) return;
+    setSaving(true);
+    let count = 0;
+    for (const q of complete_qs) {
+      try {
+        await fetch(`${API}/questions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(q),
+        });
+        count++;
+      } catch {}
+    }
+    setSaving(false);
+    setSavedCount(count);
+    setTimeout(() => setSavedCount(0), 3000);
+  }
+
   const complete = questions.filter(q => q.question && q.choices.filter(c=>c).length===4 && q.correct && q.standard && q.dok).length;
 
   return (
@@ -406,6 +430,10 @@ export default function QuestionBuilder() {
         </div>
         <div style={{ display: "flex", gap: "0.65rem", alignItems: "center" }}>
           <span style={{ fontSize: "0.75rem", opacity: .75 }}>{complete}/{questions.length} complete</span>
+          <button onClick={saveToBank} disabled={saving||complete===0}
+            style={{ background: savedCount>0?"#d4edda":complete===0?"#c8d3dd":"#1a6e2e", color: savedCount>0?"#1a6e2e":"#fff", border: "none", borderRadius: "3px", padding: "6px 14px", fontWeight: 700, fontSize: "0.8rem", cursor: complete===0?"not-allowed":"pointer" }}>
+            {savedCount>0 ? `✓ Saved ${savedCount} to Bank!` : saving ? "Saving…" : `💾 Save to Bank (${complete})`}
+          </button>
           <button onClick={copyJSON} style={{ background: copied?"#d4edda":"#fff", color: copied?"#1a6e2e":"#003865", border: "none", borderRadius: "3px", padding: "6px 14px", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer" }}>
             {copied ? "✓ Copied!" : "📋 Copy JSON"}
           </button>
