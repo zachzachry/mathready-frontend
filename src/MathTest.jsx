@@ -4,7 +4,7 @@ import TopBar from "./shared/TopBar";
 import { STUDENT_CODE, QUESTIONS as FALLBACK_QUESTIONS, START_SECS, LETTERS, S, pct, lvl, lvlC, lvlBg, lvlBd, fmtTime, now, saveSession, sendHeartbeat, API } from "./shared/constants";
 
 // ── Student Login ──────────────────────────────────────────
-function StudentLogin({ onStart, onBack }) {
+function StudentLogin({ onStart, onBack, questionCount }) {
   const [first,setFirst]=useState(""); const [last,setLast]=useState("");
   const [code,setCode]=useState(""); const [err,setErr]=useState("");
   const [step,setStep]=useState("form");
@@ -21,7 +21,7 @@ function StudentLogin({ onStart, onBack }) {
         <div style={S.hdr}><div style={S.hdrSub}>STUDENT SIGN IN</div><div style={S.hdrTitle}>Confirm Your Information</div></div>
         <div style={{padding:"1.75rem 2rem"}}>
           <div style={S.confirmBox}>
-            {[["STUDENT NAME",`${first} ${last}`],["TEST","Grade 5 Mathematics — Practice"],["TIME LIMIT","30 Minutes"],["QUESTIONS",String(TOTAL)],["CALCULATOR","Not Permitted"]].map(([k,v],i,a)=>(
+            {[["STUDENT NAME",`${first} ${last}`],["TEST","Grade 5 Mathematics — Practice"],["TIME LIMIT","30 Minutes"],["QUESTIONS",String(questionCount)],["CALCULATOR","Not Permitted"]].map(([k,v],i,a)=>(
               <div key={k} style={{...S.confirmRow,borderBottom:i<a.length-1?"1px solid #eef1f4":"none"}}><span style={S.confirmK}>{k}</span><span style={S.confirmV}>{v}</span></div>
             ))}
           </div>
@@ -69,22 +69,14 @@ function StudentLogin({ onStart, onBack }) {
 }
 
 // ── Student Test ───────────────────────────────────────────
-function StudentTest({ studentName, onFinish }) {
-  const [questions, setQuestions] = useState(FALLBACK_QUESTIONS);
+function StudentTest({ studentName, questions, onFinish }) {
+  const TOTAL = questions.length;
   const [cur,setCur]    = useState(0);
   const [ans,setAns]    = useState({});
   const [flg,setFlg]    = useState({});
   const [secs,setSecs]  = useState(START_SECS);
   const [modal,setModal]= useState(false);
   const [nav,setNav]    = useState(window.innerWidth > 640);
-
-  // Load active test from backend on mount
-  useEffect(() => {
-    fetch(`${API}/test/active`)
-      .then(r => r.json())
-      .then(t => { if (t.questions?.length > 0) setQuestions(t.questions); })
-      .catch(() => {});
-  }, []);
 
   useEffect(()=>{const t=setInterval(()=>setSecs(s=>s>0?s-1:0),1000);return()=>clearInterval(t);},[]);
   useEffect(()=>{
@@ -93,15 +85,17 @@ function StudentTest({ studentName, onFinish }) {
     return()=>clearInterval(t);
   },[studentName,cur]);
 
-  const TOTAL=questions.length;
-  const q=questions[cur]; const sel=ans[q.id]??null; const isFl=flg[q.id]??false;
+  const q=questions[cur];
+  if (!q) return <div style={{padding:"3rem",textAlign:"center",color:"#aaa"}}>Loading questions…</div>;
+
+  const sel=ans[q.id]??null; const isFl=flg[q.id]??false;
   const ansCount=Object.keys(ans).length; const flgCount=Object.values(flg).filter(Boolean).length;
 
   async function doSubmit() {
     const score=questions.reduce((a,q)=>a+(ans[q.id]===q.correct?1:0),0);
     const session={name:studentName,score,total:TOTAL,pct:pct(score,TOTAL),submitted:now(),timeUsed:fmtTime(START_SECS-secs),answers:{...ans}};
     await saveSession(session);
-    onFinish(session, questions);
+    onFinish(session);
   }
 
   return (
@@ -162,24 +156,23 @@ function StudentTest({ studentName, onFinish }) {
               🚩 {isFl?"Flagged":"Flag for Review"}
             </button>
           </div>
-
           <div style={{height:"1px",background:"#dde3e9"}}/>
-
           <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"1.25rem 1.5rem"}}>
             <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"0.65rem"}}>QUESTION</div>
             <p style={{fontSize:"1.05rem",fontFamily:"Georgia,serif",color:"#0f0f0f",lineHeight:1.72,margin:0}}><MathText text={q.question}/></p>
+            {q.questionImage && <img src={q.questionImage} alt="diagram" style={{maxWidth:"100%",maxHeight:"200px",marginTop:"0.75rem",borderRadius:"3px",display:"block"}}/>}
           </div>
-
           <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"1.1rem 1.5rem"}}>
             <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"0.9rem"}}>SELECT ONE ANSWER</div>
             <div style={{display:"flex",flexDirection:"column",gap:"0.55rem"}}>
               {q.choices.map((choice,i)=>{
                 const chosen=sel===choice;
-                return <label key={choice} onClick={()=>setAns(p=>({...p,[q.id]:choice}))} style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.8rem 1rem",border:`2px solid ${chosen?"#003865":"#c8d3dd"}`,borderRadius:"3px",background:chosen?"#ddeaf7":"#fafbfc",cursor:"pointer"}}>
+                return <label key={i} onClick={()=>setAns(p=>({...p,[q.id]:choice}))} style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.8rem 1rem",border:`2px solid ${chosen?"#003865":"#c8d3dd"}`,borderRadius:"3px",background:chosen?"#ddeaf7":"#fafbfc",cursor:"pointer"}}>
                   <div style={{width:"26px",height:"26px",borderRadius:"50%",border:`2px solid ${chosen?"#003865":"#9aabba"}`,background:chosen?"#003865":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                     <span style={{fontSize:"0.7rem",fontWeight:700,color:chosen?"#fff":"#667"}}>{LETTERS[i]}</span>
                   </div>
                   <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color:"#0f0f0f"}}><MathText text={choice}/></span>
+                  {q.choiceImages?.[i] && <img src={q.choiceImages[i]} alt="" style={{maxHeight:"60px",maxWidth:"150px",marginLeft:"0.5rem",borderRadius:"2px"}}/>}
                 </label>;
               })}
             </div>
@@ -190,7 +183,7 @@ function StudentTest({ studentName, onFinish }) {
       <div style={{background:"#fff",borderTop:"2px solid #c8d3dd",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0.65rem 1.5rem",flexShrink:0}}>
         <button onClick={()=>setCur(c=>Math.max(0,c-1))} disabled={cur===0} style={{background:cur===0?"#e8edf2":"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"7px 20px",fontSize:"0.83rem",cursor:cur===0?"not-allowed":"pointer",color:cur===0?"#aaa":"#333",fontWeight:600}}>◀ Back</button>
         <div style={{display:"flex",gap:"4px"}}>
-          {questions.map((item,i)=><div key={i} onClick={()=>setCur(i)} style={{width:"9px",height:"9px",borderRadius:"50%",background:i===cur?"#003865":ans[item.id]?"#1a6e2e":"#c8d3dd",cursor:"pointer"}}/>)}
+          {questions.map((_,i)=><div key={i} onClick={()=>setCur(i)} style={{width:"9px",height:"9px",borderRadius:"50%",background:i===cur?"#003865":ans[questions[i].id]?"#1a6e2e":"#c8d3dd",cursor:"pointer"}}/>)}
         </div>
         {cur<TOTAL-1
           ?<button onClick={()=>setCur(c=>c+1)} style={{background:"#003865",border:"none",borderRadius:"3px",padding:"7px 20px",fontSize:"0.83rem",cursor:"pointer",color:"#fff",fontWeight:600}}>Next ▶</button>
@@ -222,7 +215,7 @@ function StudentTest({ studentName, onFinish }) {
 }
 
 // ── Student Results ────────────────────────────────────────
-function StudentResults({ session, onReset, questions }) {
+function StudentResults({ session, questions, onReset }) {
   const p=session.pct;
   return (
     <div style={{minHeight:"100vh",background:"#e8edf2",fontFamily:"sans-serif",display:"flex",flexDirection:"column"}}>
@@ -242,7 +235,7 @@ function StudentResults({ session, onReset, questions }) {
           </div>
           <div style={{padding:"1.25rem 1.5rem"}}>
             <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"0.75rem"}}>ITEM REVIEW</div>
-            {(questions||[]).map((q,i)=>{
+            {questions.map((q,i)=>{
               const a=session.answers[q.id]; const ok=a===q.correct;
               return <div key={q.id} style={{display:"flex",gap:"0.75rem",marginBottom:"0.6rem",padding:"0.7rem 0.85rem",background:ok?"#f0faf2":"#fdf2f2",border:`1px solid ${ok?"#b3dfc0":"#f0b8b8"}`,borderRadius:"3px"}}>
                 <div style={{width:"22px",height:"22px",borderRadius:"50%",background:ok?"#1a6e2e":"#8b1a1a",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:"1px"}}>
@@ -251,7 +244,7 @@ function StudentResults({ session, onReset, questions }) {
                 <div style={{flex:1,fontSize:"0.82rem"}}>
                   <div style={{color:"#777",fontSize:"0.63rem",letterSpacing:"0.08em",marginBottom:"2px"}}>{q.standard}</div>
                   <div style={{color:"#1a1a1a",fontFamily:"Georgia,serif",marginBottom:ok?0:"4px"}}><MathText text={q.question}/></div>
-                  {!ok&&<div style={{fontSize:"0.78rem"}}><span style={{color:"#1a6e2e"}}>Correct: <strong>{q.correct}</strong></span>{a&&<span style={{color:"#8b1a1a"}}> · Your answer: {a}</span>}</div>}
+                  {!ok&&<div style={{fontSize:"0.78rem"}}><span style={{color:"#1a6e2e"}}>Correct: <strong><MathText text={q.correct}/></strong></span>{a&&<span style={{color:"#8b1a1a"}}> · Your answer: <MathText text={a}/></span>}</div>}
                 </div>
                 <span style={{fontWeight:700,fontSize:"0.9rem",color:ok?"#1a6e2e":"#8b1a1a"}}>{ok?"✓":"✗"}</span>
               </div>;
@@ -266,14 +259,27 @@ function StudentResults({ session, onReset, questions }) {
   );
 }
 
-// ── Exported shell ─────────────────────────────────────────
+// ── Main shell ─────────────────────────────────────────────
 export default function MathTest({ onBack }) {
-  const [screen,setScreen]       = useState("login");
-  const [studentName,setStudentName] = useState("");
+  const [screen,setScreen]             = useState("login");
+  const [studentName,setStudentName]   = useState("");
   const [finalSession,setFinalSession] = useState(null);
-  const [activeQuestions,setActiveQuestions] = useState(FALLBACK_QUESTIONS);
+  const [questions,setQuestions]       = useState(FALLBACK_QUESTIONS);
 
-  if (screen==="login")   return <StudentLogin onStart={n=>{setStudentName(n);setScreen("test");}} onBack={onBack}/>;
-  if (screen==="test")    return <StudentTest  studentName={studentName} onFinish={(s,qs)=>{setFinalSession(s);setActiveQuestions(qs||FALLBACK_QUESTIONS);setScreen("results");}}/>;
-  if (screen==="results") return <StudentResults session={finalSession} questions={activeQuestions} onReset={()=>{setStudentName("");setFinalSession(null);setScreen("login");onBack();}}/>;
+  // Load active test from backend — fall back to built-in questions if none set
+  useEffect(()=>{
+    fetch(`${API}/test/active`)
+      .then(r=>r.json())
+      .then(t=>{ if (t?.questions?.length > 0) setQuestions(t.questions); })
+      .catch(()=>{});
+  },[]);
+
+  if (screen==="login")
+    return <StudentLogin onStart={n=>{setStudentName(n);setScreen("test");}} onBack={onBack} questionCount={questions.length}/>;
+
+  if (screen==="test")
+    return <StudentTest studentName={studentName} questions={questions} onFinish={s=>{setFinalSession(s);setScreen("results");}}/>;
+
+  if (screen==="results")
+    return <StudentResults session={finalSession} questions={questions} onReset={()=>{setStudentName("");setFinalSession(null);setScreen("login");onBack();}}/>;
 }
