@@ -1,16 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import MathText from "./shared/MathText";
 import TopBar from "./shared/TopBar";
 import { QUESTIONS as FALLBACK_QUESTIONS, START_SECS, LETTERS, S, pct, lvl, lvlC, lvlBg, lvlBd, fmtTime, now, saveSession, sendHeartbeat, API } from "./shared/constants";
 
 // ── Student Login ──────────────────────────────────────────
-function StudentLogin({ onStart, onBack }) {
+function StudentLogin({ onStartTest, onStartPractice, onBack }) {
   const [classes,    setClasses]    = useState([]);
   const [classId,    setClassId]    = useState("");
   const [studentId,  setStudentId]  = useState("");
   const [code,       setCode]       = useState("");
   const [err,        setErr]        = useState("");
-  const [step,       setStep]       = useState("form");
+  const [step,       setStep]       = useState("form");   // form → mode → code → confirm
   const [loading,    setLoading]    = useState(true);
   const [checking,   setChecking]   = useState(false);
   const [testInfo,   setTestInfo]   = useState(null);
@@ -25,11 +25,23 @@ function StudentLogin({ onStart, onBack }) {
   const selectedClass   = classes.find(c => c.id === classId);
   const selectedStudent = selectedClass?.students.find(s => s.id === studentId);
 
-  async function submit() {
-    if (!classId)     { setErr("Please select your class.");   return; }
-    if (!studentId)   { setErr("Please select your name.");    return; }
+  // Step 1: class + name selected → go to mode picker
+  function handleContinueToMode() {
+    if (!classId)   { setErr("Please select your class."); return; }
+    if (!studentId) { setErr("Please select your name.");  return; }
+    setErr("");
+    setStep("mode");
+  }
+
+  // Step 2b: practice → straight in
+  function handlePractice() {
+    onStartPractice(selectedStudent, selectedClass);
+  }
+
+  // Step 2a: test → code entry
+  async function checkCode() {
     const c = code.trim().toUpperCase();
-    if (!c)           { setErr("Please enter the test code."); return; }
+    if (!c) { setErr("Please enter the test code."); return; }
     setChecking(true); setErr("");
     try {
       const r    = await fetch(`${API}/test/code/${encodeURIComponent(c)}`);
@@ -46,44 +58,114 @@ function StudentLogin({ onStart, onBack }) {
     setChecking(false);
   }
 
-  if (step === "confirm" && testInfo) {
-    return (
-      <div style={S.page}>
-        <div style={S.card}>
-          <div style={S.hdr}>
-            <div style={S.hdrSub}>STUDENT SIGN IN</div>
-            <div style={S.hdrTitle}>Confirm Your Information</div>
+  // ── Confirm screen ──
+  if (step === "confirm" && testInfo) return (
+    <div style={S.page}>
+      <div style={S.card}>
+        <div style={S.hdr}>
+          <div style={S.hdrSub}>STUDENT SIGN IN</div>
+          <div style={S.hdrTitle}>Confirm Your Information</div>
+        </div>
+        <div style={{padding:"1.75rem 2rem"}}>
+          <div style={S.confirmBox}>
+            {[
+              ["STUDENT NAME", selectedStudent?.name],
+              ["CLASS",        selectedClass?.name],
+              ["TEST",         testInfo.title || "Grade 5 Mathematics"],
+              ["TEST CODE",    code.toUpperCase()],
+              ["QUESTIONS",    String(testInfo.questions.length)],
+              ["TIME LIMIT",   "30 Minutes"],
+              ["CALCULATOR",   "Not Permitted"],
+            ].map(([k,v],i,a) => (
+              <div key={k} style={{...S.confirmRow, borderBottom:i<a.length-1?"1px solid #eef1f4":"none"}}>
+                <span style={S.confirmK}>{k}</span>
+                <span style={{...S.confirmV, fontFamily:k==="TEST CODE"?"monospace":"inherit", letterSpacing:k==="TEST CODE"?"0.18em":"inherit"}}>{v}</span>
+              </div>
+            ))}
           </div>
-          <div style={{padding:"1.75rem 2rem"}}>
-            <div style={S.confirmBox}>
-              {[
-                ["STUDENT NAME", selectedStudent?.name],
-                ["CLASS",        selectedClass?.name],
-                ["TEST",         testInfo.title || "Grade 5 Mathematics"],
-                ["TEST CODE",    code.toUpperCase()],
-                ["QUESTIONS",    String(testInfo.questions.length)],
-                ["TIME LIMIT",   "30 Minutes"],
-                ["CALCULATOR",   "Not Permitted"],
-              ].map(([k,v],i,a) => (
-                <div key={k} style={{...S.confirmRow, borderBottom:i<a.length-1?"1px solid #eef1f4":"none"}}>
-                  <span style={S.confirmK}>{k}</span>
-                  <span style={{...S.confirmV, fontFamily:k==="TEST CODE"?"monospace":"inherit", letterSpacing:k==="TEST CODE"?"0.18em":"inherit"}}>{v}</span>
-                </div>
-              ))}
-            </div>
-            <div style={{background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"3px",padding:"0.65rem 1rem",marginBottom:"1.25rem",fontSize:"0.8rem",color:"#7a4e00"}}>
-              ⚠ Once you click <strong>Begin Test</strong>, your timer starts immediately.
-            </div>
-            <div style={{display:"flex",gap:"0.75rem"}}>
-              <button onClick={()=>setStep("form")} style={S.btnSec}>← Go Back</button>
-              <button onClick={()=>onStart(selectedStudent, selectedClass, code.toUpperCase(), testInfo)} style={S.btnPri}>Begin Test →</button>
-            </div>
+          <div style={{background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"3px",padding:"0.65rem 1rem",marginBottom:"1.25rem",fontSize:"0.8rem",color:"#7a4e00"}}>
+            ⚠ Once you click <strong>Begin Test</strong>, your timer starts immediately.
+          </div>
+          <div style={{display:"flex",gap:"0.75rem"}}>
+            <button onClick={()=>setStep("code")} style={S.btnSec}>← Go Back</button>
+            <button onClick={()=>onStartTest(selectedStudent, selectedClass, code.toUpperCase(), testInfo)} style={S.btnPri}>Begin Test →</button>
           </div>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
 
+  // ── Code entry screen ──
+  if (step === "code") return (
+    <div style={S.page}>
+      <div style={{background:"#003865",width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem"}}>
+        <button onClick={()=>setStep("mode")} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"4px 10px",cursor:"pointer",fontSize:"0.72rem"}}>← Back</button>
+        <div style={{color:"#fff",fontSize:"0.95rem",fontWeight:700}}>Enter Test Code</div>
+      </div>
+      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem 1rem",width:"100%"}}>
+        <div style={S.card}>
+          <div style={S.hdr}>
+            <div style={S.hdrSub}>{selectedStudent?.name} · {selectedClass?.name}</div>
+            <div style={S.hdrTitle}>Enter Your Test Code</div>
+          </div>
+          <div style={{padding:"1.75rem 2rem"}}>
+            <div style={{marginBottom:"1.25rem"}}>
+              <label style={S.lbl}>TEST CODE — given to you by your teacher</label>
+              <input style={{...S.inp,fontFamily:"monospace",fontSize:"1.3rem",letterSpacing:"0.25em",textTransform:"uppercase",fontWeight:700,textAlign:"center"}}
+                value={code} onChange={e=>{setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,""));setErr("");}}
+                onKeyDown={e=>e.key==="Enter"&&checkCode()} placeholder="e.g. FRACTIONS" maxLength={8} autoFocus/>
+            </div>
+            {err && <div style={S.errBox}>⚠ {err}</div>}
+            <button onClick={checkCode} disabled={checking}
+              style={{...S.btnPri,width:"100%",marginTop:"0.5rem",opacity:checking?0.7:1}}>
+              {checking ? "Checking code…" : "Continue →"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── Mode picker screen ──
+  if (step === "mode") return (
+    <div style={S.page}>
+      <div style={{background:"#003865",width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem"}}>
+        <button onClick={()=>setStep("form")} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"4px 10px",cursor:"pointer",fontSize:"0.72rem"}}>← Back</button>
+        <div style={{color:"#fff",fontSize:"0.95rem",fontWeight:700}}>Georgia Milestones Readiness Trainer</div>
+      </div>
+      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem 1rem",width:"100%"}}>
+        <div style={{width:"100%",maxWidth:"520px"}}>
+          <div style={{textAlign:"center",marginBottom:"2rem"}}>
+            <div style={{fontSize:"0.72rem",fontWeight:700,letterSpacing:"0.14em",color:"#888",marginBottom:"6px"}}>SIGNED IN AS</div>
+            <div style={{fontSize:"1.3rem",fontWeight:700,color:"#1a1a1a"}}>{selectedStudent?.name}</div>
+            <div style={{fontSize:"0.85rem",color:"#666"}}>{selectedClass?.name}</div>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
+            {/* Practice card */}
+            <button onClick={handlePractice}
+              style={{background:"#fff",border:"2px solid #1a6e2e",borderRadius:"8px",padding:"1.75rem 2rem",textAlign:"left",cursor:"pointer",display:"flex",alignItems:"center",gap:"1.25rem",boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
+              <div style={{width:"52px",height:"52px",borderRadius:"50%",background:"#f0faf2",border:"2px solid #b3dfc0",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:"1.6rem"}}>🎯</div>
+              <div>
+                <div style={{fontSize:"1.05rem",fontWeight:700,color:"#1a6e2e",marginBottom:"4px"}}>Practice Mode</div>
+                <div style={{fontSize:"0.82rem",color:"#555",lineHeight:1.5}}>Random questions from the bank. See if you got it right after every answer. Practice as long as you want.</div>
+              </div>
+            </button>
+            {/* Test card */}
+            <button onClick={()=>setStep("code")}
+              style={{background:"#fff",border:"2px solid #003865",borderRadius:"8px",padding:"1.75rem 2rem",textAlign:"left",cursor:"pointer",display:"flex",alignItems:"center",gap:"1.25rem",boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
+              <div style={{width:"52px",height:"52px",borderRadius:"50%",background:"#ddeaf7",border:"2px solid #9dbfe0",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:"1.6rem"}}>📝</div>
+              <div>
+                <div style={{fontSize:"1.05rem",fontWeight:700,color:"#003865",marginBottom:"4px"}}>Take a Test</div>
+                <div style={{fontSize:"0.82rem",color:"#555",lineHeight:1.5}}>Enter a test code from your teacher. Timed, no feedback until the end.</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── Form screen (class + name) ──
   return (
     <div style={S.page}>
       <div style={{background:"#003865",width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem"}}>
@@ -105,7 +187,6 @@ function StudentLogin({ onStart, onBack }) {
               </div>
             ) : (
               <>
-                {/* Class select */}
                 <div style={{marginBottom:"1rem"}}>
                   <label style={S.lbl}>CLASS / PERIOD</label>
                   <select style={S.inp} value={classId} onChange={e=>{setClassId(e.target.value);setStudentId("");setErr("");}}>
@@ -113,31 +194,293 @@ function StudentLogin({ onStart, onBack }) {
                     {classes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
-
-                {/* Student select */}
-                <div style={{marginBottom:"1rem"}}>
+                <div style={{marginBottom:"1.25rem"}}>
                   <label style={S.lbl}>YOUR NAME</label>
                   <select style={S.inp} value={studentId} onChange={e=>{setStudentId(e.target.value);setErr("");}} disabled={!classId}>
                     <option value="">— Select your name —</option>
                     {(selectedClass?.students || []).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </div>
-
-                {/* Test code */}
-                <div style={{marginBottom:"1.25rem"}}>
-                  <label style={S.lbl}>TEST CODE — given to you by your teacher</label>
-                  <input style={{...S.inp,fontFamily:"monospace",fontSize:"1.1rem",letterSpacing:"0.2em",textTransform:"uppercase",fontWeight:700}}
-                    value={code} onChange={e=>{setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,""));setErr("");}}
-                    onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="e.g. FRACTIONS" maxLength={8}/>
-                </div>
               </>
             )}
-
             {err && <div style={S.errBox}>⚠ {err}</div>}
-            <button onClick={submit} disabled={checking||loading||classes.length===0}
-              style={{...S.btnPri,width:"100%",marginTop:"1rem",opacity:checking?0.7:1}}>
-              {checking ? "Checking code…" : "Continue →"}
+            <button onClick={handleContinueToMode} disabled={loading||classes.length===0}
+              style={{...S.btnPri,width:"100%",marginTop:"0.5rem"}}>
+              Continue →
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Practice Mode ──────────────────────────────────────────
+function PracticeMode({ student, cls, onFinish, onQuit }) {
+  const [questions,   setQuestions]   = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [cur,         setCur]         = useState(0);
+  const [selected,    setSelected]    = useState(null);   // chosen answer for current Q
+  const [revealed,    setRevealed]    = useState(false);  // feedback shown
+  const [history,     setHistory]     = useState([]);     // [{q, chosen, correct, timeSecs}]
+  const [qStart,      setQStart]      = useState(Date.now());
+  const [totalSecs,   setTotalSecs]   = useState(0);
+  const [done,        setDone]        = useState(false);
+  const timerRef = useRef(null);
+
+  // Fetch + shuffle questions
+  useEffect(() => {
+    fetch(`${API}/questions`)
+      .then(r => r.json())
+      .then(data => {
+        const qs = Array.isArray(data) && data.length ? data : FALLBACK_QUESTIONS;
+        // Shuffle
+        const shuffled = [...qs].sort(() => Math.random() - 0.5).slice(0, 10);
+        setQuestions(shuffled);
+        setLoading(false);
+        setQStart(Date.now());
+      })
+      .catch(() => {
+        const shuffled = [...FALLBACK_QUESTIONS].sort(() => Math.random() - 0.5).slice(0, 10);
+        setQuestions(shuffled);
+        setLoading(false);
+        setQStart(Date.now());
+      });
+  }, []);
+
+  // Total session timer
+  useEffect(() => {
+    timerRef.current = setInterval(() => setTotalSecs(s => s + 1), 1000);
+    return () => clearInterval(timerRef.current);
+  }, []);
+
+  function handleChoose(choice) {
+    if (revealed) return;
+    setSelected(choice);
+    setRevealed(true);
+  }
+
+  function handleNext() {
+    const q = questions[cur];
+    const timeSecs = Math.round((Date.now() - qStart) / 1000);
+    const isCorrect = selected === q.correct;
+    setHistory(h => [...h, { q, chosen: selected, correct: isCorrect, timeSecs }]);
+
+    if (cur >= questions.length - 1) {
+      // Ran out of questions — wrap or finish
+      handleFinish([...history, { q, chosen: selected, correct: isCorrect, timeSecs }]);
+    } else {
+      setCur(c => c + 1);
+      setSelected(null);
+      setRevealed(false);
+      setQStart(Date.now());
+    }
+  }
+
+  function handleFinish(finalHistory) {
+    clearInterval(timerRef.current);
+    const h = finalHistory || history;
+    const score = h.filter(x => x.correct).length;
+    const session = {
+      name:        student?.name || "Student",
+      studentName: student?.name || "Student",
+      studentId:   student?.id   || "",
+      className:   cls?.name     || "",
+      classId:     cls?.id       || "",
+      score,
+      total:       h.length,
+      pct:         h.length ? pct(score, h.length) : 0,
+      submitted:   now(),
+      timeUsed:    fmtTime(totalSecs),
+      mode:        "practice",
+      testCode:    "PRACTICE",
+      answers:     Object.fromEntries(h.map(x => [x.q.id, x.chosen])),
+    };
+    onFinish(session, h);
+  }
+
+  function handleQuit() {
+    if (history.length === 0) { onQuit(); return; }
+    handleFinish();
+  }
+
+  if (loading) return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#e8edf2",fontFamily:"sans-serif"}}>
+      <div style={{textAlign:"center",color:"#aaa"}}>
+        <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>🎯</div>
+        Loading questions…
+      </div>
+    </div>
+  );
+
+  if (done || questions.length === 0) return null;
+
+  const q = questions[cur];
+  const correct = q.correct;
+  const streak  = (() => { let s=0; for(let i=history.length-1;i>=0;i--){ if(history[i].correct) s++; else break; } return s; })();
+  const totalCorrect = history.filter(x=>x.correct).length;
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",minHeight:"100vh",fontFamily:"sans-serif",background:"#e8edf2"}}>
+      {/* Header */}
+      <div style={{background:"#1a6e2e",color:"#fff",padding:"0.75rem 1.5rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
+        <div style={{fontSize:"1rem",fontWeight:700}}>🎯 Practice Mode</div>
+        <div style={{marginLeft:"auto",display:"flex",gap:"1.25rem",alignItems:"center"}}>
+          {streak >= 3 && <div style={{fontSize:"0.75rem",background:"rgba(255,255,255,.2)",padding:"3px 10px",borderRadius:"12px",fontWeight:700}}>🔥 {streak} streak!</div>}
+          <div style={{textAlign:"center"}}>
+            <div style={{fontSize:"0.55rem",opacity:.7,letterSpacing:"0.08em"}}>SCORE</div>
+            <div style={{fontSize:"0.9rem",fontWeight:700}}>{totalCorrect}/{history.length}</div>
+          </div>
+          <div style={{textAlign:"center"}}>
+            <div style={{fontSize:"0.55rem",opacity:.7,letterSpacing:"0.08em"}}>TIME</div>
+            <div style={{fontSize:"0.9rem",fontWeight:700,fontFamily:"monospace"}}>{fmtTime(totalSecs)}</div>
+          </div>
+          <div style={{textAlign:"center"}}>
+            <div style={{fontSize:"0.55rem",opacity:.7,letterSpacing:"0.08em"}}>STUDENT</div>
+            <div style={{fontSize:"0.82rem",fontWeight:600}}>{student?.name}</div>
+          </div>
+          <button onClick={handleQuit}
+            style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"5px 12px",cursor:"pointer",fontSize:"0.75rem",fontWeight:600}}>
+            Quit
+          </button>
+        </div>
+      </div>
+
+      {/* Question counter strip */}
+      <div style={{background:"#155a27",color:"#a8e6b8",padding:"0.4rem 1.5rem",fontSize:"0.7rem",display:"flex",gap:"1rem"}}>
+        <span>Question {history.length + 1} of 10</span>
+        <span style={{opacity:.6}}>·</span>
+        <span style={{color:"#fff",fontWeight:700}}>{q.standard}</span>
+        {q.dok && <><span style={{opacity:.6}}>·</span><span>DOK {q.dok}</span></>}
+      </div>
+
+      {/* Question area */}
+      <div style={{flex:1,display:"flex",justifyContent:"center",padding:"1.5rem 1rem 2rem",overflowY:"auto"}}>
+        <div style={{width:"100%",maxWidth:"680px",display:"flex",flexDirection:"column",gap:"1rem"}}>
+
+          {/* Question card */}
+          <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"6px",padding:"1.5rem 1.75rem",boxShadow:"0 2px 8px rgba(0,0,0,.05)"}}>
+            <p style={{fontSize:"1.08rem",fontFamily:"Georgia,serif",color:"#0f0f0f",lineHeight:1.75,margin:0}}>
+              <MathText text={q.question}/>
+            </p>
+          </div>
+
+          {/* Choices */}
+          <div style={{display:"flex",flexDirection:"column",gap:"0.6rem"}}>
+            {q.choices.map((choice, i) => {
+              const isChosen  = selected === choice;
+              const isCorrect = choice === correct;
+              let bg = "#fff", border = "2px solid #c8d3dd", color = "#1a1a1a";
+              if (revealed) {
+                if (isCorrect)       { bg="#f0faf2"; border="2px solid #1a6e2e"; color="#1a6e2e"; }
+                else if (isChosen)   { bg="#fdf2f2"; border="2px solid #8b1a1a"; color="#8b1a1a"; }
+                else                 { bg="#fafbfc"; border="2px solid #e0e0e0"; color="#aaa"; }
+              } else if (isChosen)   { bg="#ddeaf7"; border="2px solid #003865"; }
+
+              return (
+                <button key={i} onClick={() => handleChoose(choice)} disabled={revealed}
+                  style={{background:bg,border,borderRadius:"6px",padding:"0.9rem 1.25rem",textAlign:"left",cursor:revealed?"default":"pointer",display:"flex",alignItems:"center",gap:"1rem",transition:"all .15s"}}>
+                  <div style={{width:"30px",height:"30px",borderRadius:"50%",border:`2px solid ${revealed?(isCorrect?"#1a6e2e":isChosen?"#8b1a1a":"#ddd"):"#9aabba"}`,background:revealed?(isCorrect?"#1a6e2e":isChosen?"#8b1a1a":"#f0f0f0"):(isChosen?"#003865":"#fff"),display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <span style={{fontSize:"0.75rem",fontWeight:700,color:revealed?(isCorrect||isChosen?"#fff":"#aaa"):(isChosen?"#fff":"#667")}}>
+                      {revealed && isCorrect ? "✓" : revealed && isChosen ? "✗" : LETTERS[i]}
+                    </span>
+                  </div>
+                  <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color,flex:1}}>
+                    <MathText text={choice}/>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Feedback banner */}
+          {revealed && (
+            <div style={{borderRadius:"6px",padding:"1rem 1.25rem",background:selected===correct?"#f0faf2":"#fdf2f2",border:`1px solid ${selected===correct?"#b3dfc0":"#f0b8b8"}`}}>
+              <div style={{fontSize:"1rem",fontWeight:700,color:selected===correct?"#1a6e2e":"#8b1a1a",marginBottom:q.explanation?"6px":0}}>
+                {selected===correct ? "✓ Correct!" : `✗ The correct answer is: ${correct}`}
+              </div>
+              {q.explanation && (
+                <div style={{fontSize:"0.85rem",color:"#444",lineHeight:1.6}}>
+                  <MathText text={q.explanation}/>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Next button */}
+          {revealed && (
+            <div style={{display:"flex",gap:"0.75rem"}}>
+              <button onClick={handleNext}
+                style={{flex:1,background:"#003865",border:"none",borderRadius:"6px",padding:"0.85rem",fontSize:"0.95rem",cursor:"pointer",color:"#fff",fontWeight:700}}>
+                Next Question →
+              </button>
+              <button onClick={handleQuit}
+                style={{background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"6px",padding:"0.85rem 1.25rem",fontSize:"0.85rem",cursor:"pointer",color:"#555",fontWeight:600}}>
+                Finish
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Practice Results ───────────────────────────────────────
+function PracticeResults({ session, history, onReset }) {
+  const p = session.pct;
+  return (
+    <div style={{minHeight:"100vh",background:"#e8edf2",fontFamily:"sans-serif",display:"flex",flexDirection:"column"}}>
+      <div style={{background:"#1a6e2e",color:"#fff",padding:"0.85rem 1.5rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+        <div style={{fontSize:"1rem",fontWeight:700}}>🎯 Practice Session Complete</div>
+      </div>
+      <div style={{flex:1,display:"flex",justifyContent:"center",padding:"2rem 1rem"}}>
+        <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"6px",width:"100%",maxWidth:"640px",boxShadow:"0 2px 12px rgba(0,0,0,.07)",overflow:"hidden"}}>
+          {/* Score header */}
+          <div style={{background:"#f0faf2",borderBottom:"1px solid #c8d3dd",padding:"1.5rem 1.75rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#888",marginBottom:"4px"}}>PRACTICE SCORE</div>
+              <div style={{fontSize:"1rem",fontWeight:700,color:"#1a1a1a"}}>{session.studentName}</div>
+              <div style={{fontSize:"2rem",fontWeight:700,color:lvlC(p),fontFamily:"Georgia,serif",marginTop:"4px"}}>{session.score}/{session.total} <span style={{fontSize:"1rem",opacity:.6}}>({p}%)</span></div>
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:"0.62rem",color:"#888",marginBottom:"4px"}}>TIME</div>
+              <div style={{fontSize:"1.1rem",fontWeight:700,color:"#003865",fontFamily:"monospace"}}>{session.timeUsed}</div>
+              <div style={{marginTop:"8px",fontSize:"0.75rem",background:"#ddeaf7",color:"#003865",border:"1px solid #9dbfe0",borderRadius:"3px",padding:"3px 10px",fontWeight:700}}>📝 PRACTICE</div>
+            </div>
+          </div>
+
+          {/* Per-question review */}
+          <div style={{padding:"1.25rem 1.5rem"}}>
+            <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"0.75rem"}}>QUESTION REVIEW</div>
+            {history.map((item, i) => {
+              const { q, chosen, correct: isCorrect } = item;
+              return (
+                <div key={q.id} style={{display:"flex",gap:"0.75rem",marginBottom:"0.6rem",padding:"0.75rem 0.9rem",background:isCorrect?"#f0faf2":"#fdf2f2",border:`1px solid ${isCorrect?"#b3dfc0":"#f0b8b8"}`,borderRadius:"4px"}}>
+                  <div style={{width:"22px",height:"22px",borderRadius:"50%",background:isCorrect?"#1a6e2e":"#8b1a1a",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:"2px"}}>
+                    <span style={{color:"#fff",fontSize:"0.7rem",fontWeight:700}}>{i+1}</span>
+                  </div>
+                  <div style={{flex:1,fontSize:"0.82rem"}}>
+                    <div style={{color:"#777",fontSize:"0.63rem",letterSpacing:"0.08em",marginBottom:"2px"}}>{q.standard}{item.timeSecs ? ` · ${item.timeSecs}s` : ""}</div>
+                    <div style={{color:"#1a1a1a",fontFamily:"Georgia,serif",marginBottom:isCorrect?0:"4px"}}><MathText text={q.question}/></div>
+                    {!isCorrect && (
+                      <div style={{fontSize:"0.78rem"}}>
+                        <span style={{color:"#1a6e2e"}}>Correct: <strong><MathText text={q.correct}/></strong></span>
+                        {chosen && <span style={{color:"#8b1a1a"}}> · Your answer: <MathText text={chosen}/></span>}
+                      </div>
+                    )}
+                    {q.explanation && !isCorrect && (
+                      <div style={{fontSize:"0.75rem",color:"#555",marginTop:"4px",fontStyle:"italic"}}><MathText text={q.explanation}/></div>
+                    )}
+                  </div>
+                  <span style={{fontWeight:700,fontSize:"0.9rem",color:isCorrect?"#1a6e2e":"#8b1a1a"}}>{isCorrect?"✓":"✗"}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{padding:"1rem 1.5rem",borderTop:"1px solid #dde3e9",display:"flex",gap:"0.75rem",justifyContent:"flex-end"}}>
+            <button onClick={onReset} style={{background:"#1a6e2e",color:"#fff",border:"none",borderRadius:"3px",padding:"0.65rem 1.75rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600}}>Practice Again</button>
           </div>
         </div>
       </div>
@@ -344,23 +687,32 @@ function StudentResults({ session, questions, onReset }) {
 
 // ── Main shell ─────────────────────────────────────────────
 export default function MathTest({ onBack }) {
-  const [screen,       setScreen]       = useState("login");
-  const [student,      setStudent]      = useState(null);   // {id, name}
-  const [cls,          setCls]          = useState(null);   // {id, name}
-  const [testCode,     setTestCode]     = useState("");
-  const [finalSession, setFinalSession] = useState(null);
-  const [questions,    setQuestions]    = useState(FALLBACK_QUESTIONS);
+  const [screen,        setScreen]        = useState("login");
+  const [student,       setStudent]       = useState(null);
+  const [cls,           setCls]           = useState(null);
+  const [testCode,      setTestCode]      = useState("");
+  const [finalSession,  setFinalSession]  = useState(null);
+  const [practiceHistory, setPracticeHistory] = useState([]);
+  const [questions,     setQuestions]     = useState(FALLBACK_QUESTIONS);
 
-  function handleStart(studentObj, classObj, code, testInfo) {
-    setStudent(studentObj);
-    setCls(classObj);
-    setTestCode(code);
+  function reset() {
+    setStudent(null); setCls(null); setTestCode("");
+    setFinalSession(null); setPracticeHistory([]);
+    setScreen("login");
+  }
+
+  function handleStartTest(studentObj, classObj, code, testInfo) {
+    setStudent(studentObj); setCls(classObj); setTestCode(code);
     if (testInfo?.questions?.length) setQuestions(testInfo.questions);
     setScreen("test");
   }
 
-  async function handleFinish(session) {
-    // Enrich session with roster data before saving
+  function handleStartPractice(studentObj, classObj) {
+    setStudent(studentObj); setCls(classObj);
+    setScreen("practice");
+  }
+
+  async function handleFinishTest(session) {
     const enriched = {
       ...session,
       studentId:   student?.id   || "",
@@ -368,8 +720,8 @@ export default function MathTest({ onBack }) {
       classId:     cls?.id       || "",
       className:   cls?.name     || "",
       testCode,
+      mode:        "test",
     };
-    // saveSession was already called in StudentTest — we re-save the enriched version
     try {
       await fetch(`${API}/submit`, {
         method:"POST", headers:{"Content-Type":"application/json"},
@@ -380,14 +732,30 @@ export default function MathTest({ onBack }) {
     setScreen("results");
   }
 
+  async function handleFinishPractice(session, history) {
+    try {
+      await fetch(`${API}/submit`, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify(session),
+      });
+    } catch {}
+    setFinalSession(session);
+    setPracticeHistory(history);
+    setScreen("practice-results");
+  }
+
   if (screen === "login")
-    return <StudentLogin onStart={handleStart} onBack={onBack}/>;
+    return <StudentLogin onStartTest={handleStartTest} onStartPractice={handleStartPractice} onBack={onBack}/>;
+
+  if (screen === "practice")
+    return <PracticeMode student={student} cls={cls} onFinish={handleFinishPractice} onQuit={reset}/>;
+
+  if (screen === "practice-results")
+    return <PracticeResults session={finalSession} history={practiceHistory} onReset={reset}/>;
 
   if (screen === "test")
-    return <StudentTest studentName={student?.name || ""} questions={questions}
-      onFinish={handleFinish}/>;
+    return <StudentTest studentName={student?.name || ""} questions={questions} onFinish={handleFinishTest}/>;
 
   if (screen === "results")
-    return <StudentResults session={finalSession} questions={questions}
-      onReset={()=>{ setStudent(null); setCls(null); setTestCode(""); setFinalSession(null); setScreen("login"); onBack(); }}/>;
+    return <StudentResults session={finalSession} questions={questions} onReset={()=>{ reset(); onBack(); }}/>;
 }
