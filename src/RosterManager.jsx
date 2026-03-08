@@ -20,7 +20,7 @@ function PinEditor({ pin, onSave, onRegen }) {
 
   async function save() {
     const clean = val.trim();
-    if (clean.length !== 5 || !/^\d{5}$/.test(clean)) { setErr("Must be exactly 5 digits"); return; }
+    if (clean.length !== 5 || !/^[0-9]{5}$/.test(clean)) { setErr("Must be exactly 5 digits"); return; }
     const ok = await onSave(clean);
     if (ok === true) { setEditing(false); setErr(""); }
     else             { setErr(ok || "Already in use"); }
@@ -171,9 +171,7 @@ export default function RosterManager() {
   const [csvImporting, setCsvImporting] = useState(false);
 
   function parseCSV(text) {
-    const lines = text.trim().split(/
-?
-/).filter(l => l.trim());
+    const lines = text.trim().replace(/\r/g, "").split("\n").filter(l => l.trim());
     if (!lines.length) return { err:"Empty file", rows:[] };
     // Detect header row
     const first = lines[0].toLowerCase();
@@ -187,7 +185,7 @@ export default function RosterManager() {
       const name = parts[0]?.trim().replace(/^"|"$/g,"");
       const pin  = parts[1]?.trim().replace(/^"|"$/g,"");
       if (!name) { errs.push(`Row ${i+2}: missing name`); return; }
-      if (pin && (pin.length !== 5 || !/^\d{5}$/.test(pin))) {
+      if (pin && (pin.length !== 5 || !/^[0-9]{5}$/.test(pin))) {
         errs.push(`Row ${i+2}: PIN must be 5 digits (got "${pin}")`);
         return;
       }
