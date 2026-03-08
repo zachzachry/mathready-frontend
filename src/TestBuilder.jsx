@@ -540,7 +540,9 @@ export default function TestBuilder() {
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:"0.9rem",fontWeight:700,color:"#1a1a1a"}}>{t.name}</div>
                         <div style={{fontSize:"0.72rem",color:"#888",marginTop:"2px"}}>
-                          {t.count} question{t.count!==1?"s":""} · Saved {t.saved_at}
+                          {t.type==="drill"
+                            ? `⚡ Fluency Drill · ${t.drill_count||10} questions · Saved ${t.saved_at}`
+                            : `${t.count} question${t.count!==1?"s":""} · Saved ${t.saved_at}`}
                         </div>
                       </div>
                       <div style={{display:"flex",gap:"0.4rem",flexShrink:0}}>
