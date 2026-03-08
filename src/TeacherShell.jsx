@@ -4,21 +4,23 @@ import Dashboard from "./Dashboard";
 import QuestionBuilder from "./QuestionBuilder";
 import PDFImporter from "./PDFImporter";
 import TestBuilder from "./TestBuilder";
+import RosterManager from "./RosterManager";
 import { TEACHER_CODE, S } from "./shared/constants";
 
 const TOOLS = [
-  { id:"dashboard", icon:"📊", label:"Live Dashboard",     sub:"Scores & item analysis" },
-  { id:"builder",   icon:"🔨", label:"Question Builder",   sub:"Build & edit questions"  },
-  { id:"importer",  icon:"📄", label:"PDF Importer",       sub:"Extract from PDFs"       },
-  { id:"testbuilder",icon:"🚀", label:"Test Builder",       sub:"Select & activate tests"  },
+  { id:"dashboard",   icon:"📊", label:"Live Dashboard",   sub:"Scores & item analysis" },
+  { id:"roster",      icon:"👥", label:"Class Roster",      sub:"Manage students & periods" },
+  { id:"testbuilder", icon:"📚", label:"Test Builder",      sub:"Build, save & share tests" },
+  { id:"builder",     icon:"🔨", label:"Question Builder",  sub:"Create & edit questions" },
+  { id:"importer",    icon:"📄", label:"PDF Importer",      sub:"Extract from PDFs" },
 ];
 
 function TeacherLogin({ onEnter, onBack }) {
-  const [code,setCode] = useState("");
-  const [err,setErr]   = useState("");
+  const [code, setCode] = useState("");
+  const [err,  setErr]  = useState("");
 
   function submit() {
-    if (code.trim().toUpperCase()!==TEACHER_CODE) { setErr("Invalid code."); return; }
+    if (code.trim().toUpperCase() !== TEACHER_CODE) { setErr("Invalid code."); return; }
     onEnter();
   }
 
@@ -34,7 +36,7 @@ function TeacherLogin({ onEnter, onBack }) {
           <input style={{...S.inp,fontFamily:"monospace",fontSize:"1rem",letterSpacing:"0.15em",textTransform:"uppercase"}}
             value={code} onChange={e=>{setCode(e.target.value);setErr("");}}
             onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="Enter code" autoFocus/>
-          {err&&<div style={{...S.errBox,marginTop:"0.75rem"}}>⚠ {err}</div>}
+          {err && <div style={{...S.errBox,marginTop:"0.75rem"}}>⚠ {err}</div>}
           <button onClick={submit} style={{...S.btnPri,width:"100%",marginTop:"1.25rem"}}>Enter →</button>
           <button onClick={onBack}  style={{...S.btnSec,width:"100%",marginTop:"0.5rem"}}>← Back</button>
         </div>
@@ -44,7 +46,7 @@ function TeacherLogin({ onEnter, onBack }) {
 }
 
 function TeacherApp({ onBack }) {
-  const [tool, setTool] = useState("dashboard");
+  const [tool, setTool]             = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
 
   return (
@@ -52,7 +54,7 @@ function TeacherApp({ onBack }) {
       <TopBar title="Teacher Tools — Grade 5 Mathematics" right={
         <div style={{display:"flex",gap:"0.75rem",alignItems:"center"}}>
           <button onClick={()=>setSidebarOpen(o=>!o)} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"5px 10px",cursor:"pointer",fontSize:"0.72rem"}}>
-            {sidebarOpen?"◀ Hide":"▶ Menu"}
+            {sidebarOpen ? "◀ Hide" : "▶ Menu"}
           </button>
           <button onClick={onBack} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"5px 12px",cursor:"pointer",fontSize:"0.75rem"}}>
             ← Exit
@@ -61,18 +63,16 @@ function TeacherApp({ onBack }) {
       }/>
 
       <div style={{display:"flex",flex:1,overflow:"hidden"}}>
-
-        {/* Sidebar */}
         {sidebarOpen && (
           <div style={{width:"220px",background:"#1a2e44",flexShrink:0,display:"flex",flexDirection:"column",overflowY:"auto"}}>
             <div style={{padding:"0.85rem 1rem",fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.14em",color:"rgba(255,255,255,.4)",borderBottom:"1px solid rgba(255,255,255,.08)"}}>
               TEACHER TOOLS
             </div>
-            {TOOLS.map(t=>{
-              const active = tool===t.id;
+            {TOOLS.map(t => {
+              const active = tool === t.id;
               return (
                 <button key={t.id} onClick={()=>{ setTool(t.id); if(window.innerWidth<768) setSidebarOpen(false); }}
-                  style={{display:"flex",alignItems:"center",gap:"0.75rem",padding:"0.9rem 1rem",background:active?"rgba(255,255,255,.1)":"transparent",borderLeft:`3px solid ${active?"#4da6ff":"transparent"}`,border:"none",borderLeft:active?"3px solid #4da6ff":"3px solid transparent",cursor:"pointer",textAlign:"left",width:"100%",transition:"all .1s"}}>
+                  style={{display:"flex",alignItems:"center",gap:"0.75rem",padding:"0.9rem 1rem",background:active?"rgba(255,255,255,.1)":"transparent",borderLeft:active?"3px solid #4da6ff":"3px solid transparent",border:"none",borderLeft:active?"3px solid #4da6ff":"3px solid transparent",cursor:"pointer",textAlign:"left",width:"100%",transition:"all .1s"}}>
                   <span style={{fontSize:"1.2rem"}}>{t.icon}</span>
                   <div>
                     <div style={{fontSize:"0.82rem",fontWeight:700,color:active?"#fff":"rgba(255,255,255,.75)"}}>{t.label}</div>
@@ -84,12 +84,12 @@ function TeacherApp({ onBack }) {
           </div>
         )}
 
-        {/* Main content area */}
         <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-          {tool==="dashboard" && <Dashboard />}
-          {tool==="builder"   && <div style={{flex:1,overflowY:"auto"}}><QuestionBuilder /></div>}
-          {tool==="importer"  && <div style={{flex:1,overflowY:"auto"}}><PDFImporter /></div>}
+          {tool==="dashboard"   && <Dashboard />}
+          {tool==="roster"      && <RosterManager />}
           {tool==="testbuilder" && <TestBuilder />}
+          {tool==="builder"     && <div style={{flex:1,overflowY:"auto"}}><QuestionBuilder /></div>}
+          {tool==="importer"    && <div style={{flex:1,overflowY:"auto"}}><PDFImporter /></div>}
         </div>
       </div>
     </div>
@@ -99,5 +99,5 @@ function TeacherApp({ onBack }) {
 export default function TeacherShell({ onBack }) {
   const [loggedIn, setLoggedIn] = useState(false);
   if (!loggedIn) return <TeacherLogin onEnter={()=>setLoggedIn(true)} onBack={onBack}/>;
-  return <TeacherApp onBack={()=>{setLoggedIn(false);onBack();}}/>;
+  return <TeacherApp onBack={()=>{ setLoggedIn(false); onBack(); }}/>;
 }
