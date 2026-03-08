@@ -219,7 +219,8 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
           <span style={{ fontSize: "0.68rem", fontWeight: 700, color: isComplete ? "#1a6e2e" : "#667" }}>{index+1}</span>
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", gap: "0.4rem", marginBottom: "2px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "0.4rem", marginBottom: "2px", flexWrap: "wrap", alignItems: "center" }}>
+            {q.id && <span style={{ fontSize: "0.65rem", fontWeight: 700, fontFamily: "monospace", color: "#fff", background: "#003865", padding: "1px 7px", borderRadius: "3px", letterSpacing:"0.05em" }}>{q.id}</span>}
             {q.standard && <span style={{ fontSize: "0.6rem", fontWeight: 700, color: "#003865", background: "#ddeaf7", padding: "1px 6px", borderRadius: "2px", border: "1px solid #b3cde8" }}>{q.standard}</span>}
             {q.short    && <span style={{ fontSize: "0.6rem", color: "#666", padding: "1px 6px" }}>{q.short}</span>}
             {q.dok      && <span style={{ fontSize: "0.6rem", fontWeight: 700, color: "#7a4e00", background: "#fff3cd", padding: "1px 6px", borderRadius: "2px", border: "1px solid #ffc107" }}>DOK {q.dok}</span>}
@@ -475,6 +476,124 @@ export default function QuestionBuilder() {
     setSaving(false);
   }
 
+  // ── CSV Import ──────────────────────────────────────────
+  const csvRef = useRef();
+  const [csvPanel,   setCsvPanel]   = useState(false);
+  const [csvPreview, setCsvPreview] = useState(null);
+  const [csvErr,     setCsvErr]     = useState("");
+  const [csvImporting, setCsvImporting] = useState(false);
+  const [csvResult,  setCsvResult]  = useState(null);
+
+  const CSV_COLS = ["id","standard","short","dok","question","choiceA","choiceB","choiceC","choiceD","correct"];
+
+  function downloadTemplate() {
+    const header = CSV_COLS.join(",");
+    const example = [
+      "","5.NR.2.1","Multiply whole numbers","1",
+      "What is 24 × 13?","302","312","322","332","312"
+    ].map(v => `"${v}"`).join(",");
+    const blob = new Blob([header + "\n" + example + "\n"], { type:"text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "mathready_questions_template.csv";
+    a.click();
+  }
+
+  function parseQuestionCSV(text) {
+    const lines = text.trim().replace(/\r/g,"").split("\n").filter(l=>l.trim());
+    if (!lines.length) return { rows:[], errs:["Empty file"] };
+    // Detect and skip header row
+    const first = lines[0].toLowerCase();
+    const hasHeader = CSV_COLS.some(c => first.includes(c));
+    const dataLines = hasHeader ? lines.slice(1) : lines;
+
+    const rows = [], errs = [];
+    dataLines.forEach((line, i) => {
+      const rowNum = i + (hasHeader ? 2 : 1);
+      // Parse CSV respecting quoted fields
+      const parts = [];
+      let cur = "", inQ = false;
+      for (let ci = 0; ci < line.length; ci++) {
+        const ch = line[ci];
+        if (ch === '"') { inQ = !inQ; }
+        else if (ch === ',' && !inQ) { parts.push(cur.trim()); cur = ""; }
+        else cur += ch;
+      }
+      parts.push(cur.trim());
+
+      // Support both with and without id column (9 or 10 cols)
+      let id, standard, short, dok, question, choiceA, choiceB, choiceC, choiceD, correct;
+      if (parts.length >= 10) {
+        [id,standard,short,dok,question,choiceA,choiceB,choiceC,choiceD,correct] = parts;
+      } else {
+        [standard,short,dok,question,choiceA,choiceB,choiceC,choiceD,correct] = parts;
+        id = "";
+      }
+      const rowErrs = [];
+      if (!standard?.trim()) rowErrs.push("missing standard");
+      if (!short?.trim())    rowErrs.push("missing skill label");
+      if (!dok?.trim() || isNaN(parseInt(dok))) rowErrs.push("dok must be 1-4");
+      if (!question?.trim()) rowErrs.push("missing question");
+      if (!choiceA?.trim() || !choiceB?.trim() || !choiceC?.trim() || !choiceD?.trim()) rowErrs.push("need 4 choices");
+      if (!correct?.trim()) rowErrs.push("missing correct answer");
+      if (correct?.trim() && ![choiceA,choiceB,choiceC,choiceD].map(c=>c?.trim()).includes(correct.trim())) {
+        rowErrs.push("correct answer must match one of the 4 choices exactly");
+      }
+      if (rowErrs.length) { errs.push(`Row ${rowNum}: ${rowErrs.join(", ")}`); return; }
+
+      rows.push({
+        ...(id?.trim() ? { id: id.trim() } : {}),
+        standard: standard.trim(),
+        short:    short.trim(),
+        dok:      parseInt(dok),
+        question: question.trim(),
+        choices:  [choiceA,choiceB,choiceC,choiceD].map(c=>c.trim()),
+        correct:  correct.trim(),
+      });
+    });
+    return { rows, errs };
+  }
+
+  function handleCSVFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCsvErr(""); setCsvPreview(null); setCsvResult(null);
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const { rows, errs } = parseQuestionCSV(ev.target.result);
+      if (errs.length && !rows.length) { setCsvErr(errs.join(" · ")); return; }
+      setCsvPreview({ rows, errs });
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }
+
+  async function importCSVQuestions(forceReassign = false) {
+    if (!csvPreview?.rows?.length) return;
+    setCsvImporting(true); setCsvErr("");
+    try {
+      // If forceReassign, strip IDs from rows that were flagged as duplicates
+      const toUpload = forceReassign
+        ? csvPreview.rows.map(r => csvPreview.duplicateIds?.includes(r.id) ? {...r, id:""} : r)
+        : csvPreview.rows;
+      const r = await fetch(`${API}/questions/seed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(toUpload),
+      });
+      const d = await r.json();
+      // Show duplicate warning before final success
+      if (d.duplicate_count > 0 && !forceReassign) {
+        setCsvPreview(prev => ({ ...prev, duplicateIds: d.duplicates }));
+        setCsvResult({ ...d, pendingDuplicates: true });
+      } else {
+        setCsvResult(d);
+        setCsvPreview(null);
+      }
+    } catch { setCsvErr("Upload failed. Check your connection."); }
+    setCsvImporting(false);
+  }
+
   const complete = questions.filter(q => q.question && q.standard && q.dok && (q.type==="plotpoint" ? (Array.isArray(q.answer)&&q.answer.length===2) : (q.choices.filter(c=>c).length===4 && q.correct))).length;
 
   return (
@@ -488,6 +607,10 @@ export default function QuestionBuilder() {
         </div>
         <div style={{ display: "flex", gap: "0.65rem", alignItems: "center" }}>
           <span style={{ fontSize: "0.75rem", opacity: .75 }}>{complete}/{questions.length} complete</span>
+          <button onClick={()=>{setCsvPanel(p=>!p);setCsvPreview(null);setCsvErr("");setCsvResult(null);}}
+            style={{ background:"#4a7fa5", border:"none", borderRadius:"3px", padding:"6px 14px", fontSize:"0.78rem", fontWeight:700, color:"#fff", cursor:"pointer" }}>
+            📥 Import CSV
+          </button>
           <button onClick={seedBank} disabled={saving}
             style={{ background:"#7a4e00", border:"none", borderRadius:"3px", padding:"6px 14px", fontSize:"0.78rem", fontWeight:700, color:"#fff", cursor:"pointer", opacity:saving?0.6:1 }}
             title="Re-load the 100 built-in questions into the bank">
@@ -506,7 +629,128 @@ export default function QuestionBuilder() {
 
       <div style={{ maxWidth: "780px", margin: "0 auto", padding: "1.5rem 1rem" }}>
 
-        {/* DOK legend */}
+        {/* CSV Import Panel */}
+      {csvPanel && (
+        <div style={{background:"#fff",border:"1px solid #b3cde8",borderRadius:"6px",padding:"1.25rem",marginBottom:"1rem",boxShadow:"0 2px 12px rgba(0,56,101,.08)"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1rem"}}>
+            <div>
+              <div style={{fontSize:"0.95rem",fontWeight:700,color:"#003865"}}>Import Questions from CSV</div>
+              <div style={{fontSize:"0.75rem",color:"#888",marginTop:"2px"}}>
+                One question per row. ID column optional — leave blank to auto-assign (Q00001 format). Columns: id, standard, short, dok, question, choiceA–D, correct
+              </div>
+            </div>
+            <button onClick={downloadTemplate}
+              style={{background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"6px 14px",fontSize:"0.78rem",fontWeight:600,cursor:"pointer",color:"#003865"}}>
+              ⬇ Download Template
+            </button>
+          </div>
+
+          {/* Upload area */}
+          <input ref={csvRef} type="file" accept=".csv,.txt" onChange={handleCSVFile} style={{display:"none"}}/>
+          <div onClick={()=>csvRef.current?.click()}
+            style={{border:"2px dashed #b3cde8",borderRadius:"6px",padding:"1.5rem",textAlign:"center",cursor:"pointer",background:"#f7fafd",marginBottom:"1rem"}}
+            onDragOver={e=>{e.preventDefault();e.currentTarget.style.background="#ddeaf7";}}
+            onDragLeave={e=>{e.currentTarget.style.background="#f7fafd";}}
+            onDrop={e=>{e.preventDefault();e.currentTarget.style.background="#f7fafd";const f=e.dataTransfer.files[0];if(f){const dt=new DataTransfer();dt.items.add(f);csvRef.current.files=dt.files;handleCSVFile({target:{files:[f],value:""}})}}}>
+            <div style={{fontSize:"1.5rem",marginBottom:"6px"}}>📄</div>
+            <div style={{fontSize:"0.85rem",fontWeight:600,color:"#4a7fa5"}}>Click to choose a CSV file</div>
+            <div style={{fontSize:"0.72rem",color:"#aaa",marginTop:"4px"}}>or drag and drop here</div>
+          </div>
+
+          {/* Errors */}
+          {csvErr && (
+            <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"4px",padding:"0.65rem 0.9rem",fontSize:"0.78rem",color:"#8b1a1a",marginBottom:"0.75rem"}}>
+              ⚠ {csvErr}
+            </div>
+          )}
+
+          {/* Row-level warnings */}
+          {csvPreview?.errs?.length > 0 && (
+            <div style={{background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"4px",padding:"0.65rem 0.9rem",fontSize:"0.75rem",color:"#7a4e00",marginBottom:"0.75rem"}}>
+              <strong>⚠ {csvPreview.errs.length} row{csvPreview.errs.length!==1?"s":""} skipped:</strong>
+              <ul style={{margin:"4px 0 0",paddingLeft:"1.25rem"}}>
+                {csvPreview.errs.map((e,i)=><li key={i}>{e}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {/* Preview table */}
+          {csvPreview?.rows?.length > 0 && (
+            <div>
+              <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"6px"}}>
+                PREVIEW — {csvPreview.rows.length} question{csvPreview.rows.length!==1?"s":""} ready to import
+              </div>
+              <div style={{border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden",marginBottom:"0.85rem"}}>
+                <div style={{display:"grid",gridTemplateColumns:"56px 110px 60px 30px 1fr 80px",background:"#f0f4f8",padding:"0.4rem 0.75rem",gap:"0.5rem",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.08em",color:"#555"}}>
+                  <span>ID</span><span>STANDARD</span><span>SKILL</span><span>DOK</span><span>QUESTION</span><span>CORRECT</span>
+                </div>
+                <div style={{maxHeight:"220px",overflowY:"auto"}}>
+                  {csvPreview.rows.map((r,i)=>(
+                    <div key={i} style={{display:"grid",gridTemplateColumns:"56px 110px 60px 30px 1fr 80px",padding:"0.45rem 0.75rem",gap:"0.5rem",fontSize:"0.78rem",borderTop:"1px solid #eef1f4",alignItems:"center"}}>
+                      <span style={{fontFamily:"monospace",fontSize:"0.72rem",color:r.id?"#003865":"#bbb"}}>{r.id||"auto"}</span>
+                      <span style={{color:"#003865",fontWeight:700,fontSize:"0.72rem"}}>{r.standard}</span>
+                      <span style={{color:"#555",fontSize:"0.72rem"}}>{r.short}</span>
+                      <span style={{color:"#888",textAlign:"center"}}>{r.dok}</span>
+                      <span style={{color:"#1a1a1a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.question}</span>
+                      <span style={{color:"#1a6e2e",fontWeight:600,fontSize:"0.75rem",overflow:"hidden",textOverflow:"ellipsis"}}>{r.correct}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <button onClick={importCSVQuestions} disabled={csvImporting}
+                style={{background:"#1a6e2e",color:"#fff",border:"none",borderRadius:"4px",padding:"0.65rem 1.5rem",fontSize:"0.85rem",fontWeight:700,cursor:"pointer",opacity:csvImporting?0.7:1,width:"100%"}}>
+                {csvImporting ? "Importing…" : `✓ Add ${csvPreview.rows.length} Question${csvPreview.rows.length!==1?"s":""} to Bank`}
+              </button>
+            </div>
+          )}
+
+          {/* Success / duplicate warning */}
+          {csvResult && (
+            <div>
+              {csvResult.added > 0 && (
+                <div style={{background:"#f0faf2",border:"1px solid #b3dfc0",borderRadius:"4px",padding:"0.75rem 1rem",marginBottom:"0.75rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+                  <span style={{fontSize:"1.3rem"}}>✅</span>
+                  <div>
+                    <div style={{fontWeight:700,color:"#1a6e2e",fontSize:"0.9rem"}}>{csvResult.added} question{csvResult.added!==1?"s":""} added to bank</div>
+                    <div style={{fontSize:"0.72rem",color:"#888"}}>Bank now has {csvResult.total} total questions</div>
+                  </div>
+                </div>
+              )}
+              {csvResult.pendingDuplicates && csvResult.duplicate_count > 0 && (
+                <div style={{background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"4px",padding:"0.85rem 1rem"}}>
+                  <div style={{fontWeight:700,color:"#7a4e00",marginBottom:"6px"}}>
+                    ⚠ {csvResult.duplicate_count} ID{csvResult.duplicate_count!==1?"s":""} already exist in the bank
+                  </div>
+                  <div style={{fontSize:"0.75rem",color:"#555",marginBottom:"8px"}}>
+                    <strong>Conflicting IDs:</strong> {csvResult.duplicates.join(", ")}
+                  </div>
+                  <div style={{fontSize:"0.75rem",color:"#555",marginBottom:"0.75rem"}}>
+                    These questions were skipped. What would you like to do?
+                  </div>
+                  <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap"}}>
+                    <button onClick={()=>importCSVQuestions(true)}
+                      style={{background:"#003865",color:"#fff",border:"none",borderRadius:"3px",padding:"6px 14px",cursor:"pointer",fontSize:"0.78rem",fontWeight:700}}>
+                      Auto-assign new IDs and import
+                    </button>
+                    <button onClick={()=>{ setCsvResult(null); setCsvPreview(null); setCsvPanel(false); }}
+                      style={{background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"6px 14px",cursor:"pointer",fontSize:"0.78rem",fontWeight:600}}>
+                      Skip them, I'll fix the CSV
+                    </button>
+                  </div>
+                </div>
+              )}
+              {!csvResult.pendingDuplicates && (
+                <button onClick={()=>{ setCsvPanel(false); setCsvResult(null); }}
+                  style={{width:"100%",marginTop:"0.5rem",background:"#1a6e2e",color:"#fff",border:"none",borderRadius:"3px",padding:"7px",cursor:"pointer",fontSize:"0.82rem",fontWeight:700}}>
+                  Done
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* DOK legend */}
         <div style={{ background: "#fff", border: "1px solid #c8d3dd", borderRadius: "4px", padding: "0.75rem 1.1rem", marginBottom: "1rem", display: "flex", gap: "1.25rem", flexWrap: "wrap", alignItems: "center" }}>
           <span style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.1em", color: "#555" }}>DOK:</span>
           {DOK_OPTIONS.map(d => (
