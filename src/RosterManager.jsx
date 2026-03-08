@@ -29,6 +29,15 @@ export default function RosterManager() {
 
   function flash(text) { setMsg(text); setTimeout(() => setMsg(""), 3000); }
 
+  async function generateMissingPins() {
+    try {
+      const r = await fetch(`${API}/roster/pins/generate-missing`, { method:"POST" });
+      const data = await r.json();
+      await load();
+      flash(`Generated ${data.generated} new PIN${data.generated !== 1 ? "s" : ""}.`);
+    } catch { flash("Failed to generate PINs."); }
+  }
+
   async function addClass() {
     if (!newClassName.trim()) return;
     try {
@@ -73,8 +82,18 @@ export default function RosterManager() {
     catch {}
   }
 
+  async function regenPin(cid, sid) {
+    try {
+      const r = await fetch(`${API}/roster/class/${cid}/student/${sid}/pin`, { method:"PUT" });
+      const data = await r.json();
+      await load();
+      flash(`New PIN: ${data.pin}`);
+    } catch { flash("Failed to update PIN."); }
+  }
+
   const activeClassData = classes.find(c => c.id === activeClass);
   const totalStudents   = classes.reduce((a, c) => a + c.students.length, 0);
+  const missingPins     = classes.reduce((a, c) => a + c.students.filter(s=>!s.pin).length, 0);
 
   if (loading) return <div style={{padding:"3rem",textAlign:"center",color:"#aaa"}}>Loading roster…</div>;
 
@@ -189,12 +208,24 @@ export default function RosterManager() {
               ) : (
                 <div style={{display:"flex",flexDirection:"column",gap:"0.35rem"}}>
                   {activeClassData.students.map((s, i) => (
-                    <div key={s.id} style={{background:"#fff",border:"1px solid #dde3e9",borderRadius:"3px",padding:"0.6rem 0.9rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+                    <div key={s.id} style={{background:"#fff",border:"1px solid #dde3e9",borderRadius:"3px",padding:"0.6rem 0.9rem",display:"flex",alignItems:"center",gap:"0.75rem",flexWrap:"wrap"}}>
                       <div style={{width:"26px",height:"26px",borderRadius:"50%",background:"#003865",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                         <span style={{color:"#fff",fontSize:"0.65rem",fontWeight:700}}>{i+1}</span>
                       </div>
-                      <div style={{flex:1,fontSize:"0.88rem",fontWeight:600,color:"#1a1a1a"}}>{s.name}</div>
-                      <div style={{fontSize:"0.65rem",color:"#aaa",fontFamily:"monospace"}}>{s.id}</div>
+                      <div style={{flex:1,fontSize:"0.88rem",fontWeight:600,color:"#1a1a1a",minWidth:"120px"}}>{s.name}</div>
+                      {/* PIN display */}
+                      <div style={{display:"flex",alignItems:"center",gap:"0.4rem",background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"3px 8px"}}>
+                        <span style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.08em",color:"#555"}}>PIN</span>
+                        <span style={{fontFamily:"monospace",fontSize:"0.95rem",fontWeight:700,letterSpacing:"0.18em",color:"#003865"}}>
+                          {s.pin || "—"}
+                        </span>
+                        <button onClick={()=>navigator.clipboard.writeText(s.pin||"")}
+                          title="Copy PIN"
+                          style={{...S.btn,padding:"1px 6px",fontSize:"0.65rem",marginLeft:"2px"}}>📋</button>
+                        <button onClick={()=>regenPin(activeClassData.id, s.id)}
+                          title="Generate new PIN"
+                          style={{...S.btn,padding:"1px 6px",fontSize:"0.65rem"}}>🔀</button>
+                      </div>
                       <button onClick={()=>removeStudent(activeClassData.id, s.id, s.name)}
                         style={{...S.btn,padding:"2px 8px",color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",fontSize:"0.7rem"}}>✕</button>
                     </div>
