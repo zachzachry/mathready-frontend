@@ -3,6 +3,7 @@ import MathText from "./shared/MathText";
 import TopBar from "./shared/TopBar";
 import { QUESTIONS as FALLBACK_QUESTIONS, START_SECS, LETTERS, S, pct, lvl, lvlC, lvlBg, lvlBd, fmtTime, now, saveSession, sendHeartbeat, API } from "./shared/constants";
 import { buildWeightMap, updateSessionWeights, pickAdaptiveQuestion, ALL_STANDARDS, generateDrill } from "./adaptive";
+import PlotGrid from "./shared/PlotGrid";
 
 // ── Student Login ──────────────────────────────────────────
 function StudentLogin({ onStartTest, onStartPractice, onBack }) {
@@ -270,7 +271,9 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
 
   function handleNext() {
     const timeSecs = Math.round((Date.now() - qStart) / 1000);
-    const isCorrect = selected === curQ.correct;
+    const isCorrect = curQ.type === "plotpoint"
+      ? selected === JSON.stringify(curQ.answer)
+      : selected === curQ.correct;
     const newHistory = [...history, { q: curQ, chosen: selected, correct: isCorrect, timeSecs }];
     setHistory(newHistory);
 
@@ -332,7 +335,9 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
   if (!curQ) return null;
 
   const q = curQ;
-  const correct = q.correct;
+  const correct = q.type === "plotpoint"
+    ? JSON.stringify(q.answer)
+    : q.correct;
   const streak  = (() => { let s=0; for(let i=history.length-1;i>=0;i--){ if(history[i].correct) s++; else break; } return s; })();
   const totalCorrect = history.filter(x=>x.correct).length;
   const questionNum  = history.length + 1;
@@ -383,7 +388,18 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
             </p>
           </div>
 
-          {/* Choices */}
+          {/* Choices — MCQ or Plot Point */}
+          {q.type === "plotpoint" ? (
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"0.75rem"}}>
+              <PlotGrid
+                answer={revealed ? q.answer : null}
+                placed={selected ? JSON.parse(selected) : null}
+                onPlace={pt => !revealed && handleChoose(JSON.stringify(pt))}
+                revealed={revealed}
+                size={Math.min(320, window.innerWidth - 60)}
+              />
+            </div>
+          ) : (
           <div style={{display:"flex",flexDirection:"column",gap:"0.6rem"}}>
             {q.choices.map((choice, i) => {
               const isChosen  = selected === choice;
@@ -410,6 +426,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
               );
             })}
           </div>
+          )}
 
           {/* Feedback banner */}
           {revealed && (
@@ -426,11 +443,11 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
           )}
 
           {/* Next button */}
-          {revealed && (
+          {(revealed || (q.type==="plotpoint" && selected)) && (
             <div style={{display:"flex",gap:"0.75rem"}}>
               <button onClick={handleNext}
                 style={{flex:1,background:"#003865",border:"none",borderRadius:"6px",padding:"0.85rem",fontSize:"0.95rem",cursor:"pointer",color:"#fff",fontWeight:700}}>
-                Next Question →
+                {q.type==="plotpoint" && !revealed ? "Submit Answer →" : "Next Question →"}
               </button>
               <button onClick={handleQuit}
                 style={{background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"6px",padding:"0.85rem 1.25rem",fontSize:"0.85rem",cursor:"pointer",color:"#555",fontWeight:600}}>
@@ -481,7 +498,12 @@ function PracticeResults({ session, history, onReset }) {
                   <div style={{flex:1,fontSize:"0.82rem"}}>
                     <div style={{color:"#777",fontSize:"0.63rem",letterSpacing:"0.08em",marginBottom:"2px"}}>{q.standard}{item.timeSecs ? ` · ${item.timeSecs}s` : ""}</div>
                     <div style={{color:"#1a1a1a",fontFamily:"Georgia,serif",marginBottom:isCorrect?0:"4px"}}><MathText text={q.question}/></div>
-                    {!isCorrect && (
+                    {q.type==="plotpoint" && !isCorrect && (
+                      <div style={{margin:"6px 0"}}>
+                        <PlotGrid answer={q.answer} placed={chosen?(()=>{try{return JSON.parse(chosen);}catch{return null;}})():null} revealed readOnly size={180}/>
+                      </div>
+                    )}
+                    {!isCorrect && q.type!=="plotpoint" && (
                       <div style={{fontSize:"0.78rem"}}>
                         <span style={{color:"#1a6e2e"}}>Correct: <strong><MathText text={q.correct}/></strong></span>
                         {chosen && <span style={{color:"#8b1a1a"}}> · Your answer: <MathText text={chosen}/></span>}
@@ -579,7 +601,11 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
   const flgCount = Object.values(flg).filter(Boolean).length;
 
   async function doSubmit() {
-    const score = questions.reduce((a,q) => a+(ans[q.id]===q.correct?1:0), 0);
+    const score = questions.reduce((a,q) => {
+      const given = ans[q.id] ?? null;
+      const right = q.type==="plotpoint" ? JSON.stringify(q.answer) : q.correct;
+      return a + (given === right ? 1 : 0);
+    }, 0);
     const session = { name:studentName, score, total:TOTAL, pct:pct(score,TOTAL), submitted:now(), timeUsed:fmtTime(START_SECS-secs), answers:{...ans} };
     await saveSession(session);
     onFinish(session);
@@ -652,19 +678,38 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
             {q.questionImage&&<img src={q.questionImage} alt="diagram" style={{maxWidth:"100%",maxHeight:"200px",marginTop:"0.75rem",borderRadius:"3px",display:"block"}}/>}
           </div>
           <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"1.1rem 1.5rem"}}>
-            <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"0.9rem"}}>SELECT ONE ANSWER</div>
-            <div style={{display:"flex",flexDirection:"column",gap:"0.55rem"}}>
-              {q.choices.map((choice,i)=>{
-                const chosen = sel===choice;
-                return <label key={i} onClick={()=>{ setAns(p=>({...p,[q.id]:choice})); handleAdaptiveAnswer(q.id, choice); }}
-                  style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.8rem 1rem",border:`2px solid ${chosen?"#003865":"#c8d3dd"}`,borderRadius:"3px",background:chosen?"#ddeaf7":"#fafbfc",cursor:"pointer"}}>
-                  <div style={{width:"26px",height:"26px",borderRadius:"50%",border:`2px solid ${chosen?"#003865":"#9aabba"}`,background:chosen?"#003865":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    <span style={{fontSize:"0.7rem",fontWeight:700,color:chosen?"#fff":"#667"}}>{LETTERS[i]}</span>
-                  </div>
-                  <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color:"#0f0f0f"}}><MathText text={choice}/></span>
-                </label>;
-              })}
-            </div>
+            {q.type === "plotpoint" ? (
+              <>
+                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"0.9rem"}}>PLOT YOUR ANSWER</div>
+                <div style={{display:"flex",justifyContent:"center"}}>
+                  <PlotGrid
+                    placed={sel ? JSON.parse(sel) : null}
+                    onPlace={pt => {
+                      const v = JSON.stringify(pt);
+                      setAns(p=>({...p,[q.id]:v}));
+                      handleAdaptiveAnswer(q.id, v);
+                    }}
+                    size={Math.min(300, window.innerWidth - 80)}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"0.9rem"}}>SELECT ONE ANSWER</div>
+                <div style={{display:"flex",flexDirection:"column",gap:"0.55rem"}}>
+                  {q.choices.map((choice,i)=>{
+                    const chosen = sel===choice;
+                    return <label key={i} onClick={()=>{ setAns(p=>({...p,[q.id]:choice})); handleAdaptiveAnswer(q.id, choice); }}
+                      style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.8rem 1rem",border:`2px solid ${chosen?"#003865":"#c8d3dd"}`,borderRadius:"3px",background:chosen?"#ddeaf7":"#fafbfc",cursor:"pointer"}}>
+                      <div style={{width:"26px",height:"26px",borderRadius:"50%",border:`2px solid ${chosen?"#003865":"#9aabba"}`,background:chosen?"#003865":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <span style={{fontSize:"0.7rem",fontWeight:700,color:chosen?"#fff":"#667"}}>{LETTERS[i]}</span>
+                      </div>
+                      <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color:"#0f0f0f"}}><MathText text={choice}/></span>
+                    </label>;
+                  })}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
