@@ -289,7 +289,7 @@ export async function generateClassReport(sessions, bankQ, filterClass = 'all') 
       const testLabel = sess.testCode ? (testNameMap[sess.testCode.toUpperCase()] || sess.testCode) : `Session ${idx+1}`;
       const modeTag   = sess.mode === 'practice' ? ' [PRACTICE]' : '';
       const timeTag   = sess.timeUsed ? `  ·  ${sess.timeUsed}` : '';
-      const label = `${testLabel}${modeTag}  —  ${sess.pct}%  (${sess.score}/${sess.total})${timeTag}${dateStr ? `   |   ${dateStr}` : ''}`;"  
+      const label = `${testLabel}${modeTag}  —  ${sess.pct}%  (${sess.score}/${sess.total})${timeTag}${dateStr ? `   |   ${dateStr}` : ''}`; 
 
       ensureSpace(24);
 
