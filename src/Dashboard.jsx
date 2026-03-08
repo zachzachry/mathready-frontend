@@ -94,7 +94,7 @@ function LineChart({ points, width=320, height=80, color="#003865" }) {
   );
 }
 
-export default function Dashboard() {
+export default function Dashboard({ teacher }) {
   const [tab,      setTab]      = useState("overview");
   const [sessions, setSessions] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -111,8 +111,8 @@ export default function Dashboard() {
   const refresh = useCallback(async () => {
     try {
       const [s, r, q] = await Promise.all([
-        fetch(`${API}/sessions`).then(r=>r.json()),
-        fetch(`${API}/roster`).then(r=>r.json()),
+        fetch(`${API}/sessions${teacher?.classIds ? "?classIds="+teacher.classIds.join(",") : ""}`).then(r=>r.json()),
+        fetch(`${API}/roster${teacher?.classIds ? "?classIds="+teacher.classIds.join(",") : ""}`).then(r=>r.json()),
         fetch(`${API}/questions`).then(r=>r.json()).catch(()=>[]),
       ]);
       setSessions(Array.isArray(s) ? s : []);
