@@ -322,28 +322,33 @@ export default function Dashboard() {
               <div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
                 <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"1.25rem 1.5rem"}}>
                   <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"0.75rem"}}>{focusStudent.name.toUpperCase()} — SCORE TREND</div>
-                  <div style={{display:"flex",alignItems:"center",gap:"2rem",flexWrap:"wrap"}}>
-                    <LineChart points={focusStudent.sessions.map(s=>s.pct)} width={340} height={90}/>
-                    <div style={{display:"flex",gap:"1.5rem"}}>
-                      {focusStudent.sessions.length>=2&&(()=>{
-                        const first=focusStudent.sessions[0].pct; const last=focusStudent.sessions[focusStudent.sessions.length-1].pct; const delta=last-first;
-                        return <>
-                          <div style={{textAlign:"center"}}>
-                            <div style={{fontSize:"0.6rem",color:"#888",letterSpacing:"0.1em"}}>FIRST</div>
-                            <div style={{fontSize:"1.4rem",fontWeight:700,color:lvlC(first)}}>{first}%</div>
-                          </div>
-                          <div style={{textAlign:"center"}}>
-                            <div style={{fontSize:"0.6rem",color:"#888",letterSpacing:"0.1em"}}>LATEST</div>
-                            <div style={{fontSize:"1.4rem",fontWeight:700,color:lvlC(last)}}>{last}%</div>
-                          </div>
-                          <div style={{textAlign:"center"}}>
-                            <div style={{fontSize:"0.6rem",color:"#888",letterSpacing:"0.1em"}}>CHANGE</div>
-                            <div style={{fontSize:"1.4rem",fontWeight:700,color:delta>0?"#1a6e2e":delta<0?"#8b1a1a":"#888"}}>{delta>0?"+":""}{delta}%</div>
-                          </div>
-                        </>;
-                      })()}
-                    </div>
-                  </div>
+                  {(()=>{
+                    const scores = focusStudent.sessions.map(s=>s.pct);
+                    const fsFirst = scores[0];
+                    const fsLast  = scores[scores.length-1];
+                    const fsDelta = scores.length>=2 ? fsLast-fsFirst : null;
+                    return (
+                      <div style={{display:"flex",alignItems:"center",gap:"2rem",flexWrap:"wrap"}}>
+                        <LineChart points={scores} width={340} height={90}/>
+                        <div style={{display:"flex",gap:"1.5rem"}}>
+                          {fsDelta!==null&&<>
+                            <div style={{textAlign:"center"}}>
+                              <div style={{fontSize:"0.6rem",color:"#888",letterSpacing:"0.1em"}}>FIRST</div>
+                              <div style={{fontSize:"1.4rem",fontWeight:700,color:lvlC(fsFirst)}}>{fsFirst}%</div>
+                            </div>
+                            <div style={{textAlign:"center"}}>
+                              <div style={{fontSize:"0.6rem",color:"#888",letterSpacing:"0.1em"}}>LATEST</div>
+                              <div style={{fontSize:"1.4rem",fontWeight:700,color:lvlC(fsLast)}}>{fsLast}%</div>
+                            </div>
+                            <div style={{textAlign:"center"}}>
+                              <div style={{fontSize:"0.6rem",color:"#888",letterSpacing:"0.1em"}}>CHANGE</div>
+                              <div style={{fontSize:"1.4rem",fontWeight:700,color:fsDelta>0?"#1a6e2e":fsDelta<0?"#8b1a1a":"#888"}}>{fsDelta>0?"+":""}{fsDelta}%</div>
+                            </div>
+                          </>}
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {/* Session history */}
                   <div style={{marginTop:"1rem",display:"flex",gap:"0.5rem",flexWrap:"wrap"}}>
                     {focusStudent.sessions.map((s,i)=>(
