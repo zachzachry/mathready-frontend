@@ -101,7 +101,7 @@ export default function App() {
     setLoading(false);
   }
 
-  if (screen==="teacher") return <TeacherShell onBack={()=>{setScreen("pin");setErr("");}}/>;
+  if (screen==="teacher") return <TeacherShell pinAuth onBack={()=>{setScreen("pin");setErr("");}}/>;
   if (screen==="student") return <MathTest identity={identity} onBack={()=>{setScreen("pin");setErr("");setIdentity(null);}}/>;
 
   return (
