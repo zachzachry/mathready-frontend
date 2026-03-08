@@ -8,6 +8,69 @@ const TABS = [
   ["growth",    "📈 Growth"],
 ];
 
+// ── Focus student stats panel ──────────────────────────────
+function FocusStudentStats({ student, standardMasteryFn, bankQ, lvlC, lvlBg, lvlBd }) {
+  const scores  = student.sessions.map(s => s.pct);
+  const fsFirst = scores[0];
+  const fsLast  = scores[scores.length - 1];
+  const fsDelta = scores.length >= 2 ? fsLast - fsFirst : null;
+  const mastery = standardMasteryFn(student.sessions);
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
+      <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"1.25rem 1.5rem"}}>
+        <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"0.75rem"}}>{student.name.toUpperCase()} — SCORE TREND</div>
+        <div style={{display:"flex",alignItems:"center",gap:"2rem",flexWrap:"wrap"}}>
+          <LineChart points={scores} width={340} height={90}/>
+          {fsDelta !== null && (
+            <div style={{display:"flex",gap:"1.5rem"}}>
+              <div style={{textAlign:"center"}}>
+                <div style={{fontSize:"0.6rem",color:"#888",letterSpacing:"0.1em"}}>FIRST</div>
+                <div style={{fontSize:"1.4rem",fontWeight:700,color:lvlC(fsFirst)}}>{fsFirst}%</div>
+              </div>
+              <div style={{textAlign:"center"}}>
+                <div style={{fontSize:"0.6rem",color:"#888",letterSpacing:"0.1em"}}>LATEST</div>
+                <div style={{fontSize:"1.4rem",fontWeight:700,color:lvlC(fsLast)}}>{fsLast}%</div>
+              </div>
+              <div style={{textAlign:"center"}}>
+                <div style={{fontSize:"0.6rem",color:"#888",letterSpacing:"0.1em"}}>CHANGE</div>
+                <div style={{fontSize:"1.4rem",fontWeight:700,color:fsDelta>0?"#1a6e2e":fsDelta<0?"#8b1a1a":"#888"}}>{fsDelta>0?"+":""}{fsDelta}%</div>
+              </div>
+            </div>
+          )}
+        </div>
+        {/* Session history */}
+        <div style={{marginTop:"1rem",display:"flex",gap:"0.5rem",flexWrap:"wrap"}}>
+          {student.sessions.map((s,i) => (
+            <div key={i} style={{background:lvlBg(s.pct),border:`1px solid ${lvlC(s.pct)}33`,borderRadius:"3px",padding:"0.4rem 0.65rem",textAlign:"center",minWidth:"70px"}}>
+              <div style={{fontSize:"0.6rem",color:"#888"}}>{s.submitted?.split(",")[0]||`Test ${i+1}`}</div>
+              <div style={{fontSize:"1rem",fontWeight:700,color:lvlC(s.pct)}}>{s.pct}%</div>
+              {s.testCode&&<div style={{fontSize:"0.58rem",color:"#aaa",fontFamily:"monospace"}}>{s.testCode}</div>}
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Standard mastery grid */}
+      <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"1.25rem 1.5rem"}}>
+        <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"0.75rem"}}>STANDARD MASTERY</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:"0.4rem"}}>
+          {Object.entries(mastery).sort(([a],[b])=>a.localeCompare(b)).map(([std,v])=>{
+            const p = Math.round((v.correct/v.total)*100);
+            return (
+              <div key={std} title={`${v.correct}/${v.total} correct`}
+                style={{background:p>=80?"#f0faf2":p>=60?"#fff8e1":"#fdf2f2",border:`1px solid ${p>=80?"#b3dfc0":p>=60?"#ffc107":"#f0b8b8"}`,borderRadius:"3px",padding:"0.35rem 0.65rem",textAlign:"center",minWidth:"80px"}}>
+                <div style={{fontSize:"0.6rem",fontWeight:700,color:"#555"}}>{std}</div>
+                <div style={{fontSize:"0.9rem",fontWeight:700,color:p>=80?"#1a6e2e":p>=60?"#7a4e00":"#8b1a1a"}}>{p}%</div>
+                <div style={{fontSize:"0.58rem",color:"#aaa"}}>{v.correct}/{v.total}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Simple SVG line chart
 function LineChart({ points, width=320, height=80, color="#003865" }) {
   if (!points || points.length < 2) return (
@@ -318,67 +381,14 @@ export default function Dashboard() {
                 <div style={{fontSize:"0.82rem",marginTop:"4px"}}>Students need to complete more than one test for growth to appear.</div>
               </div>
             ) : focusStudent ? (
-              /* ── Single student view ── */
-              <div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
-                <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"1.25rem 1.5rem"}}>
-                  <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"0.75rem"}}>{focusStudent.name.toUpperCase()} — SCORE TREND</div>
-                  {(()=>{
-                    const scores = focusStudent.sessions.map(s=>s.pct);
-                    const fsFirst = scores[0];
-                    const fsLast  = scores[scores.length-1];
-                    const fsDelta = scores.length>=2 ? fsLast-fsFirst : null;
-                    return (
-                      <div style={{display:"flex",alignItems:"center",gap:"2rem",flexWrap:"wrap"}}>
-                        <LineChart points={scores} width={340} height={90}/>
-                        <div style={{display:"flex",gap:"1.5rem"}}>
-                          {fsDelta!==null&&<>
-                            <div style={{textAlign:"center"}}>
-                              <div style={{fontSize:"0.6rem",color:"#888",letterSpacing:"0.1em"}}>FIRST</div>
-                              <div style={{fontSize:"1.4rem",fontWeight:700,color:lvlC(fsFirst)}}>{fsFirst}%</div>
-                            </div>
-                            <div style={{textAlign:"center"}}>
-                              <div style={{fontSize:"0.6rem",color:"#888",letterSpacing:"0.1em"}}>LATEST</div>
-                              <div style={{fontSize:"1.4rem",fontWeight:700,color:lvlC(fsLast)}}>{fsLast}%</div>
-                            </div>
-                            <div style={{textAlign:"center"}}>
-                              <div style={{fontSize:"0.6rem",color:"#888",letterSpacing:"0.1em"}}>CHANGE</div>
-                              <div style={{fontSize:"1.4rem",fontWeight:700,color:fsDelta>0?"#1a6e2e":fsDelta<0?"#8b1a1a":"#888"}}>{fsDelta>0?"+":""}{fsDelta}%</div>
-                            </div>
-                          </>}
-                        </div>
-                      </div>
-                    );
-                  })()}
-                  {/* Session history */}
-                  <div style={{marginTop:"1rem",display:"flex",gap:"0.5rem",flexWrap:"wrap"}}>
-                    {focusStudent.sessions.map((s,i)=>(
-                      <div key={i} style={{background:lvlBg(s.pct),border:`1px solid ${lvlC(s.pct)}33`,borderRadius:"3px",padding:"0.4rem 0.65rem",textAlign:"center",minWidth:"70px"}}>
-                        <div style={{fontSize:"0.6rem",color:"#888"}}>{s.submitted?.split(",")[0]||`Test ${i+1}`}</div>
-                        <div style={{fontSize:"1rem",fontWeight:700,color:lvlC(s.pct)}}>{s.pct}%</div>
-                        {s.testCode&&<div style={{fontSize:"0.58rem",color:"#aaa",fontFamily:"monospace"}}>{s.testCode}</div>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Standard mastery grid */}
-                <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"1.25rem 1.5rem"}}>
-                  <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"0.75rem"}}>STANDARD MASTERY</div>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:"0.4rem"}}>
-                    {Object.entries(standardMastery(focusStudent.sessions)).sort(([a],[b])=>a.localeCompare(b)).map(([std,v])=>{
-                      const p=Math.round((v.correct/v.total)*100);
-                      return (
-                        <div key={std} title={`${v.correct}/${v.total} correct`}
-                          style={{background:p>=80?"#f0faf2":p>=60?"#fff8e1":"#fdf2f2",border:`1px solid ${p>=80?"#b3dfc0":p>=60?"#ffc107":"#f0b8b8"}`,borderRadius:"3px",padding:"0.35rem 0.65rem",textAlign:"center",minWidth:"80px"}}>
-                          <div style={{fontSize:"0.6rem",fontWeight:700,color:"#555"}}>{std}</div>
-                          <div style={{fontSize:"0.9rem",fontWeight:700,color:p>=80?"#1a6e2e":p>=60?"#7a4e00":"#8b1a1a"}}>{p}%</div>
-                          <div style={{fontSize:"0.58rem",color:"#aaa"}}>{v.correct}/{v.total}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
+              <FocusStudentStats
+                student={focusStudent}
+                standardMasteryFn={standardMastery}
+                bankQ={bankQ}
+                lvlC={lvlC}
+                lvlBg={lvlBg}
+                lvlBd={lvlBd}
+              />
 
             ) : (
               /* ── All students growth overview ── */
