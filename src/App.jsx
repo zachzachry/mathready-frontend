@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import MathTest from "./MathTest";
+import AdminShell from "./AdminShell";
 import TeacherShell from "./TeacherShell";
 import { API } from "./shared/constants";
 
@@ -87,7 +88,9 @@ export default function App() {
     try {
       const r    = await fetch(`${API}/auth/pin/${pin}`);
       const data = await r.json();
-      if (data.role==="teacher") {
+      if (data.role==="admin") {
+        setScreen("admin");
+      } else if (data.role==="teacher") {
         setScreen("teacher");
       } else if (data.role==="student") {
         setIdentity(data);
@@ -101,6 +104,7 @@ export default function App() {
     setLoading(false);
   }
 
+  if (screen==="admin")   return <AdminShell   onBack={()=>{setScreen("pin");setErr("");}}/>;
   if (screen==="teacher") return <TeacherShell pinAuth onBack={()=>{setScreen("pin");setErr("");}}/>;
   if (screen==="student") return <MathTest identity={identity} onBack={()=>{setScreen("pin");setErr("");setIdentity(null);}}/>;
 
