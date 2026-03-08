@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import MathText from "./shared/MathText";
 import PlotGrid from "./shared/PlotGrid";
-import { API } from "./shared/constants";
+import { API, QUESTIONS as BUILTIN_QUESTIONS } from "./shared/constants";
 
 
 // ── Math snippet toolbar ───────────────────────────────────
@@ -459,6 +459,22 @@ export default function QuestionBuilder() {
     setTimeout(() => setSavedCount(0), 3000);
   }
 
+  async function seedBank() {
+    if (!window.confirm(`Re-seed the bank with ${BUILTIN_QUESTIONS.length} built-in questions? Only missing questions will be added.`)) return;
+    setSaving(true);
+    try {
+      const r = await fetch(`${API}/questions/seed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(BUILTIN_QUESTIONS),
+      });
+      const data = await r.json();
+      setSavedCount(data.added);
+      setTimeout(() => setSavedCount(0), 4000);
+    } catch {}
+    setSaving(false);
+  }
+
   const complete = questions.filter(q => q.question && q.standard && q.dok && (q.type==="plotpoint" ? (Array.isArray(q.answer)&&q.answer.length===2) : (q.choices.filter(c=>c).length===4 && q.correct))).length;
 
   return (
@@ -472,6 +488,12 @@ export default function QuestionBuilder() {
         </div>
         <div style={{ display: "flex", gap: "0.65rem", alignItems: "center" }}>
           <span style={{ fontSize: "0.75rem", opacity: .75 }}>{complete}/{questions.length} complete</span>
+          <button onClick={seedBank} disabled={saving}
+            style={{ background:"#7a4e00", border:"none", borderRadius:"3px", padding:"6px 14px", fontSize:"0.78rem", fontWeight:700, color:"#fff", cursor:"pointer", opacity:saving?0.6:1 }}
+            title="Re-load the 100 built-in questions into the bank">
+            🔄 Restore Built-in Questions
+          </button>
+          {savedCount>0&&<span style={{fontSize:"0.75rem",color:"#1a6e2e",fontWeight:700}}>+{savedCount} added</span>}
           <button onClick={saveToBank} disabled={saving||complete===0}
             style={{ background: savedCount>0?"#d4edda":complete===0?"#c8d3dd":"#1a6e2e", color: savedCount>0?"#1a6e2e":"#fff", border: "none", borderRadius: "3px", padding: "6px 14px", fontWeight: 700, fontSize: "0.8rem", cursor: complete===0?"not-allowed":"pointer" }}>
             {savedCount>0 ? `✓ Saved ${savedCount} to Bank!` : saving ? "Saving…" : `💾 Save to Bank (${complete})`}
