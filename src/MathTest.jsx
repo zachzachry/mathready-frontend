@@ -47,7 +47,7 @@ function StudentLogin({ onStartTest, onStartPractice, onBack }) {
     try {
       const r    = await fetch(`${API}/test/code/${encodeURIComponent(c)}`);
       const data = await r.json();
-      if (!data.found || !data.questions?.length) {
+      if (!data.found || (!data.questions?.length && data.type !== "drill")) {
         setErr("Invalid test code. Check with your teacher.");
         setChecking(false); return;
       }
