@@ -8,33 +8,80 @@ const S = {
   btn:  { border:"1px solid #c8d3dd", borderRadius:"3px", padding:"6px 14px", cursor:"pointer", fontSize:"0.78rem", fontWeight:600, background:"#f0f4f8", color:"#333" },
 };
 
-function ClassPicker({ allClasses, selected, onChange }) {
+function ClassPicker({ allClasses, selected, onChange, onClassCreated }) {
+  const [adding,   setAdding]   = useState(false);
+  const [newName,  setNewName]  = useState("");
+  const [creating, setCreating] = useState(false);
+
+  async function createClass() {
+    if (!newName.trim()) return;
+    setCreating(true);
+    try {
+      const r = await fetch(`${API}/roster/class`, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ name: newName.trim() })
+      });
+      const d = await r.json();
+      setNewName(""); setAdding(false);
+      onClassCreated(d.id); // auto-select the new class
+    } catch {}
+    setCreating(false);
+  }
+
   return (
-    <div style={{ display:"flex", flexDirection:"column", gap:"0.3rem", maxHeight:"200px", overflowY:"auto",
-      border:"1px solid #c8d3dd", borderRadius:"3px", padding:"0.5rem", background:"#fafbfc" }}>
-      {allClasses.length === 0 && <div style={{ color:"#aaa", fontSize:"0.8rem" }}>No classes yet — create them in Roster Manager.</div>}
-      {allClasses.map(cls => {
-        const checked = selected.includes(cls.id);
-        return (
-          <label key={cls.id} style={{ display:"flex", alignItems:"center", gap:"0.5rem", cursor:"pointer",
-            padding:"0.35rem 0.5rem", borderRadius:"3px", background: checked ? "#ddeaf7" : "transparent" }}>
-            <input type="checkbox" checked={checked}
-              onChange={() => onChange(checked ? selected.filter(id=>id!==cls.id) : [...selected, cls.id])}
-              style={{ accentColor: NAVY }}/>
-            <span style={{ fontSize:"0.85rem", fontWeight: checked ? 700 : 500, color: checked ? NAVY : "#333" }}>
-              {cls.name}
-            </span>
-            <span style={{ fontSize:"0.68rem", color:"#aaa", marginLeft:"auto" }}>
-              {cls.students?.length || 0} students
-            </span>
-          </label>
-        );
-      })}
+    <div>
+      <div style={{ display:"flex", flexDirection:"column", gap:"0.3rem", maxHeight:"180px", overflowY:"auto",
+        border:"1px solid #c8d3dd", borderRadius:"3px", padding:"0.5rem", background:"#fafbfc",
+        marginBottom:"0.4rem" }}>
+        {allClasses.length === 0 && !adding && (
+          <div style={{ color:"#aaa", fontSize:"0.8rem", padding:"0.25rem" }}>No classes yet — create one below.</div>
+        )}
+        {allClasses.map(cls => {
+          const checked = selected.includes(cls.id);
+          return (
+            <label key={cls.id} style={{ display:"flex", alignItems:"center", gap:"0.5rem", cursor:"pointer",
+              padding:"0.35rem 0.5rem", borderRadius:"3px", background: checked ? "#ddeaf7" : "transparent" }}>
+              <input type="checkbox" checked={checked}
+                onChange={() => onChange(checked ? selected.filter(id=>id!==cls.id) : [...selected, cls.id])}
+                style={{ accentColor: NAVY }}/>
+              <span style={{ fontSize:"0.85rem", fontWeight: checked ? 700 : 500, color: checked ? NAVY : "#333" }}>
+                {cls.name}
+              </span>
+              <span style={{ fontSize:"0.68rem", color:"#aaa", marginLeft:"auto" }}>
+                {cls.students?.length || 0} students
+              </span>
+            </label>
+          );
+        })}
+      </div>
+      {/* Inline class creation */}
+      {adding ? (
+        <div style={{ display:"flex", gap:"0.4rem" }}>
+          <input autoFocus value={newName} onChange={e=>setNewName(e.target.value)}
+            onKeyDown={e=>{ if(e.key==="Enter") createClass(); if(e.key==="Escape") setAdding(false); }}
+            placeholder="Class name, e.g. Ms. Johnson Pd 1"
+            style={{ flex:1, padding:"5px 8px", border:"1px solid #003865", borderRadius:"3px", fontSize:"0.82rem" }}/>
+          <button onClick={createClass} disabled={creating||!newName.trim()}
+            style={{ background:NAVY, color:"#fff", border:"none", borderRadius:"3px",
+              padding:"5px 12px", cursor:"pointer", fontSize:"0.78rem", fontWeight:700 }}>
+            {creating ? "…" : "Add"}
+          </button>
+          <button onClick={()=>setAdding(false)}
+            style={{ background:"#f0f4f8", border:"1px solid #c8d3dd", borderRadius:"3px",
+              padding:"5px 10px", cursor:"pointer", fontSize:"0.78rem" }}>✕</button>
+        </div>
+      ) : (
+        <button onClick={()=>setAdding(true)}
+          style={{ background:"none", border:"1px dashed #b3cde8", borderRadius:"3px", padding:"5px 12px",
+            cursor:"pointer", fontSize:"0.75rem", color:"#4a7fa5", width:"100%", textAlign:"left" }}>
+          + Create new class
+        </button>
+      )}
     </div>
   );
 }
 
-function TeacherForm({ teacher, allClasses, onSave, onCancel }) {
+function TeacherForm({ teacher, allClasses, onSave, onCancel, onClassCreated }) {
   const [name,     setName]     = useState(teacher?.name     || "");
   const [pin,      setPin]      = useState("");
   const [classIds, setClassIds] = useState(teacher?.classIds || []);
@@ -81,7 +128,8 @@ function TeacherForm({ teacher, allClasses, onSave, onCancel }) {
 
       <div style={{ marginBottom:"1rem" }}>
         <label style={S.lbl}>ASSIGN CLASSES</label>
-        <ClassPicker allClasses={allClasses} selected={classIds} onChange={setClassIds}/>
+        <ClassPicker allClasses={allClasses} selected={classIds} onChange={setClassIds}
+          onClassCreated={(newId) => { onClassCreated(newId); setClassIds(ids => [...ids, newId]); }}/>
         <div style={{ fontSize:"0.68rem", color:"#888", marginTop:"4px" }}>
           {classIds.length === 0 ? "No classes assigned — teacher will see no data." : `${classIds.length} class${classIds.length!==1?"es":""} assigned`}
         </div>
@@ -173,6 +221,7 @@ export default function TeacherManager() {
             allClasses={allClasses}
             onSave={async () => { await load(); setEditing(null); flash(editing==="new" ? "Teacher account created!" : "Account updated!"); }}
             onCancel={() => setEditing(null)}
+            onClassCreated={async () => { await load(); }}
           />
         </div>
       )}
