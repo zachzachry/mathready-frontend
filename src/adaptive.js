@@ -302,3 +302,24 @@ export const ALL_STANDARDS = [
   '5.MDR.7.1','5.MDR.7.2','5.MDR.7.3','5.MDR.7.4',
   '5.GSR.8.1','5.GSR.8.2','5.GSR.8.3','5.GSR.8.4',
 ];
+
+/**
+ * Generate a full drill session — N unique parametric questions
+ * spread evenly across the given standards.
+ */
+export function generateDrill(standards, count) {
+  const qs = [];
+  const validStds = standards.filter(s => GENERATORS[s]);
+  if (!validStds.length) return [];
+
+  let stdIdx = 0;
+  let attempts = 0;
+  while (qs.length < count && attempts < count * 4) {
+    attempts++;
+    const std = validStds[stdIdx % validStds.length];
+    stdIdx++;
+    const q = generateParametric(std);
+    if (q) qs.push(q);
+  }
+  return qs;
+}
