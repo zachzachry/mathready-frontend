@@ -89,11 +89,11 @@ function TeacherForm({ teacher, allClasses, onSave, onCancel, onClassCreated }) 
   const [saving,   setSaving]   = useState(false);
 
   async function submit() {
-    if (!name.trim())           { setErr("Name is required."); return; }
-    if (!teacher && pin.length !== 5) { setErr("PIN must be exactly 5 digits."); return; }
+    if (!name.trim()) { setErr("Name is required."); return; }
+    if (!teacher && (!pin || pin.length !== 5)) { setErr("PIN must be exactly 5 digits."); return; }
     if (pin && !/^[0-9]{5}$/.test(pin)) { setErr("PIN must be exactly 5 digits."); return; }
     setSaving(true); setErr("");
-    const body = { name: name.trim(), pin: pin || (teacher?.pin || "00000"), classIds };
+    const body = { name: name.trim(), pin: pin || "", classIds };
     try {
       const url    = teacher ? `${API}/teachers/${teacher.id}` : `${API}/teachers`;
       const method = teacher ? "PUT" : "POST";
