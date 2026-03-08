@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import MathText from "./shared/MathText";
 import TopBar from "./shared/TopBar";
 import { QUESTIONS as FALLBACK_QUESTIONS, START_SECS, LETTERS, S, pct, lvl, lvlC, lvlBg, lvlBd, fmtTime, now, saveSession, sendHeartbeat, API } from "./shared/constants";
-import { buildWeightMap, updateSessionWeights, pickAdaptiveQuestion, ALL_STANDARDS } from "./adaptive";
+import { buildWeightMap, updateSessionWeights, pickAdaptiveQuestion, ALL_STANDARDS, generateDrill } from "./adaptive";
 
 // ── Student Login ──────────────────────────────────────────
 function StudentLogin({ onStartTest, onStartPractice, onBack }) {
@@ -767,11 +767,20 @@ export default function MathTest({ onBack }) {
   }
 
   const [isAdaptive, setIsAdaptive] = useState(false);
+  const [isDrill,    setIsDrill]    = useState(false);
 
   function handleStartTest(studentObj, classObj, code, testInfo) {
     setStudent(studentObj); setCls(classObj); setTestCode(code);
-    if (testInfo?.questions?.length) setQuestions(testInfo.questions);
-    setIsAdaptive(!!testInfo?.adaptive);
+    const drill = testInfo?.type === "drill";
+    setIsDrill(drill);
+    setIsAdaptive(!!testInfo?.adaptive && !drill);
+    if (drill) {
+      // Generate unique questions for this student right now
+      const qs = generateDrill(testInfo.drillStandards || [], testInfo.drillCount || 10);
+      setQuestions(qs.length ? qs : FALLBACK_QUESTIONS.slice(0, testInfo.drillCount || 10));
+    } else if (testInfo?.questions?.length) {
+      setQuestions(testInfo.questions);
+    }
     setScreen("test");
   }
 
@@ -788,7 +797,7 @@ export default function MathTest({ onBack }) {
       classId:     cls?.id       || "",
       className:   cls?.name     || "",
       testCode,
-      mode:        "test",
+      mode:        isDrill ? "drill" : "test",
     };
     try {
       await fetch(`${API}/submit`, {
