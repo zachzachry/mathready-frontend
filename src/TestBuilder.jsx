@@ -224,8 +224,13 @@ export default function TestBuilder() {
   const filtered = bank.filter(q => {
     if (filterStd  && !q.standard?.startsWith(filterStd)) return false;
     if (filterDok  && q.dok !== Number(filterDok))         return false;
-    if (filterText && !q.question?.toLowerCase().includes(filterText.toLowerCase()) &&
-                      !q.short?.toLowerCase().includes(filterText.toLowerCase())) return false;
+    if (filterText) {
+      const t = filterText.toLowerCase();
+      const matchesId = q.id?.toLowerCase().includes(t);
+      const matchesQ  = q.question?.toLowerCase().includes(t);
+      const matchesS  = q.short?.toLowerCase().includes(t);
+      if (!matchesId && !matchesQ && !matchesS) return false;
+    }
     return true;
   });
 
@@ -325,7 +330,7 @@ export default function TestBuilder() {
               <option value="">All DOK</option>
               {[1,2,3,4].map(d=><option key={d} value={d}>DOK {d}</option>)}
             </select>
-            <input style={{...S.inp,flex:2,minWidth:"120px"}} value={filterText} onChange={e=>setFilterText(e.target.value)} placeholder="Search…"/>
+            <input style={{...S.inp,flex:2,minWidth:"120px"}} value={filterText} onChange={e=>setFilterText(e.target.value)} placeholder="Search by ID, keyword…"/>
           </div>
           <div style={{display:"flex",gap:"0.5rem",alignItems:"center",flexWrap:"wrap"}}>
             <span style={{fontSize:"0.72rem",color:"#555"}}>
@@ -355,7 +360,8 @@ export default function TestBuilder() {
                     {sel&&<span style={{color:"#fff",fontSize:"0.7rem",fontWeight:700}}>✓</span>}
                   </div>
                   <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>toggleSelect(q)}>
-                    <div style={{display:"flex",gap:"0.4rem",marginBottom:"3px",flexWrap:"wrap"}}>
+                    <div style={{display:"flex",gap:"0.4rem",marginBottom:"3px",flexWrap:"wrap",alignItems:"center"}}>
+                      {q.id&&<span style={{fontSize:"0.65rem",fontWeight:700,fontFamily:"monospace",color:"#fff",background:"#003865",padding:"1px 7px",borderRadius:"3px",letterSpacing:"0.05em"}}>{q.id}</span>}
                       <span style={{fontSize:"0.6rem",fontWeight:700,color:"#003865",background:"#ddeaf7",padding:"1px 6px",borderRadius:"2px",border:"1px solid #b3cde8"}}>{q.standard}</span>
                       {q.dok&&<span style={{fontSize:"0.6rem",fontWeight:700,color:"#7a4e00",background:"#fff3cd",padding:"1px 6px",borderRadius:"2px",border:"1px solid #ffc107"}}>DOK {q.dok}</span>}
                       <span style={{fontSize:"0.6rem",color:"#888"}}>{q.short}</span>
