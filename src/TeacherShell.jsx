@@ -96,8 +96,8 @@ function TeacherApp({ onBack }) {
   );
 }
 
-export default function TeacherShell({ onBack }) {
-  const [loggedIn, setLoggedIn] = useState(false);
+export default function TeacherShell({ onBack, pinAuth }) {
+  const [loggedIn, setLoggedIn] = useState(!!pinAuth);
   if (!loggedIn) return <TeacherLogin onEnter={()=>setLoggedIn(true)} onBack={onBack}/>;
   return <TeacherApp onBack={()=>{ setLoggedIn(false); onBack(); }}/>;
 }
