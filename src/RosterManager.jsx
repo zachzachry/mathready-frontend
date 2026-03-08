@@ -99,7 +99,7 @@ function printPinSheet(cls) {
 }
 
 // ── Main ───────────────────────────────────────────────────
-export default function RosterManager() {
+export default function RosterManager({ teacher }) {
   const [classes,    setClasses]    = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [activeClass,setActiveClass]= useState(null);
@@ -111,7 +111,7 @@ export default function RosterManager() {
   const [msg,        setMsg]        = useState("");
 
   const load = useCallback(async () => {
-    try { const r = await fetch(`${API}/roster`); setClasses(await r.json()); }
+    try { const url = `${API}/roster${teacher?.classIds ? '?classIds='+teacher.classIds.join(',') : ''}`; const r = await fetch(url); setClasses(await r.json()); }
     catch { setClasses([]); }
     setLoading(false);
   }, []);
