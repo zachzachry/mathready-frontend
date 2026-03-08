@@ -191,6 +191,15 @@ export default function TestBuilder() {
   const [filterText, setFilterText] = useState("");
   const [autoCount,  setAutoCount]  = useState(10);
 
+  // Fluency Drill state
+  const [drillName,     setDrillName]     = useState("Fluency Drill");
+  const [drillStds,     setDrillStds]     = useState([]);
+  const [drillCount,    setDrillCount]    = useState(10);
+  const [drillCode,     setDrillCode]     = useState(genCode());
+  const [drillSaving,   setDrillSaving]   = useState(false);
+  const [drillMsg,      setDrillMsg]      = useState("");
+  const [drillCodeErr,  setDrillCodeErr]  = useState("");
+
   const loadBank = useCallback(async () => {
     try { const r=await fetch(`${API}/questions`); setBank(await r.json()); }
     catch { setBank([]); }
@@ -253,6 +262,32 @@ export default function TestBuilder() {
       setTimeout(()=>setSavedMsg(""),5000);
       setShowSaveModal(false);
     } catch { return "Save failed"; }
+  }
+
+  async function saveDrill() {
+    if (!drillName.trim() || drillStds.length === 0 || drillCode.length < 4) return;
+    setDrillSaving(true); setDrillCodeErr("");
+    try {
+      const r = await fetch(`${API}/tests/saved`, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          name: drillName.trim(),
+          code: drillCode,
+          title: drillName.trim(),
+          questions: [],
+          type: "drill",
+          drillStandards: drillStds,
+          drillCount,
+        }),
+      });
+      const data = await r.json();
+      if (r.status === 400) { setDrillCodeErr(data.detail || "Code already in use"); setDrillSaving(false); return; }
+      await loadSavedTests();
+      setDrillMsg(`Saved! Code: ${data.code}`);
+      setDrillCode(genCode());
+      setTimeout(() => setDrillMsg(""), 5000);
+    } catch { setDrillCodeErr("Save failed"); }
+    setDrillSaving(false);
   }
 
   async function loadSavedTest(id) {
@@ -343,7 +378,7 @@ export default function TestBuilder() {
       {/* ── Right panel ── */}
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
         <div style={{background:"#004e94",display:"flex",alignItems:"flex-end",padding:"0 1rem",gap:"0.15rem",flexShrink:0}}>
-          {[["current","📋 Current Test"],["library","📚 Test Library"]].map(([key,lbl])=>(
+          {[["current","📋 Current Test"],["drill","⚡ Fluency Drill"],["library","📚 Test Library"]].map(([key,lbl])=>(
             <button key={key} onClick={()=>setRightTab(key)}
               style={{background:rightTab===key?"#fff":"transparent",color:rightTab===key?"#003865":"#cce0f5",border:"none",padding:"0.55rem 0.9rem",fontSize:"0.75rem",fontWeight:700,cursor:"pointer",borderRadius:"4px 4px 0 0"}}>
               {lbl}{key==="library"&&savedTests.length>0&&<span style={{marginLeft:"5px",background:rightTab===key?"#003865":"rgba(255,255,255,.25)",color:"#fff",borderRadius:"10px",padding:"0px 6px",fontSize:"0.65rem"}}>{savedTests.length}</span>}
@@ -407,6 +442,81 @@ export default function TestBuilder() {
               )}
             </div>
           </>
+        )}
+
+        {/* Fluency Drill */}
+        {rightTab==="drill"&&(
+          <div style={{flex:1,overflowY:"auto",padding:"1rem",display:"flex",flexDirection:"column",gap:"1rem"}}>
+            <div style={{background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"6px",padding:"0.85rem 1rem",fontSize:"0.8rem",color:"#7a4e00",lineHeight:1.5}}>
+              ⚡ <strong>Fluency Drill</strong> — each student gets <em>different numbers</em>, same standard. Great for fluency practice without answer sharing.
+            </div>
+
+            {/* Drill name */}
+            <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"0.9rem 1rem"}}>
+              <label style={S.lbl}>DRILL NAME</label>
+              <input style={S.inp} value={drillName} onChange={e=>setDrillName(e.target.value)} placeholder="e.g. Multiplication Fluency"/>
+            </div>
+
+            {/* Standard picker */}
+            <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"0.9rem 1rem"}}>
+              <label style={S.lbl}>STANDARDS — pick one or more (must have ⚡ generator)</label>
+              <div style={{display:"flex",flexWrap:"wrap",gap:"0.4rem",marginTop:"0.4rem"}}>
+                {["5.NR.1.1","5.NR.2.1","5.NR.2.2","5.NR.3.1","5.NR.3.2","5.NR.3.3","5.NR.4.1","5.NR.4.2"].map(std=>{
+                  const on = drillStds.includes(std);
+                  return (
+                    <button key={std} onClick={()=>setDrillStds(s=>on?s.filter(x=>x!==std):[...s,std])}
+                      style={{padding:"5px 10px",borderRadius:"4px",border:`2px solid ${on?"#1a6e2e":"#c8d3dd"}`,background:on?"#f0faf2":"#fafbfc",color:on?"#1a6e2e":"#555",fontSize:"0.75rem",fontWeight:700,cursor:"pointer"}}>
+                      {on?"✓ ":""}{std}
+                    </button>
+                  );
+                })}
+              </div>
+              {drillStds.length === 0 && <div style={{fontSize:"0.7rem",color:"#8b1a1a",marginTop:"6px"}}>Select at least one standard</div>}
+            </div>
+
+            {/* Question count */}
+            <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"0.9rem 1rem"}}>
+              <label style={S.lbl}>QUESTIONS PER SESSION</label>
+              <div style={{display:"flex",gap:"0.5rem",marginTop:"0.4rem"}}>
+                {[5,10,15,20].map(n=>(
+                  <button key={n} onClick={()=>setDrillCount(n)}
+                    style={{flex:1,padding:"0.55rem",border:`2px solid ${drillCount===n?"#003865":"#c8d3dd"}`,borderRadius:"4px",background:drillCount===n?"#003865":"#fafbfc",color:drillCount===n?"#fff":"#555",fontSize:"0.85rem",fontWeight:700,cursor:"pointer"}}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Code */}
+            <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"0.9rem 1rem"}}>
+              <label style={S.lbl}>STUDENT CODE</label>
+              <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
+                <input style={{...S.inp,...S.code,flex:1}} value={drillCode}
+                  onChange={e=>{ const v=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,8); setDrillCode(v); setDrillCodeErr(v.length<4?"Code must be at least 4 characters":""); }}
+                  maxLength={8} placeholder="e.g. MULT5"/>
+                <button onClick={()=>setDrillCode(genCode())} style={{...S.smBtn,flexShrink:0,padding:"0.5rem 0.75rem"}}>🔀</button>
+              </div>
+              {drillCodeErr
+                ? <div style={{fontSize:"0.7rem",color:"#8b1a1a",marginTop:"4px"}}>⚠ {drillCodeErr}</div>
+                : <div style={{fontSize:"0.7rem",color:"#888",marginTop:"4px"}}>Students enter this code to start the drill</div>}
+            </div>
+
+            {/* Preview */}
+            {drillStds.length > 0 && (
+              <div style={{background:"#f0f4f8",borderRadius:"4px",padding:"0.75rem 1rem",fontSize:"0.78rem",color:"#555"}}>
+                Each student gets <strong>{drillCount} unique questions</strong> on{" "}
+                <strong>{drillStds.join(", ")}</strong> — numbers randomized per student.
+              </div>
+            )}
+
+            {drillMsg && <div style={{background:"#f0faf2",border:"1px solid #b3dfc0",borderRadius:"4px",padding:"0.65rem 1rem",fontSize:"0.82rem",color:"#1a6e2e",fontWeight:700}}>✓ {drillMsg}</div>}
+
+            <button onClick={saveDrill}
+              disabled={drillSaving || drillStds.length===0 || !drillName.trim() || drillCode.length<4}
+              style={{background:(drillStds.length===0||!drillName.trim()||drillCode.length<4)?"#c8d3dd":"#1a6e2e",border:"none",borderRadius:"4px",padding:"0.85rem",fontSize:"0.95rem",fontWeight:700,color:"#fff",cursor:"pointer"}}>
+              {drillSaving ? "Saving…" : "⚡ Save Fluency Drill & Get Code"}
+            </button>
+          </div>
         )}
 
         {/* Library */}
