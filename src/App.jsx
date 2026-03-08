@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
 import MathTest from "./MathTest";
-import AdminShell from "./AdminShell";
 import TeacherShell from "./TeacherShell";
+import AdminShell from "./AdminShell";
 import { API } from "./shared/constants";
 
-// ── PIN Pad ────────────────────────────────────────────────
 function PinPad({ onConfirm, loading, err }) {
   const [digits, setDigits] = useState([]);
   const MAX = 5;
@@ -18,7 +17,6 @@ function PinPad({ onConfirm, loading, err }) {
       return next;
     });
   }
-
   function del() { if (!loading) setDigits(d => d.slice(0, -1)); }
 
   useEffect(() => {
@@ -36,7 +34,6 @@ function PinPad({ onConfirm, loading, err }) {
 
   return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"1.5rem"}}>
-      {/* Dots */}
       <div style={{display:"flex",gap:"0.85rem"}}>
         {Array.from({length:MAX}).map((_,i)=>(
           <div key={i} style={{width:"18px",height:"18px",borderRadius:"50%",
@@ -45,10 +42,9 @@ function PinPad({ onConfirm, loading, err }) {
             transition:"background 0.15s"}}/>
         ))}
       </div>
-      {err&&<div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"4px",
+      {err && <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"4px",
         padding:"0.55rem 1.25rem",fontSize:"0.82rem",color:"#8b1a1a",fontWeight:600,textAlign:"center"}}>
         ⚠ {err}</div>}
-      {/* Keypad */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3, 72px)",gap:"0.6rem"}}>
         {KEYS.flat().map((k,i)=>{
           if(k===null) return <div key={i}/>;
@@ -71,29 +67,37 @@ function PinPad({ onConfirm, loading, err }) {
           );
         })}
       </div>
-      {loading&&<div style={{fontSize:"0.8rem",color:"#888"}}>Checking PIN…</div>}
+      {loading && <div style={{fontSize:"0.8rem",color:"#888"}}>Checking PIN…</div>}
     </div>
   );
 }
 
-// ── Main App ───────────────────────────────────────────────
 export default function App() {
-  const [screen,   setScreen]   = useState("pin");
-  const [identity, setIdentity] = useState(null);
-  const [loading,  setLoading]  = useState(false);
-  const [err,      setErr]      = useState("");
+  const [screen,         setScreen]         = useState("pin");
+  const [studentIdentity,setStudentIdentity]= useState(null);
+  const [teacherIdentity,setTeacherIdentity]= useState(null);
+  const [loading,        setLoading]        = useState(false);
+  const [err,            setErr]            = useState("");
+
+  function reset() { setScreen("pin"); setErr(""); setStudentIdentity(null); setTeacherIdentity(null); }
 
   async function handlePin(pin) {
     setLoading(true); setErr("");
     try {
       const r    = await fetch(`${API}/auth/pin/${pin}`);
       const data = await r.json();
-      if (data.role==="admin") {
+      if (data.role === "admin") {
         setScreen("admin");
-      } else if (data.role==="teacher") {
+      } else if (data.role === "teacher") {
+        setTeacherIdentity({
+          teacherId:   data.teacherId,
+          teacherName: data.teacherName,
+          classIds:    data.classIds,   // null means legacy (sees all)
+          isLegacy:    data.isLegacy,
+        });
         setScreen("teacher");
-      } else if (data.role==="student") {
-        setIdentity(data);
+      } else if (data.role === "student") {
+        setStudentIdentity(data);
         setScreen("student");
       } else {
         setErr("PIN not recognized. Check with your teacher.");
@@ -104,9 +108,9 @@ export default function App() {
     setLoading(false);
   }
 
-  if (screen==="admin")   return <AdminShell   onBack={()=>{setScreen("pin");setErr("");}}/>;
-  if (screen==="teacher") return <TeacherShell pinAuth onBack={()=>{setScreen("pin");setErr("");}}/>;
-  if (screen==="student") return <MathTest identity={identity} onBack={()=>{setScreen("pin");setErr("");setIdentity(null);}}/>;
+  if (screen === "admin")   return <AdminShell   onBack={reset}/>;
+  if (screen === "teacher") return <TeacherShell teacher={teacherIdentity} onBack={reset}/>;
+  if (screen === "student") return <MathTest     identity={studentIdentity} onBack={reset}/>;
 
   return (
     <div style={{minHeight:"100vh",background:"#e8edf2",display:"flex",flexDirection:"column",
