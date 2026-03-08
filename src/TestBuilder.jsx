@@ -107,6 +107,7 @@ function SaveTestModal({ count, currentTitle, onSave, onClose }) {
   const [code, setCode]   = useState(genCode());
   const [saving, setSaving] = useState(false);
   const [codeErr, setCodeErr] = useState("");
+  const [adaptive, setAdaptive] = useState(false);
 
   function handleCodeChange(val) {
     const clean = val.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,8);
@@ -117,7 +118,7 @@ function SaveTestModal({ count, currentTitle, onSave, onClose }) {
   async function handleSave() {
     if (!name.trim() || code.length < 4) return;
     setSaving(true);
-    const err = await onSave(name.trim(), code);
+    const err = await onSave(name.trim(), code, adaptive);
     if (err) { setCodeErr(err); setSaving(false); }
   }
 
@@ -145,6 +146,18 @@ function SaveTestModal({ count, currentTitle, onSave, onClose }) {
           </div>
           <div style={{background:"#f0f4f8",borderRadius:"3px",padding:"0.65rem 0.85rem",fontSize:"0.78rem",color:"#555"}}>
             Students log in and enter <strong style={S.code}>{code||"—"}</strong> to take this {count}-question test.
+          </div>
+          <div>
+            <label style={{display:"flex",alignItems:"center",gap:"0.75rem",cursor:"pointer",padding:"0.65rem 0.85rem",background:adaptive?"#f0faf2":"#fafbfc",border:`1px solid ${adaptive?"#b3dfc0":"#dde3e9"}`,borderRadius:"3px"}}>
+              <div onClick={()=>setAdaptive(a=>!a)}
+                style={{width:"36px",height:"20px",borderRadius:"10px",background:adaptive?"#1a6e2e":"#c8d3dd",position:"relative",flexShrink:0,transition:"background .2s"}}>
+                <div style={{position:"absolute",top:"2px",left:adaptive?"18px":"2px",width:"16px",height:"16px",borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+              </div>
+              <div>
+                <div style={{fontSize:"0.82rem",fontWeight:700,color:adaptive?"#1a6e2e":"#333"}}>Adaptive Mode {adaptive?"ON":"OFF"}</div>
+                <div style={{fontSize:"0.7rem",color:"#888",marginTop:"1px"}}>Questions adjust to each student's weak areas during the test</div>
+              </div>
+            </label>
           </div>
         </div>
         <div style={{display:"flex",gap:"0.65rem",padding:"0.9rem 1.25rem",borderTop:"1px solid #dde3e9"}}>
@@ -230,9 +243,9 @@ export default function TestBuilder() {
 
   function handleSaveEdit(updated) { setBank(b=>b.map(q=>q.id===updated.id?updated:q)); setEditingQ(null); }
 
-  async function saveTest(name, code) {
+  async function saveTest(name, code, adaptive=false) {
     try {
-      const r = await fetch(`${API}/tests/saved`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,code,title:testTitle,questions:selectedQuestions})});
+      const r = await fetch(`${API}/tests/saved`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,code,title:testTitle,questions:selectedQuestions,adaptive})});
       const data = await r.json();
       if (r.status===400) return data.detail || "Code already in use";
       await loadSavedTests();
