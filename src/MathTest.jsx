@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import MathText from "./shared/MathText";
 import TopBar from "./shared/TopBar";
 import { QUESTIONS as FALLBACK_QUESTIONS, START_SECS, LETTERS, S, pct, lvl, lvlC, lvlBg, lvlBd, fmtTime, now, saveSession, sendHeartbeat, API } from "./shared/constants";
+import { buildWeightMap, updateSessionWeights, pickAdaptiveQuestion, ALL_STANDARDS } from "./adaptive";
 
 // ── Student Login ──────────────────────────────────────────
 function StudentLogin({ onStartTest, onStartPractice, onBack }) {
@@ -217,42 +218,49 @@ function StudentLogin({ onStartTest, onStartPractice, onBack }) {
 
 // ── Practice Mode ──────────────────────────────────────────
 function PracticeMode({ student, cls, onFinish, onQuit }) {
-  const [questions,   setQuestions]   = useState([]);
+  const [bankQ,       setBankQ]       = useState([]);
+  const [weights,     setWeights]     = useState({});
+  const [seenIds,     setSeenIds]     = useState(new Set());
   const [loading,     setLoading]     = useState(true);
-  const [cur,         setCur]         = useState(0);
-  const [selected,    setSelected]    = useState(null);   // chosen answer for current Q
-  const [revealed,    setRevealed]    = useState(false);  // feedback shown
-  const [history,     setHistory]     = useState([]);     // [{q, chosen, correct, timeSecs}]
+  const [curQ,        setCurQ]        = useState(null);
+  const [selected,    setSelected]    = useState(null);
+  const [revealed,    setRevealed]    = useState(false);
+  const [history,     setHistory]     = useState([]);
   const [qStart,      setQStart]      = useState(Date.now());
   const [totalSecs,   setTotalSecs]   = useState(0);
-  const [done,        setDone]        = useState(false);
   const timerRef = useRef(null);
+  const LIMIT = 10;
 
-  // Fetch + shuffle questions
+  // Fetch bank + student history to seed weights
   useEffect(() => {
-    fetch(`${API}/questions`)
-      .then(r => r.json())
-      .then(data => {
-        const qs = Array.isArray(data) && data.length ? data : FALLBACK_QUESTIONS;
-        // Shuffle
-        const shuffled = [...qs].sort(() => Math.random() - 0.5).slice(0, 10);
-        setQuestions(shuffled);
-        setLoading(false);
-        setQStart(Date.now());
-      })
-      .catch(() => {
-        const shuffled = [...FALLBACK_QUESTIONS].sort(() => Math.random() - 0.5).slice(0, 10);
-        setQuestions(shuffled);
-        setLoading(false);
-        setQStart(Date.now());
-      });
-  }, []);
-
-  // Total session timer
-  useEffect(() => {
+    async function init() {
+      let bank = FALLBACK_QUESTIONS;
+      let initWeights = {};
+      try {
+        const [qRes, hRes] = await Promise.all([
+          fetch(`${API}/questions`).then(r=>r.json()).catch(()=>[]),
+          student?.id
+            ? fetch(`${API}/student/history/${encodeURIComponent(student.id)}`).then(r=>r.json()).catch(()=>[])
+            : Promise.resolve([]),
+        ]);
+        if (Array.isArray(qRes) && qRes.length) bank = qRes;
+        if (Array.isArray(hRes) && hRes.length)  initWeights = buildWeightMap(hRes);
+      } catch {}
+      // Seed all standards at 0.5 if not in history
+      ALL_STANDARDS.forEach(std => { if (!initWeights[std]) initWeights[std] = 0.5; });
+      setBankQ(bank);
+      setWeights(initWeights);
+      // Pick first question
+      const first = pickAdaptiveQuestion(bank, initWeights, new Set(), ALL_STANDARDS);
+      setCurQ(first);
+      setSeenIds(new Set([first.id]));
+      setLoading(false);
+      setQStart(Date.now());
+    }
+    init();
     timerRef.current = setInterval(() => setTotalSecs(s => s + 1), 1000);
     return () => clearInterval(timerRef.current);
-  }, []);
+  }, []);  // eslint-disable-line
 
   function handleChoose(choice) {
     if (revealed) return;
@@ -261,20 +269,28 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
   }
 
   function handleNext() {
-    const q = questions[cur];
     const timeSecs = Math.round((Date.now() - qStart) / 1000);
-    const isCorrect = selected === q.correct;
-    setHistory(h => [...h, { q, chosen: selected, correct: isCorrect, timeSecs }]);
+    const isCorrect = selected === curQ.correct;
+    const newHistory = [...history, { q: curQ, chosen: selected, correct: isCorrect, timeSecs }];
+    setHistory(newHistory);
 
-    if (cur >= questions.length - 1) {
-      // Ran out of questions — wrap or finish
-      handleFinish([...history, { q, chosen: selected, correct: isCorrect, timeSecs }]);
-    } else {
-      setCur(c => c + 1);
-      setSelected(null);
-      setRevealed(false);
-      setQStart(Date.now());
+    if (newHistory.length >= LIMIT) {
+      handleFinish(newHistory);
+      return;
     }
+
+    // Update weights based on session so far
+    const newWeights = updateSessionWeights(weights, newHistory, ALL_STANDARDS);
+    setWeights(newWeights);
+
+    // Pick next question adaptively
+    const newSeen = new Set([...seenIds, curQ.id]);
+    const next = pickAdaptiveQuestion(bankQ, newWeights, newSeen, ALL_STANDARDS);
+    setSeenIds(new Set([...newSeen, next.id]));
+    setCurQ(next);
+    setSelected(null);
+    setRevealed(false);
+    setQStart(Date.now());
   }
 
   function handleFinish(finalHistory) {
@@ -308,17 +324,18 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
     <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#e8edf2",fontFamily:"sans-serif"}}>
       <div style={{textAlign:"center",color:"#aaa"}}>
         <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>🎯</div>
-        Loading questions…
+        <div>Building your practice session…</div>
       </div>
     </div>
   );
 
-  if (done || questions.length === 0) return null;
+  if (!curQ) return null;
 
-  const q = questions[cur];
+  const q = curQ;
   const correct = q.correct;
   const streak  = (() => { let s=0; for(let i=history.length-1;i>=0;i--){ if(history[i].correct) s++; else break; } return s; })();
   const totalCorrect = history.filter(x=>x.correct).length;
+  const questionNum  = history.length + 1;
 
   return (
     <div style={{display:"flex",flexDirection:"column",minHeight:"100vh",fontFamily:"sans-serif",background:"#e8edf2"}}>
@@ -347,11 +364,12 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
       </div>
 
       {/* Question counter strip */}
-      <div style={{background:"#155a27",color:"#a8e6b8",padding:"0.4rem 1.5rem",fontSize:"0.7rem",display:"flex",gap:"1rem"}}>
-        <span>Question {history.length + 1} of 10</span>
+      <div style={{background:"#155a27",color:"#a8e6b8",padding:"0.4rem 1.5rem",fontSize:"0.7rem",display:"flex",gap:"1rem",alignItems:"center"}}>
+        <span>Question {questionNum} of {LIMIT}</span>
         <span style={{opacity:.6}}>·</span>
         <span style={{color:"#fff",fontWeight:700}}>{q.standard}</span>
         {q.dok && <><span style={{opacity:.6}}>·</span><span>DOK {q.dok}</span></>}
+        {q.parametric && <span style={{background:"rgba(255,255,255,.2)",borderRadius:"8px",padding:"1px 7px",fontSize:"0.65rem",fontWeight:700}}>⚡ Generated</span>}
       </div>
 
       {/* Question area */}
@@ -489,7 +507,10 @@ function PracticeResults({ session, history, onReset }) {
 }
 
 // ── Student Test ───────────────────────────────────────────
-function StudentTest({ studentName, questions, onFinish }) {
+function StudentTest({ studentName, studentId, questions: initialQuestions, adaptive, onFinish }) {
+  const [questions, setQuestions] = useState(initialQuestions);
+  const [weights,   setWeights]   = useState({});
+  const [seenIds,   setSeenIds]   = useState(new Set(initialQuestions.map(q=>q.id)));
   const TOTAL = questions.length;
   const [cur,   setCur]   = useState(0);
   const [ans,   setAns]   = useState({});
@@ -497,6 +518,50 @@ function StudentTest({ studentName, questions, onFinish }) {
   const [secs,  setSecs]  = useState(START_SECS);
   const [modal, setModal] = useState(false);
   const [nav,   setNav]   = useState(window.innerWidth > 640);
+
+  // Adaptive: fetch student history and seed weights
+  useEffect(() => {
+    if (!adaptive) return;
+    async function seedWeights() {
+      try {
+        const hRes = studentId
+          ? await fetch(`${API}/student/history/${encodeURIComponent(studentId)}`).then(r=>r.json()).catch(()=>[])
+          : [];
+        const initW = buildWeightMap(Array.isArray(hRes) ? hRes : []);
+        ALL_STANDARDS.forEach(std => { if (!initW[std]) initW[std] = 0.5; });
+        setWeights(initW);
+      } catch {}
+    }
+    seedWeights();
+  }, [adaptive, studentId]);  // eslint-disable-line
+
+  // Adaptive: when student answers, swap in an adaptive next question
+  function handleAdaptiveAnswer(qId, choice) {
+    if (!adaptive) return;
+    setAns(prev => {
+      const newAns = {...prev, [qId]: choice};
+      // Build mini history from current answers
+      const miniHistory = questions.slice(0, cur+1).map(q => ({
+        q, chosen: newAns[q.id], correct: newAns[q.id] === q.correct
+      }));
+      const newW = updateSessionWeights(weights, miniHistory, ALL_STANDARDS);
+      setWeights(newW);
+      // Replace the NEXT question in the queue if there is one
+      if (cur + 1 < questions.length) {
+        const newSeen = new Set([...seenIds]);
+        const nextQ = pickAdaptiveQuestion(initialQuestions, newW, newSeen, ALL_STANDARDS);
+        if (nextQ && nextQ.id !== questions[cur+1].id) {
+          setQuestions(qs => {
+            const updated = [...qs];
+            updated[cur+1] = nextQ;
+            return updated;
+          });
+          setSeenIds(s => new Set([...s, nextQ.id]));
+        }
+      }
+      return newAns;
+    });
+  }
 
   useEffect(()=>{ const t=setInterval(()=>setSecs(s=>s>0?s-1:0),1000); return()=>clearInterval(t); },[]);
   useEffect(()=>{
@@ -591,7 +656,7 @@ function StudentTest({ studentName, questions, onFinish }) {
             <div style={{display:"flex",flexDirection:"column",gap:"0.55rem"}}>
               {q.choices.map((choice,i)=>{
                 const chosen = sel===choice;
-                return <label key={i} onClick={()=>setAns(p=>({...p,[q.id]:choice}))}
+                return <label key={i} onClick={()=>{ setAns(p=>({...p,[q.id]:choice})); handleAdaptiveAnswer(q.id, choice); }}
                   style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.8rem 1rem",border:`2px solid ${chosen?"#003865":"#c8d3dd"}`,borderRadius:"3px",background:chosen?"#ddeaf7":"#fafbfc",cursor:"pointer"}}>
                   <div style={{width:"26px",height:"26px",borderRadius:"50%",border:`2px solid ${chosen?"#003865":"#9aabba"}`,background:chosen?"#003865":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                     <span style={{fontSize:"0.7rem",fontWeight:700,color:chosen?"#fff":"#667"}}>{LETTERS[i]}</span>
@@ -701,9 +766,12 @@ export default function MathTest({ onBack }) {
     setScreen("login");
   }
 
+  const [isAdaptive, setIsAdaptive] = useState(false);
+
   function handleStartTest(studentObj, classObj, code, testInfo) {
     setStudent(studentObj); setCls(classObj); setTestCode(code);
     if (testInfo?.questions?.length) setQuestions(testInfo.questions);
+    setIsAdaptive(!!testInfo?.adaptive);
     setScreen("test");
   }
 
@@ -754,7 +822,7 @@ export default function MathTest({ onBack }) {
     return <PracticeResults session={finalSession} history={practiceHistory} onReset={reset}/>;
 
   if (screen === "test")
-    return <StudentTest studentName={student?.name || ""} questions={questions} onFinish={handleFinishTest}/>;
+    return <StudentTest studentName={student?.name || ""} studentId={student?.id || ""} questions={questions} adaptive={isAdaptive} onFinish={handleFinishTest}/>;
 
   if (screen === "results")
     return <StudentResults session={finalSession} questions={questions} onReset={()=>{ reset(); onBack(); }}/>;
