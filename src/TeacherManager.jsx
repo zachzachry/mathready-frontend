@@ -82,18 +82,19 @@ function ClassPicker({ allClasses, selected, onChange, onClassCreated }) {
 }
 
 function TeacherForm({ teacher, allClasses, onSave, onCancel, onClassCreated }) {
-  const [name,     setName]     = useState(teacher?.name     || "");
-  const [pin,      setPin]      = useState("");
-  const [classIds, setClassIds] = useState(teacher?.classIds || []);
-  const [err,      setErr]      = useState("");
-  const [saving,   setSaving]   = useState(false);
+  const [name,       setName]       = useState(teacher?.name     || "");
+  const [pin,        setPin]        = useState("");
+  const [changingPin,setChangingPin]= useState(!teacher); // true for new, false for edit
+  const [classIds,   setClassIds]   = useState(teacher?.classIds || []);
+  const [err,        setErr]        = useState("");
+  const [saving,     setSaving]     = useState(false);
 
   async function submit() {
     if (!name.trim()) { setErr("Name is required."); return; }
-    if (!teacher && (!pin || pin.length !== 5)) { setErr("PIN must be exactly 5 digits."); return; }
-    if (pin && !/^[0-9]{5}$/.test(pin)) { setErr("PIN must be exactly 5 digits."); return; }
+    if (changingPin && (!pin || pin.length !== 5)) { setErr("PIN must be exactly 5 digits."); return; }
+    if (changingPin && !/^[0-9]{5}$/.test(pin)) { setErr("PIN must be exactly 5 digits."); return; }
     setSaving(true); setErr("");
-    const body = { name: name.trim(), pin: pin || "", classIds };
+    const body = { name: name.trim(), pin: changingPin ? pin : "", classIds };
     try {
       const url    = teacher ? `${API}/teachers/${teacher.id}` : `${API}/teachers`;
       const method = teacher ? "PUT" : "POST";
@@ -119,10 +120,32 @@ function TeacherForm({ teacher, allClasses, onSave, onCancel, onClassCreated }) 
             placeholder="Ms. Johnson" autoFocus/>
         </div>
         <div>
-          <label style={S.lbl}>{teacher ? "NEW PIN (leave blank to keep)" : "PIN (5 digits)"}</label>
-          <input style={{...S.inp, fontFamily:"monospace", letterSpacing:"0.2em"}}
-            value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,"").slice(0,5))}
-            placeholder={teacher ? "•••••" : "12345"} maxLength={5}/>
+          <label style={S.lbl}>PIN</label>
+          {!teacher || changingPin ? (
+            <div style={{display:"flex",gap:"0.4rem",alignItems:"center"}}>
+              <input style={{...S.inp, fontFamily:"monospace", letterSpacing:"0.2em", flex:1}}
+                value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,"").slice(0,5))}
+                placeholder="12345" maxLength={5} autoFocus={!!teacher}/>
+              {teacher && (
+                <button type="button" onClick={()=>{setChangingPin(false);setPin("");setErr("");}}
+                  style={{...S.btn,padding:"5px 10px",fontSize:"0.75rem",whiteSpace:"nowrap"}}>
+                  Cancel
+                </button>
+              )}
+            </div>
+          ) : (
+            <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
+              <div style={{flex:1,padding:"0.5rem 0.75rem",background:"#f0f4f8",border:"1px solid #c8d3dd",
+                borderRadius:"3px",fontFamily:"monospace",letterSpacing:"0.25em",fontSize:"1rem",color:"#888"}}>
+                {"•••••"}
+              </div>
+              <button type="button" onClick={()=>setChangingPin(true)}
+                style={{...S.btn,padding:"5px 12px",fontSize:"0.75rem",whiteSpace:"nowrap",
+                  background:"#fff3cd",borderColor:"#ffc107",color:"#7a4e00",fontWeight:700}}>
+                🔑 Change PIN
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
