@@ -397,7 +397,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
           {revealed && (
             <div style={{borderRadius:"6px",padding:"1rem 1.25rem",background:selected===correct?"#f0faf2":"#fdf2f2",border:`1px solid ${selected===correct?"#b3dfc0":"#f0b8b8"}`}}>
               <div style={{fontSize:"1rem",fontWeight:700,color:selected===correct?"#1a6e2e":"#8b1a1a",marginBottom:q.explanation?"6px":0}}>
-                {selected===correct ? "✓ Correct!" : `✗ The correct answer is: ${correct}`}
+                {selected===correct ? "✓ Correct!" : <span>✗ The correct answer is: <MathText text={correct}/></span>}
               </div>
               {q.explanation && (
                 <div style={{fontSize:"0.85rem",color:"#444",lineHeight:1.6}}>
