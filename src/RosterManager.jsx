@@ -367,7 +367,7 @@ export default function RosterManager() {
                     {adding?"Adding…":"+ Add"}
                   </button>
                 </div>
-              ) : (
+              ) : addMode==="paste" ? (
                 <div>
                   <label style={S.lbl}>PASTE NAMES — one per line</label>
                   <textarea style={S.ta} value={pasteInput} onChange={e=>setPasteInput(e.target.value)}
