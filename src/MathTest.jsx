@@ -6,13 +6,13 @@ import { buildWeightMap, updateSessionWeights, pickAdaptiveQuestion, ALL_STANDAR
 import PlotGrid from "./shared/PlotGrid";
 
 // ── Student Login ──────────────────────────────────────────
-function StudentLogin({ onStartTest, onStartPractice, onBack }) {
+function StudentLogin({ onStartTest, onStartPractice, onBack, prefill, codeOnly }) {
   const [classes,    setClasses]    = useState([]);
   const [classId,    setClassId]    = useState("");
   const [studentId,  setStudentId]  = useState("");
   const [code,       setCode]       = useState("");
   const [err,        setErr]        = useState("");
-  const [step,       setStep]       = useState("form");   // form → mode → code → confirm
+  const [step,       setStep]       = useState(codeOnly ? "code" : "form");   // form → mode → code → confirm
   const [loading,    setLoading]    = useState(true);
   const [checking,   setChecking]   = useState(false);
   const [testInfo,   setTestInfo]   = useState(null);
@@ -24,8 +24,8 @@ function StudentLogin({ onStartTest, onStartPractice, onBack }) {
       .catch(() => setLoading(false));
   }, []);
 
-  const selectedClass   = classes.find(c => c.id === classId);
-  const selectedStudent = selectedClass?.students.find(s => s.id === studentId);
+  const selectedClass   = prefill?.cls     || classes.find(c => c.id === classId);
+  const selectedStudent = prefill?.student || selectedClass?.students?.find(s => s.id === studentId);
 
   // Step 1: class + name selected → go to mode picker
   function handleContinueToMode() {
@@ -796,23 +796,28 @@ function StudentResults({ session, questions, onReset }) {
 }
 
 // ── Main shell ─────────────────────────────────────────────
-export default function MathTest({ onBack }) {
-  const [screen,        setScreen]        = useState("login");
-  const [student,       setStudent]       = useState(null);
-  const [cls,           setCls]           = useState(null);
-  const [testCode,      setTestCode]      = useState("");
-  const [finalSession,  setFinalSession]  = useState(null);
+export default function MathTest({ onBack, identity }) {
+  // identity is pre-filled from PIN login: { studentId, studentName, classId, className }
+  const [screen,          setScreen]          = useState(identity ? "mode" : "login");
+  const [student,         setStudent]         = useState(
+    identity ? { id: identity.studentId, name: identity.studentName } : null
+  );
+  const [cls,             setCls]             = useState(
+    identity ? { id: identity.classId, name: identity.className } : null
+  );
+  const [testCode,        setTestCode]        = useState("");
+  const [finalSession,    setFinalSession]    = useState(null);
   const [practiceHistory, setPracticeHistory] = useState([]);
-  const [questions,     setQuestions]     = useState(FALLBACK_QUESTIONS);
+  const [questions,       setQuestions]       = useState(FALLBACK_QUESTIONS);
+  const [isAdaptive,      setIsAdaptive]      = useState(false);
+  const [isDrill,         setIsDrill]         = useState(false);
 
   function reset() {
-    setStudent(null); setCls(null); setTestCode("");
     setFinalSession(null); setPracticeHistory([]);
-    setScreen("login");
+    setTestCode("");
+    // If came via PIN, go back to mode picker not login
+    setScreen(identity ? "mode" : "login");
   }
-
-  const [isAdaptive, setIsAdaptive] = useState(false);
-  const [isDrill,    setIsDrill]    = useState(false);
 
   function handleStartTest(studentObj, classObj, code, testInfo) {
     setStudent(studentObj); setCls(classObj); setTestCode(code);
@@ -820,7 +825,6 @@ export default function MathTest({ onBack }) {
     setIsDrill(drill);
     setIsAdaptive(!!testInfo?.adaptive && !drill);
     if (drill) {
-      // Generate unique questions for this student right now
       const qs = generateDrill(testInfo.drillStandards || [], testInfo.drillCount || 10);
       setQuestions(qs.length ? qs : FALLBACK_QUESTIONS.slice(0, testInfo.drillCount || 10));
     } else if (testInfo?.questions?.length) {
@@ -842,7 +846,7 @@ export default function MathTest({ onBack }) {
       classId:     cls?.id       || "",
       className:   cls?.name     || "",
       testCode,
-      mode:        isDrill ? "drill" : "test",
+      mode: isDrill ? "drill" : "test",
     };
     try {
       await fetch(`${API}/submit`, {
@@ -864,6 +868,55 @@ export default function MathTest({ onBack }) {
     setFinalSession(session);
     setPracticeHistory(history);
     setScreen("practice-results");
+  }
+
+  // ── Mode picker — shown when identity is known (PIN login) ──
+  if (screen === "mode") {
+    const s = student || (identity ? { id: identity.studentId, name: identity.studentName } : null);
+    const c = cls    || (identity ? { id: identity.classId,   name: identity.className   } : null);
+    return (
+      <div style={{minHeight:"100vh",background:"#e8edf2",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontFamily:"sans-serif",padding:"2rem 1rem",gap:"1.5rem"}}>
+        <div style={{background:"#003865",borderRadius:"6px",padding:"1rem 2rem",color:"#fff",textAlign:"center",width:"100%",maxWidth:"480px"}}>
+          <div style={{fontSize:"0.6rem",letterSpacing:"0.16em",opacity:.65,marginBottom:"3px"}}>SIGNED IN</div>
+          <div style={{fontSize:"1.2rem",fontWeight:700}}>{s?.name}</div>
+          <div style={{fontSize:"0.8rem",opacity:.75,marginTop:"2px"}}>{c?.name}</div>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:"1rem",width:"100%",maxWidth:"480px"}}>
+          <button onClick={()=>handleStartPractice(s,c)}
+            style={{background:"#fff",border:"2px solid #1a6e2e",borderRadius:"8px",padding:"1.75rem 2rem",textAlign:"left",cursor:"pointer",display:"flex",alignItems:"center",gap:"1.25rem",boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
+            <div style={{width:"52px",height:"52px",borderRadius:"50%",background:"#f0faf2",border:"2px solid #b3dfc0",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:"1.6rem"}}>🎯</div>
+            <div>
+              <div style={{fontSize:"1.05rem",fontWeight:700,color:"#1a6e2e",marginBottom:"4px"}}>Practice Mode</div>
+              <div style={{fontSize:"0.82rem",color:"#555",lineHeight:1.5}}>Adaptive questions targeting your weak areas. Instant feedback after each answer.</div>
+            </div>
+          </button>
+          <button onClick={()=>setScreen("code")}
+            style={{background:"#fff",border:"2px solid #003865",borderRadius:"8px",padding:"1.75rem 2rem",textAlign:"left",cursor:"pointer",display:"flex",alignItems:"center",gap:"1.25rem",boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
+            <div style={{width:"52px",height:"52px",borderRadius:"50%",background:"#ddeaf7",border:"2px solid #9dbfe0",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:"1.6rem"}}>📝</div>
+            <div>
+              <div style={{fontSize:"1.05rem",fontWeight:700,color:"#003865",marginBottom:"4px"}}>Take a Test</div>
+              <div style={{fontSize:"0.82rem",color:"#555",lineHeight:1.5}}>Enter a test code from your teacher.</div>
+            </div>
+          </button>
+        </div>
+        <button onClick={onBack} style={{fontSize:"0.78rem",color:"#888",background:"none",border:"none",cursor:"pointer",textDecoration:"underline"}}>
+          ← Sign out
+        </button>
+      </div>
+    );
+  }
+
+  // ── Code entry (from mode picker) ──
+  if (screen === "code") {
+    const s = student || { id: identity?.studentId, name: identity?.studentName };
+    const c = cls    || { id: identity?.classId,   name: identity?.className };
+    return <StudentLogin
+      prefill={{ student: s, cls: c }}
+      onStartTest={handleStartTest}
+      onStartPractice={handleStartPractice}
+      onBack={()=>setScreen("mode")}
+      codeOnly
+    />;
   }
 
   if (screen === "login")
