@@ -111,8 +111,8 @@ export default function Dashboard({ teacher }) {
   const refresh = useCallback(async () => {
     try {
       const [s, r, q] = await Promise.all([
-        fetch(`${API}/sessions${teacher?.classIds ? "?classIds="+teacher.classIds.join(",") : ""}`).then(r=>r.json()),
-        fetch(`${API}/roster${teacher?.classIds ? "?classIds="+teacher.classIds.join(",") : ""}`).then(r=>r.json()),
+        fetch(`${API}/sessions${teacher && teacher.classIds !== null ? "?classIds="+teacher.classIds.join(",") : ""}`).then(r=>r.json()),
+        fetch(`${API}/roster${teacher && teacher.classIds !== null ? "?classIds="+teacher.classIds.join(",") : ""}`).then(r=>r.json()),
         fetch(`${API}/questions`).then(r=>r.json()).catch(()=>[]),
       ]);
       setSessions(Array.isArray(s) ? s : []);
