@@ -106,14 +106,18 @@ export default function Dashboard() {
   const [growthClass,   setGrowthClass]   = useState("all");
   const [growthStudent, setGrowthStudent] = useState("all");
 
+  const [bankQ, setBankQ] = useState(QUESTIONS);
+
   const refresh = useCallback(async () => {
     try {
-      const [s, r] = await Promise.all([
+      const [s, r, q] = await Promise.all([
         fetch(`${API}/sessions`).then(r=>r.json()),
         fetch(`${API}/roster`).then(r=>r.json()),
+        fetch(`${API}/questions`).then(r=>r.json()).catch(()=>[]),
       ]);
       setSessions(Array.isArray(s) ? s : []);
       setRoster(Array.isArray(r) ? r : []);
+      if (Array.isArray(q) && q.length > 0) setBankQ(q);
     } catch { setSessions([]); }
     setLoading(false);
   }, []);
@@ -136,7 +140,6 @@ export default function Dashboard() {
 
   // ── Item analysis (use live question ids if available) ──
   const allQIds = [...new Set(sessions.flatMap(s=>Object.keys(s.answers||{})))];
-  const bankQ   = QUESTIONS;
   const itemData = bankQ.map(q => {
     const correct = sessions.filter(s=>s.answers?.[q.id]===q.correct).length;
     const attempted = sessions.filter(s=>q.id in (s.answers||{})).length;
