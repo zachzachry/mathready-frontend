@@ -139,6 +139,103 @@ function ClassDetail({ cls, onClose }) {
   );
 }
 
+// ── Class Admin ────────────────────────────────────────────
+function ClassAdmin() {
+  const [classes,  setClasses]  = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [newName,  setNewName]  = useState("");
+  const [adding,   setAdding]   = useState(false);
+  const [msg,      setMsg]      = useState("");
+
+  const load = useCallback(async () => {
+    try { const r = await fetch(`${API}/roster`); setClasses(await r.json()); }
+    catch {}
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  function flash(t) { setMsg(t); setTimeout(()=>setMsg(""), 3000); }
+
+  async function addClass() {
+    if (!newName.trim()) return;
+    setAdding(true);
+    try {
+      await fetch(`${API}/roster/class`, { method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ name: newName.trim() }) });
+      setNewName(""); await load(); flash("Class created!");
+    } catch {}
+    setAdding(false);
+  }
+
+  async function deleteClass(cls) {
+    if (!window.confirm(`Delete "${cls.name}" and all its students?`)) return;
+    try { await fetch(`${API}/roster/class/${cls.id}`, { method:"DELETE" }); await load(); }
+    catch {}
+  }
+
+  if (loading) return <div style={{padding:"2rem",color:"#aaa"}}>Loading…</div>;
+
+  return (
+    <div style={{ padding:"1.25rem", maxWidth:"700px", fontFamily:"sans-serif" }}>
+      <div style={{ fontSize:"1rem", fontWeight:700, color:NAVY, marginBottom:"4px" }}>Manage Classes</div>
+      <div style={{ fontSize:"0.75rem", color:"#888", marginBottom:"1.25rem" }}>
+        Create classes here, then assign them to teachers in the Teachers tab.
+      </div>
+
+      {/* Add class */}
+      <div style={{ display:"flex", gap:"0.5rem", marginBottom:"1rem" }}>
+        <input value={newName} onChange={e=>setNewName(e.target.value)}
+          onKeyDown={e=>e.key==="Enter"&&addClass()}
+          placeholder="Class name, e.g. Ms. Johnson Period 1"
+          style={{ flex:1, padding:"0.5rem 0.75rem", border:"1px solid #c8d3dd", borderRadius:"3px",
+            fontSize:"0.85rem", background:"#fafbfc" }}/>
+        <button onClick={addClass} disabled={adding||!newName.trim()}
+          style={{ background:NAVY, color:"#fff", border:"none", borderRadius:"3px",
+            padding:"0 1.25rem", cursor:"pointer", fontSize:"0.85rem", fontWeight:700,
+            opacity:adding||!newName.trim()?0.6:1 }}>
+          {adding ? "Adding…" : "+ Add Class"}
+        </button>
+      </div>
+
+      {msg && <div style={{ background:"#f0faf2", border:"1px solid #b3dfc0", borderRadius:"3px",
+        padding:"0.5rem 0.85rem", fontSize:"0.78rem", color:GREEN, fontWeight:700, marginBottom:"0.85rem" }}>
+        ✓ {msg}
+      </div>}
+
+      {/* Class list */}
+      {classes.length === 0 ? (
+        <div style={{ background:"#f8fafc", border:"1px dashed #c8d3dd", borderRadius:"6px",
+          padding:"2rem", textAlign:"center", color:"#aaa" }}>
+          No classes yet. Add your first class above.
+        </div>
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:"0.4rem" }}>
+          {classes.map((cls, i) => (
+            <div key={cls.id} style={{ background:"#fff", border:"1px solid #dde3e9", borderRadius:"4px",
+              padding:"0.75rem 1rem", display:"flex", alignItems:"center", gap:"0.75rem" }}>
+              <div style={{ width:"28px", height:"28px", borderRadius:"50%", background:NAVY, flexShrink:0,
+                display:"flex", alignItems:"center", justifyContent:"center",
+                fontSize:"0.72rem", color:"#fff", fontWeight:700 }}>{i+1}</div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontWeight:700, color:"#1a1a1a", fontSize:"0.9rem" }}>{cls.name}</div>
+                <div style={{ fontSize:"0.7rem", color:"#aaa" }}>
+                  {cls.students?.length || 0} student{cls.students?.length!==1?"s":""}
+                </div>
+              </div>
+              <button onClick={()=>deleteClass(cls)}
+                style={{ border:"1px solid #f0b8b8", borderRadius:"3px", padding:"3px 10px",
+                  cursor:"pointer", fontSize:"0.72rem", fontWeight:600,
+                  background:"#fdf2f2", color:"#8b1a1a" }}>✕ Delete</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Admin Shell ───────────────────────────────────────
 export default function AdminShell({ onBack }) {
   const [data,     setData]     = useState(null);
@@ -234,7 +331,7 @@ export default function AdminShell({ onBack }) {
       {/* Tabs */}
       <div style={{ background:"#fff", borderBottom:"2px solid #c8d3dd", padding:"0 1.5rem",
         display:"flex", gap:"0", flexShrink:0 }}>
-        {[["overview","📊 Classes"], ["gaps","⚠ School-Wide Gaps"], ["teachers","👩‍🏫 Teachers"]].map(([key, label]) => (
+        {[["overview","📊 Classes"], ["gaps","⚠ School-Wide Gaps"], ["teachers","👩‍🏫 Teachers"], ["classes","🏫 Manage Classes"]].map(([key, label]) => (
           <button key={key} onClick={() => { setTab(key); setSelected(null); }}
             style={{ padding:"0.65rem 1.25rem", background:"none", border:"none",
               borderBottom: tab===key ? `3px solid ${NAVY}` : "3px solid transparent",
@@ -273,6 +370,7 @@ export default function AdminShell({ onBack }) {
         )}
 
         {tab === "teachers" && <TeacherManager/>}
+        {tab === "classes"  && <ClassAdmin/>}
 
         {tab === "gaps" && (
           <div style={{ maxWidth:"700px" }}>
