@@ -433,7 +433,7 @@ export default function Dashboard() {
         <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:"0.5rem",paddingBottom:"4px"}}>
           <div style={{fontSize:"0.68rem",color:"#cce0f5",opacity:.7}}>{sessions.length} total submissions · live</div>
           <button
-            onClick={()=>generateClassReport(sessions, bankQ, growthClass)}
+            onClick={()=>generateClassReport(sessions, bankQ, growthClass).catch(e=>alert("Export failed: "+e.message))}
             disabled={sessions.length===0}
             style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.35)",color:"#fff",borderRadius:"3px",padding:"4px 10px",cursor:sessions.length===0?"not-allowed":"pointer",fontSize:"0.68rem",fontWeight:700,opacity:sessions.length===0?.4:1}}>
             📄 Export PDF
