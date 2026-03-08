@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import TeacherManager from "./TeacherManager";
 import { API } from "./shared/constants";
 
 const NAVY = "#003865";
@@ -233,7 +234,7 @@ export default function AdminShell({ onBack }) {
       {/* Tabs */}
       <div style={{ background:"#fff", borderBottom:"2px solid #c8d3dd", padding:"0 1.5rem",
         display:"flex", gap:"0", flexShrink:0 }}>
-        {[["overview","📊 Classes"], ["gaps","⚠ School-Wide Gaps"]].map(([key, label]) => (
+        {[["overview","📊 Classes"], ["gaps","⚠ School-Wide Gaps"], ["teachers","👩‍🏫 Teachers"]].map(([key, label]) => (
           <button key={key} onClick={() => { setTab(key); setSelected(null); }}
             style={{ padding:"0.65rem 1.25rem", background:"none", border:"none",
               borderBottom: tab===key ? `3px solid ${NAVY}` : "3px solid transparent",
@@ -270,6 +271,8 @@ export default function AdminShell({ onBack }) {
             )}
           </div>
         )}
+
+        {tab === "teachers" && <TeacherManager/>}
 
         {tab === "gaps" && (
           <div style={{ maxWidth:"700px" }}>
