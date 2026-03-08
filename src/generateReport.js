@@ -35,7 +35,7 @@ function pageFooters(doc) {
   }
 }
 
-export function generateClassReport(sessions, bankQ, filterClass = 'all') {
+export async function generateClassReport(sessions, bankQ, filterClass = 'all') {
   const filtered = filterClass && filterClass !== 'all'
     ? sessions.filter(s => s.className === filterClass)
     : sessions;
@@ -44,6 +44,14 @@ export function generateClassReport(sessions, bankQ, filterClass = 'all') {
     alert('No session data to export.');
     return;
   }
+
+  // Fetch saved tests for code→name lookup
+  let testNameMap = {};
+  try {
+    const API = process.env.REACT_APP_API_URL || 'https://mathready-backend-production.up.railway.app';
+    const saved = await fetch(`${API}/tests/saved`).then(r=>r.json());
+    if (Array.isArray(saved)) saved.forEach(t => { if (t.code) testNameMap[t.code.toUpperCase()] = t.name; });
+  } catch {}
 
   // ── Build per-student map ──────────────────────────────────────────────
   const studentMap = {};
@@ -160,30 +168,37 @@ export function generateClassReport(sessions, bankQ, filterClass = 'all') {
       const pts = st.sessions.map(s => s.pct);
       const avg2 = Math.round(pts.reduce((a,b)=>a+b,0)/pts.length);
       const latest = st.sessions[st.sessions.length - 1];
-      return { name: st.name, cls: st.className||'—', tests: st.sessions.length, avg: avg2, latest: latest.pct };
+      const latestDate = latest.submitted
+        ? new Date(latest.submitted).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
+        : '—';
+      const latestTime = latest.timeUsed || '—';
+      return { name: st.name, cls: st.className||'—', tests: st.sessions.length, avg: avg2, latest: latest.pct, date: latestDate, time: latestTime };
     })
     .sort((a, b) => b.avg - a.avg);
 
   doc.autoTable({
     startY: 64,
     margin: { left: MARGIN, right: MARGIN },
-    head: [['#', 'Student', 'Class / Period', 'Tests Taken', 'Average', 'Latest', 'Level']],
+    head: [['#', 'Student', 'Class / Period', 'Tests', 'Avg', 'Latest', 'Time (Latest)', 'Date (Latest)', 'Level']],
     body: scoreRows.map((r, i) => [
-      i + 1, r.name, r.cls, r.tests, `${r.avg}%`, `${r.latest}%`, lvlLabel(r.avg),
+      i + 1, r.name, r.cls, r.tests, `${r.avg}%`, `${r.latest}%`, r.time, r.date, lvlLabel(r.avg),
     ]),
     headStyles: { fillColor: [0, 56, 101], textColor: 255, fontStyle: 'bold', fontSize: 8.5 },
     bodyStyles: { fontSize: 8.5, cellPadding: 5 },
     alternateRowStyles: { fillColor: [245, 248, 252] },
     columnStyles: {
-      0: { cellWidth: 24, halign: 'center' },
-      3: { cellWidth: 56,  halign: 'center' },
-      4: { cellWidth: 52,  halign: 'center' },
-      5: { cellWidth: 52,  halign: 'center' },
-      6: { cellWidth: 72,  halign: 'center' },
+      0: { cellWidth: 20, halign: 'center' },
+      2: { cellWidth: 72 },
+      3: { cellWidth: 34, halign: 'center' },
+      4: { cellWidth: 36, halign: 'center' },
+      5: { cellWidth: 36, halign: 'center' },
+      6: { cellWidth: 54, halign: 'center' },
+      7: { cellWidth: 70, halign: 'center' },
+      8: { cellWidth: 60, halign: 'center' },
     },
     didParseCell: ({ column, section, cell }) => {
       if (section !== 'body') return;
-      if (column.index === 6) {
+      if (column.index === 8) {
         const v = cell.raw;
         cell.styles.textColor = v === 'Proficient' ? [26,110,46] : v === 'Developing' ? [122,78,0] : [139,26,26];
         cell.styles.fontStyle = 'bold';
@@ -271,7 +286,10 @@ export function generateClassReport(sessions, bankQ, filterClass = 'all') {
       const dateStr = sess.submitted
         ? new Date(sess.submitted).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
         : '';
-      const label = `Test ${idx + 1}${sess.testCode ? ` · Code: ${sess.testCode}` : ''}  —  ${sess.pct}%  (${sess.score}/${sess.total} correct)${dateStr ? `   ${dateStr}` : ''}`;
+      const testLabel = sess.testCode ? (testNameMap[sess.testCode.toUpperCase()] || sess.testCode) : `Session ${idx+1}`;
+      const modeTag   = sess.mode === 'practice' ? ' [PRACTICE]' : '';
+      const timeTag   = sess.timeUsed ? `  ·  ${sess.timeUsed}` : '';
+      const label = `${testLabel}${modeTag}  —  ${sess.pct}%  (${sess.score}/${sess.total})${timeTag}${dateStr ? `   |   ${dateStr}` : ''}`;"  
 
       ensureSpace(24);
 
