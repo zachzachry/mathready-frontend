@@ -111,7 +111,7 @@ export default function RosterManager({ teacher }) {
   const [msg,        setMsg]        = useState("");
 
   const load = useCallback(async () => {
-    try { const url = `${API}/roster${teacher?.classIds ? '?classIds='+teacher.classIds.join(',') : ''}`; const r = await fetch(url); setClasses(await r.json()); }
+    try { const url = `${API}/roster${teacher && teacher.classIds !== null ? '?classIds='+teacher.classIds.join(',') : ''}`; const r = await fetch(url); setClasses(await r.json()); }
     catch { setClasses([]); }
     setLoading(false);
   }, []);
