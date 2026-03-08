@@ -459,7 +459,7 @@ export default function QuestionBuilder() {
     setTimeout(() => setSavedCount(0), 3000);
   }
 
-  const complete = questions.filter(q => q.question && q.choices.filter(c=>c).length===4 && q.correct && q.standard && q.dok).length;
+  const complete = questions.filter(q => q.question && q.standard && q.dok && (q.type==="plotpoint" ? (Array.isArray(q.answer)&&q.answer.length===2) : (q.choices.filter(c=>c).length===4 && q.correct))).length;
 
   return (
     <div style={{ minHeight: "100vh", background: "#e8edf2", fontFamily: "sans-serif" }}>
