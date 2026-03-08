@@ -5,36 +5,48 @@ import { QUESTIONS as FALLBACK_QUESTIONS, START_SECS, LETTERS, S, pct, lvl, lvlC
 
 // ── Student Login ──────────────────────────────────────────
 function StudentLogin({ onStart, onBack }) {
-  const [first, setFirst]   = useState("");
-  const [last,  setLast]    = useState("");
-  const [code,  setCode]    = useState("");
-  const [err,   setErr]     = useState("");
-  const [step,  setStep]    = useState("form");
-  const [loading, setLoading] = useState(false);
-  const [testInfo, setTestInfo] = useState(null); // { title, questions }
+  const [classes,    setClasses]    = useState([]);
+  const [classId,    setClassId]    = useState("");
+  const [studentId,  setStudentId]  = useState("");
+  const [code,       setCode]       = useState("");
+  const [err,        setErr]        = useState("");
+  const [step,       setStep]       = useState("form");
+  const [loading,    setLoading]    = useState(true);
+  const [checking,   setChecking]   = useState(false);
+  const [testInfo,   setTestInfo]   = useState(null);
+
+  useEffect(() => {
+    fetch(`${API}/roster`)
+      .then(r => r.json())
+      .then(data => { setClasses(data); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const selectedClass   = classes.find(c => c.id === classId);
+  const selectedStudent = selectedClass?.students.find(s => s.id === studentId);
 
   async function submit() {
-    if (!first.trim() || !last.trim()) { setErr("Please enter your first and last name."); return; }
+    if (!classId)     { setErr("Please select your class.");   return; }
+    if (!studentId)   { setErr("Please select your name.");    return; }
     const c = code.trim().toUpperCase();
-    if (!c) { setErr("Please enter the test code from your teacher."); return; }
-    setLoading(true); setErr("");
+    if (!c)           { setErr("Please enter the test code."); return; }
+    setChecking(true); setErr("");
     try {
-      const r = await fetch(`${API}/test/code/${encodeURIComponent(c)}`);
+      const r    = await fetch(`${API}/test/code/${encodeURIComponent(c)}`);
       const data = await r.json();
       if (!data.found || !data.questions?.length) {
         setErr("Invalid test code. Check with your teacher.");
-        setLoading(false); return;
+        setChecking(false); return;
       }
       setTestInfo(data);
       setStep("confirm");
     } catch {
-      setErr("Could not connect to server. Check your internet and try again.");
+      setErr("Could not connect to server. Try again.");
     }
-    setLoading(false);
+    setChecking(false);
   }
 
   if (step === "confirm" && testInfo) {
-    const count = testInfo.questions.length;
     return (
       <div style={S.page}>
         <div style={S.card}>
@@ -42,15 +54,16 @@ function StudentLogin({ onStart, onBack }) {
             <div style={S.hdrSub}>STUDENT SIGN IN</div>
             <div style={S.hdrTitle}>Confirm Your Information</div>
           </div>
-          <div style={{ padding:"1.75rem 2rem" }}>
+          <div style={{padding:"1.75rem 2rem"}}>
             <div style={S.confirmBox}>
               {[
-                ["STUDENT NAME", `${first} ${last}`],
-                ["TEST", testInfo.title || "Grade 5 Mathematics"],
-                ["TEST CODE", code.toUpperCase()],
-                ["TIME LIMIT", "30 Minutes"],
-                ["QUESTIONS", String(count)],
-                ["CALCULATOR", "Not Permitted"],
+                ["STUDENT NAME", selectedStudent?.name],
+                ["CLASS",        selectedClass?.name],
+                ["TEST",         testInfo.title || "Grade 5 Mathematics"],
+                ["TEST CODE",    code.toUpperCase()],
+                ["QUESTIONS",    String(testInfo.questions.length)],
+                ["TIME LIMIT",   "30 Minutes"],
+                ["CALCULATOR",   "Not Permitted"],
               ].map(([k,v],i,a) => (
                 <div key={k} style={{...S.confirmRow, borderBottom:i<a.length-1?"1px solid #eef1f4":"none"}}>
                   <span style={S.confirmK}>{k}</span>
@@ -63,7 +76,7 @@ function StudentLogin({ onStart, onBack }) {
             </div>
             <div style={{display:"flex",gap:"0.75rem"}}>
               <button onClick={()=>setStep("form")} style={S.btnSec}>← Go Back</button>
-              <button onClick={()=>onStart(`${first} ${last}`, testInfo.questions)} style={S.btnPri}>Begin Test →</button>
+              <button onClick={()=>onStart(selectedStudent, selectedClass, code.toUpperCase(), testInfo)} style={S.btnPri}>Begin Test →</button>
             </div>
           </div>
         </div>
@@ -84,21 +97,46 @@ function StudentLogin({ onStart, onBack }) {
             <div style={S.hdrTitle}>Grade 5 Mathematics</div>
           </div>
           <div style={{padding:"1.75rem 2rem"}}>
-            <div style={{display:"flex",gap:"0.75rem",marginBottom:"1rem"}}>
-              {[["FIRST NAME",first,setFirst,"First name"],["LAST NAME",last,setLast,"Last name"]].map(([lbl,val,set,ph])=>(
-                <div key={lbl} style={{flex:1}}>
-                  <label style={S.lbl}>{lbl}</label>
-                  <input style={S.inp} value={val} onChange={e=>{set(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder={ph}/>
+            {loading ? (
+              <div style={{textAlign:"center",color:"#aaa",padding:"2rem"}}>Loading class roster…</div>
+            ) : classes.length === 0 ? (
+              <div style={{background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"3px",padding:"1rem",marginBottom:"1rem",fontSize:"0.82rem",color:"#7a4e00"}}>
+                ⚠ No class roster found. Ask your teacher to set up the roster first.
+              </div>
+            ) : (
+              <>
+                {/* Class select */}
+                <div style={{marginBottom:"1rem"}}>
+                  <label style={S.lbl}>CLASS / PERIOD</label>
+                  <select style={S.inp} value={classId} onChange={e=>{setClassId(e.target.value);setStudentId("");setErr("");}}>
+                    <option value="">— Select your class —</option>
+                    {classes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
                 </div>
-              ))}
-            </div>
-            <div style={{marginBottom:"1.25rem"}}>
-              <label style={S.lbl}>TEST CODE — given to you by your teacher</label>
-              <input style={{...S.inp,fontFamily:"monospace",fontSize:"1.1rem",letterSpacing:"0.2em",textTransform:"uppercase",fontWeight:700}} value={code} onChange={e=>{setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,""));setErr("");}} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="e.g. ABC123" maxLength={8}/>
-            </div>
+
+                {/* Student select */}
+                <div style={{marginBottom:"1rem"}}>
+                  <label style={S.lbl}>YOUR NAME</label>
+                  <select style={S.inp} value={studentId} onChange={e=>{setStudentId(e.target.value);setErr("");}} disabled={!classId}>
+                    <option value="">— Select your name —</option>
+                    {(selectedClass?.students || []).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+
+                {/* Test code */}
+                <div style={{marginBottom:"1.25rem"}}>
+                  <label style={S.lbl}>TEST CODE — given to you by your teacher</label>
+                  <input style={{...S.inp,fontFamily:"monospace",fontSize:"1.1rem",letterSpacing:"0.2em",textTransform:"uppercase",fontWeight:700}}
+                    value={code} onChange={e=>{setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,""));setErr("");}}
+                    onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="e.g. FRACTIONS" maxLength={8}/>
+                </div>
+              </>
+            )}
+
             {err && <div style={S.errBox}>⚠ {err}</div>}
-            <button onClick={submit} disabled={loading} style={{...S.btnPri,width:"100%",marginTop:"1rem",opacity:loading?0.7:1}}>
-              {loading ? "Checking code…" : "Continue →"}
+            <button onClick={submit} disabled={checking||loading||classes.length===0}
+              style={{...S.btnPri,width:"100%",marginTop:"1rem",opacity:checking?0.7:1}}>
+              {checking ? "Checking code…" : "Continue →"}
             </button>
           </div>
         </div>
@@ -119,27 +157,29 @@ function StudentTest({ studentName, questions, onFinish }) {
 
   useEffect(()=>{ const t=setInterval(()=>setSecs(s=>s>0?s-1:0),1000); return()=>clearInterval(t); },[]);
   useEffect(()=>{
-    sendHeartbeat(studentName,cur);
-    const t=setInterval(()=>sendHeartbeat(studentName,cur),30000);
+    sendHeartbeat(studentName, cur);
+    const t = setInterval(()=>sendHeartbeat(studentName, cur), 30000);
     return()=>clearInterval(t);
-  },[studentName,cur]);
+  },[studentName, cur]);
 
-  const q=questions[cur];
-  if (!q) return <div style={{padding:"3rem",textAlign:"center",color:"#aaa"}}>Loading questions…</div>;
+  const q = questions[cur];
+  if (!q) return <div style={{padding:"3rem",textAlign:"center",color:"#aaa"}}>Loading…</div>;
 
-  const sel=ans[q.id]??null; const isFl=flg[q.id]??false;
-  const ansCount=Object.keys(ans).length; const flgCount=Object.values(flg).filter(Boolean).length;
+  const sel  = ans[q.id] ?? null;
+  const isFl = flg[q.id] ?? false;
+  const ansCount = Object.keys(ans).length;
+  const flgCount = Object.values(flg).filter(Boolean).length;
 
   async function doSubmit() {
-    const score=questions.reduce((a,q)=>a+(ans[q.id]===q.correct?1:0),0);
-    const session={name:studentName,score,total:TOTAL,pct:pct(score,TOTAL),submitted:now(),timeUsed:fmtTime(START_SECS-secs),answers:{...ans}};
+    const score = questions.reduce((a,q) => a+(ans[q.id]===q.correct?1:0), 0);
+    const session = { name:studentName, score, total:TOTAL, pct:pct(score,TOTAL), submitted:now(), timeUsed:fmtTime(START_SECS-secs), answers:{...ans} };
     await saveSession(session);
     onFinish(session);
   }
 
   return (
     <div style={{display:"flex",flexDirection:"column",height:"100vh",fontFamily:"sans-serif",background:"#e8edf2",overflow:"hidden"}}>
-      <TopBar title="Grade 5 Math — Practice" right={
+      <TopBar title="Grade 5 Math" right={
         <div style={{display:"flex",gap:"1rem",alignItems:"center"}}>
           <div style={{textAlign:"right"}}>
             <div style={{fontSize:"0.55rem",opacity:.6,letterSpacing:"0.08em"}}>TIME</div>
@@ -169,7 +209,8 @@ function StudentTest({ studentName, questions, onFinish }) {
             <div style={{padding:"0.5rem",display:"flex",flexWrap:"wrap",gap:"4px"}}>
               {questions.map((item,i)=>{
                 const isAns=!!ans[item.id]; const isCur=i===cur; const isFg=!!flg[item.id];
-                return <button key={item.id} onClick={()=>setCur(i)} style={{width:"35px",height:"35px",borderRadius:"3px",border:`2px solid ${isCur?"#003865":isAns?"#1a6e2e":"#bcc8d4"}`,background:isCur?"#003865":isAns?"#d4edda":"#fafbfc",color:isCur?"#fff":isAns?"#1a5c28":"#445",fontSize:"0.75rem",fontWeight:700,cursor:"pointer",position:"relative"}}>
+                return <button key={item.id} onClick={()=>setCur(i)}
+                  style={{width:"35px",height:"35px",borderRadius:"3px",border:`2px solid ${isCur?"#003865":isAns?"#1a6e2e":"#bcc8d4"}`,background:isCur?"#003865":isAns?"#d4edda":"#fafbfc",color:isCur?"#fff":isAns?"#1a5c28":"#445",fontSize:"0.75rem",fontWeight:700,cursor:"pointer",position:"relative"}}>
                   {i+1}{isFg&&<span style={{position:"absolute",top:"-5px",right:"-4px",fontSize:"0.5rem"}}>🚩</span>}
                 </button>;
               })}
@@ -191,7 +232,8 @@ function StudentTest({ studentName, questions, onFinish }) {
               <span style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#003865",background:"#ddeaf7",padding:"3px 8px",borderRadius:"2px",border:"1px solid #b3cde8"}}>{q.standard}</span>
               <span style={{fontSize:"0.78rem",color:"#666"}}>Question {cur+1} of {TOTAL}</span>
             </div>
-            <button onClick={()=>setFlg(p=>({...p,[q.id]:!p[q.id]}))} style={{display:"flex",alignItems:"center",gap:"5px",background:isFl?"#fff8e1":"#f8f9fa",border:`1px solid ${isFl?"#ffc107":"#bcc8d4"}`,borderRadius:"3px",padding:"5px 12px",cursor:"pointer",fontSize:"0.73rem",color:isFl?"#7a4e00":"#555",fontWeight:isFl?700:400}}>
+            <button onClick={()=>setFlg(p=>({...p,[q.id]:!p[q.id]}))}
+              style={{display:"flex",alignItems:"center",gap:"5px",background:isFl?"#fff8e1":"#f8f9fa",border:`1px solid ${isFl?"#ffc107":"#bcc8d4"}`,borderRadius:"3px",padding:"5px 12px",cursor:"pointer",fontSize:"0.73rem",color:isFl?"#7a4e00":"#555",fontWeight:isFl?700:400}}>
               🚩 {isFl?"Flagged":"Flag for Review"}
             </button>
           </div>
@@ -205,13 +247,13 @@ function StudentTest({ studentName, questions, onFinish }) {
             <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"0.9rem"}}>SELECT ONE ANSWER</div>
             <div style={{display:"flex",flexDirection:"column",gap:"0.55rem"}}>
               {q.choices.map((choice,i)=>{
-                const chosen=sel===choice;
-                return <label key={i} onClick={()=>setAns(p=>({...p,[q.id]:choice}))} style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.8rem 1rem",border:`2px solid ${chosen?"#003865":"#c8d3dd"}`,borderRadius:"3px",background:chosen?"#ddeaf7":"#fafbfc",cursor:"pointer"}}>
+                const chosen = sel===choice;
+                return <label key={i} onClick={()=>setAns(p=>({...p,[q.id]:choice}))}
+                  style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.8rem 1rem",border:`2px solid ${chosen?"#003865":"#c8d3dd"}`,borderRadius:"3px",background:chosen?"#ddeaf7":"#fafbfc",cursor:"pointer"}}>
                   <div style={{width:"26px",height:"26px",borderRadius:"50%",border:`2px solid ${chosen?"#003865":"#9aabba"}`,background:chosen?"#003865":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                     <span style={{fontSize:"0.7rem",fontWeight:700,color:chosen?"#fff":"#667"}}>{LETTERS[i]}</span>
                   </div>
                   <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color:"#0f0f0f"}}><MathText text={choice}/></span>
-                  {q.choiceImages?.[i]&&<img src={q.choiceImages[i]} alt="" style={{maxHeight:"60px",maxWidth:"150px",marginLeft:"0.5rem",borderRadius:"2px"}}/>}
                 </label>;
               })}
             </div>
@@ -220,9 +262,11 @@ function StudentTest({ studentName, questions, onFinish }) {
       </div>
 
       <div style={{background:"#fff",borderTop:"2px solid #c8d3dd",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0.65rem 1.5rem",flexShrink:0}}>
-        <button onClick={()=>setCur(c=>Math.max(0,c-1))} disabled={cur===0} style={{background:cur===0?"#e8edf2":"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"7px 20px",fontSize:"0.83rem",cursor:cur===0?"not-allowed":"pointer",color:cur===0?"#aaa":"#333",fontWeight:600}}>◀ Back</button>
+        <button onClick={()=>setCur(c=>Math.max(0,c-1))} disabled={cur===0}
+          style={{background:cur===0?"#e8edf2":"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"7px 20px",fontSize:"0.83rem",cursor:cur===0?"not-allowed":"pointer",color:cur===0?"#aaa":"#333",fontWeight:600}}>◀ Back</button>
         <div style={{display:"flex",gap:"4px"}}>
-          {questions.map((_,i)=><div key={i} onClick={()=>setCur(i)} style={{width:"9px",height:"9px",borderRadius:"50%",background:i===cur?"#003865":ans[questions[i].id]?"#1a6e2e":"#c8d3dd",cursor:"pointer"}}/>)}
+          {questions.map((_,i)=><div key={i} onClick={()=>setCur(i)}
+            style={{width:"9px",height:"9px",borderRadius:"50%",background:i===cur?"#003865":ans[questions[i].id]?"#1a6e2e":"#c8d3dd",cursor:"pointer"}}/>)}
         </div>
         {cur<TOTAL-1
           ?<button onClick={()=>setCur(c=>c+1)} style={{background:"#003865",border:"none",borderRadius:"3px",padding:"7px 20px",fontSize:"0.83rem",cursor:"pointer",color:"#fff",fontWeight:600}}>Next ▶</button>
@@ -255,10 +299,10 @@ function StudentTest({ studentName, questions, onFinish }) {
 
 // ── Student Results ────────────────────────────────────────
 function StudentResults({ session, questions, onReset }) {
-  const p=session.pct;
+  const p = session.pct;
   return (
     <div style={{minHeight:"100vh",background:"#e8edf2",fontFamily:"sans-serif",display:"flex",flexDirection:"column"}}>
-      <TopBar title="Grade 5 Mathematics — Session Results"/>
+      <TopBar title="Grade 5 Mathematics — Results"/>
       <div style={{flex:1,display:"flex",justifyContent:"center",padding:"2rem 1rem"}}>
         <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",width:"100%",maxWidth:"640px",boxShadow:"0 2px 12px rgba(0,0,0,.07)",overflow:"hidden"}}>
           <div style={{background:"#f0f4f8",borderBottom:"1px solid #c8d3dd",padding:"1.25rem 1.5rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -301,22 +345,49 @@ function StudentResults({ session, questions, onReset }) {
 // ── Main shell ─────────────────────────────────────────────
 export default function MathTest({ onBack }) {
   const [screen,       setScreen]       = useState("login");
-  const [studentName,  setStudentName]  = useState("");
+  const [student,      setStudent]      = useState(null);   // {id, name}
+  const [cls,          setCls]          = useState(null);   // {id, name}
+  const [testCode,     setTestCode]     = useState("");
   const [finalSession, setFinalSession] = useState(null);
   const [questions,    setQuestions]    = useState(FALLBACK_QUESTIONS);
 
-  function handleStart(name, qs) {
-    setStudentName(name);
-    if (qs?.length) setQuestions(qs);
+  function handleStart(studentObj, classObj, code, testInfo) {
+    setStudent(studentObj);
+    setCls(classObj);
+    setTestCode(code);
+    if (testInfo?.questions?.length) setQuestions(testInfo.questions);
     setScreen("test");
+  }
+
+  async function handleFinish(session) {
+    // Enrich session with roster data before saving
+    const enriched = {
+      ...session,
+      studentId:   student?.id   || "",
+      studentName: student?.name || session.name,
+      classId:     cls?.id       || "",
+      className:   cls?.name     || "",
+      testCode,
+    };
+    // saveSession was already called in StudentTest — we re-save the enriched version
+    try {
+      await fetch(`${API}/submit`, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify(enriched),
+      });
+    } catch {}
+    setFinalSession(enriched);
+    setScreen("results");
   }
 
   if (screen === "login")
     return <StudentLogin onStart={handleStart} onBack={onBack}/>;
 
   if (screen === "test")
-    return <StudentTest studentName={studentName} questions={questions} onFinish={s=>{setFinalSession(s);setScreen("results");}}/>;
+    return <StudentTest studentName={student?.name || ""} questions={questions}
+      onFinish={handleFinish}/>;
 
   if (screen === "results")
-    return <StudentResults session={finalSession} questions={questions} onReset={()=>{setStudentName("");setFinalSession(null);setScreen("login");onBack();}}/>;
+    return <StudentResults session={finalSession} questions={questions}
+      onReset={()=>{ setStudent(null); setCls(null); setTestCode(""); setFinalSession(null); setScreen("login"); onBack(); }}/>;
 }
