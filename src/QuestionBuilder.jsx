@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import MathText from "./shared/MathText";
+import PlotGrid from "./shared/PlotGrid";
 import { API } from "./shared/constants";
 
 
@@ -190,7 +191,8 @@ function PasteImageZone({ image, onImage, onClear, placeholder }) {
 function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, isFirst, isLast }) {
   const [open, setOpen]         = useState(index === 0);
   const [suggestion, setSuggestion] = useState(null);
-  const isComplete = q.question && q.choices.filter(c=>c).length===4 && q.correct && q.standard && q.dok;
+  const isPlot = q.type === "plotpoint";
+  const isComplete = q.question && q.standard && q.dok && (isPlot ? (Array.isArray(q.answer) && q.answer.length === 2) : (q.choices.filter(c=>c).length===4 && q.correct));
 
   function update(field, value)  { onChange({ ...q, [field]: value }); }
   function updateChoice(i, val)  { const c=[...q.choices]; c[i]=val; update("choices",c); }
@@ -272,6 +274,17 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
             </div>
           </div>
 
+          {/* Question type toggle */}
+          <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
+            <span style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#555"}}>QUESTION TYPE</span>
+            {[["mcq","📝 Multiple Choice"],["plotpoint","📍 Plot a Point"]].map(([t,lbl2])=>(
+              <button key={t} onClick={()=>update("type",t)}
+                style={{padding:"5px 12px",borderRadius:"4px",border:`2px solid ${q.type===t?"#003865":"#c8d3dd"}`,background:q.type===t?"#003865":"#fafbfc",color:q.type===t?"#fff":"#555",fontSize:"0.78rem",fontWeight:700,cursor:"pointer"}}>
+                {lbl2}
+              </button>
+            ))}
+          </div>
+
           {/* Question text with math toolbar */}
           <div>
             <label style={lbl}>QUESTION TEXT <span style={{ fontWeight: 400, color: "#aaa" }}>— press Enter for new line · wrap math in $…$</span></label>
@@ -284,7 +297,8 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
             <PasteImageZone image={q.questionImage} onImage={img=>update("questionImage",img)} onClear={()=>update("questionImage",null)} placeholder="Click here then Ctrl+V / ⌘V to paste a screenshot" />
           </div>
 
-          {/* Answer choices */}
+          {/* Answer choices — MCQ */}
+          {!isPlot && (
           <div>
             <label style={lbl}>ANSWER CHOICES <span style={{ fontWeight: 400, color: "#aaa" }}>— text, math, and/or diagram per choice</span></label>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
@@ -297,7 +311,7 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
                       <div style={{ width: "22px", height: "22px", borderRadius: "50%", border: `2px solid ${isCorrect ? "#1a6e2e" : "#bcc8d4"}`, background: isCorrect ? "#1a6e2e" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                         <span style={{ fontSize: "0.65rem", fontWeight: 700, color: isCorrect ? "#fff" : "#667" }}>{LETTERS[i]}</span>
                       </div>
-                      <input style={{ ...inp, flex: 1, padding: "0.4rem 0.65rem", fontFamily: "monospace", fontSize: "0.85rem" }} value={choice} onChange={e => updateChoice(i, e.target.value)} placeholder={`Choice ${LETTERS[i]} — use $\\frac{1}{2}$ for fractions`} />
+                      <input style={{ ...inp, flex: 1, padding: "0.4rem 0.65rem", fontFamily: "monospace", fontSize: "0.85rem" }} value={choice} onChange={e => updateChoice(i, e.target.value)} placeholder={`Choice ${LETTERS[i]} — use $\frac{1}{2}$ for fractions`} />
                       <button onClick={() => update("correct", choice || null)}
                         style={{ ...smBtn, background: isCorrect?"#1a6e2e":"#f0f4f8", color: isCorrect?"#fff":"#555", borderColor: isCorrect?"#1a6e2e":"#c8d3dd", padding: "5px 10px", whiteSpace: "nowrap" }}>
                         {isCorrect ? "✓ Correct" : "Mark Correct"}
@@ -311,6 +325,27 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
               })}
             </div>
           </div>
+          )}
+
+          {/* Answer — Plot Point */}
+          {isPlot && (
+          <div>
+            <label style={lbl}>CORRECT ANSWER — click the grid to set the answer point</label>
+            <div style={{display:"flex",gap:"1.5rem",alignItems:"flex-start",flexWrap:"wrap"}}>
+              <PlotGrid
+                answer={q.answer}
+                placed={q.answer}
+                onPlace={pt => update("answer", pt)}
+                size={260}
+              />
+              <div style={{fontSize:"0.82rem",color:"#555",lineHeight:1.7,paddingTop:"0.5rem"}}>
+                {q.answer
+                  ? <><strong style={{color:"#1a6e2e",fontSize:"1rem"}}>✓ ({q.answer[0]}, {q.answer[1]})</strong><br/>Click a different point to change it.</>
+                  : <span style={{color:"#8b1a1a"}}>Click a point on the grid to set the correct answer.</span>}
+              </div>
+            </div>
+          </div>
+          )}
 
           {/* Live preview */}
           {(q.question || q.questionImage) && (
@@ -327,6 +362,12 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
                   </p>
                 )}
                 {q.questionImage && <img src={q.questionImage} alt="diagram" style={{ maxWidth: "100%", maxHeight: "160px", borderRadius: "3px", marginBottom: "0.5rem", display: "block" }} />}
+                {isPlot ? (
+                  <div style={{marginTop:"0.5rem"}}>
+                    <PlotGrid answer={q.answer} placed={q.answer} readOnly size={220}/>
+                    {q.answer && <div style={{fontSize:"0.78rem",color:"#1a6e2e",marginTop:"4px",fontWeight:700}}>Answer: ({q.answer[0]}, {q.answer[1]})</div>}
+                  </div>
+                ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                   {q.choices.map((c, i) => {
                     const ci = q.choiceImages?.[i];
@@ -345,6 +386,7 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
                     );
                   })}
                 </div>
+                )}
               </div>
             </div>
           )}
@@ -356,7 +398,7 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
 
 // ── Main ───────────────────────────────────────────────────
 function EMPTY_Q() {
-  return { id: uid(), standard: "5.NR.1.1", short: "Place Value Relationships", question: "", questionImage: null, choices: ["","","",""], choiceImages: [null,null,null,null], correct: "", dok: null };
+  return { id: uid(), type: "mcq", standard: "5.NR.1.1", short: "Place Value Relationships", question: "", questionImage: null, choices: ["","","",""], choiceImages: [null,null,null,null], correct: "", answer: null, dok: null };
 }
 
 export default function QuestionBuilder() {
@@ -398,7 +440,7 @@ export default function QuestionBuilder() {
   const [savedCount, setSavedCount] = useState(0);
 
   async function saveToBank() {
-    const complete_qs = questions.filter(q => q.question && q.choices.filter(c=>c).length===4 && q.correct && q.standard && q.dok);
+    const complete_qs = questions.filter(q => q.question && q.standard && q.dok && (q.type==="plotpoint" ? (Array.isArray(q.answer)&&q.answer.length===2) : (q.choices.filter(c=>c).length===4 && q.correct)));
     if (complete_qs.length === 0) return;
     setSaving(true);
     let count = 0;
