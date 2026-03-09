@@ -592,6 +592,87 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
     return()=>clearInterval(t);
   },[studentName, cur]);
 
+  // ── Lockdown ────────────────────────────────────────────
+  const containerRef = useRef();
+  const [violations,    setViolations]    = useState(0);
+  const [lockWarning,   setLockWarning]   = useState(null); // message string or null
+  const [isFullscreen,  setIsFullscreen]  = useState(false);
+
+  function addViolation(reason) {
+    setViolations(v => v + 1);
+    setLockWarning(reason);
+  }
+
+  // Enter fullscreen on mount
+  useEffect(() => {
+    const el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen().then(()=>setIsFullscreen(true)).catch(()=>{});
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+
+    return () => {
+      if (document.exitFullscreen && document.fullscreenElement) document.exitFullscreen();
+    };
+  }, []);
+
+  // Detect fullscreen exit
+  useEffect(() => {
+    function onFsChange() {
+      const inFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      setIsFullscreen(inFs);
+      if (!inFs) addViolation("You exited fullscreen. Click below to return.");
+    }
+    document.addEventListener("fullscreenchange", onFsChange);
+    document.addEventListener("webkitfullscreenchange", onFsChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFsChange);
+      document.removeEventListener("webkitfullscreenchange", onFsChange);
+    };
+  }, []);
+
+  // Detect tab/window blur
+  useEffect(() => {
+    function onBlur()       { addViolation("You left this window. Return to your test."); }
+    function onVisibility() { if (document.hidden) addViolation("You switched tabs. Return to your test."); }
+    window.addEventListener("blur", onBlur);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("blur", onBlur);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  // Block keyboard shortcuts and right-click
+  useEffect(() => {
+    function onKey(e) {
+      const bad = (
+        (e.ctrlKey || e.metaKey) && ["c","v","u","a","s","p"].includes(e.key.toLowerCase()) ||
+        (e.ctrlKey && e.shiftKey && ["i","j","c"].includes(e.key.toLowerCase())) ||
+        e.key === "F12" || e.key === "PrintScreen"
+      );
+      if (bad) { e.preventDefault(); e.stopPropagation(); }
+    }
+    function onContext(e) { e.preventDefault(); }
+    document.addEventListener("keydown", onKey, true);
+    document.addEventListener("contextmenu", onContext, true);
+    return () => {
+      document.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("contextmenu", onContext, true);
+    };
+  }, []);
+
+  // Warn before leaving page
+  useEffect(() => {
+    function onBeforeUnload(e) { e.preventDefault(); e.returnValue = ""; }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, []);
+
+  function reEnterFullscreen() {
+    const el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen().then(()=>{ setIsFullscreen(true); setLockWarning(null); }).catch(()=>{});
+    else if (el.webkitRequestFullscreen) { el.webkitRequestFullscreen(); setLockWarning(null); }
+  }
+
   const q = questions[cur];
   if (!q) return <div style={{padding:"3rem",textAlign:"center",color:"#aaa"}}>Loading…</div>;
 
@@ -606,15 +687,48 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
       const right = q.type==="plotpoint" ? JSON.stringify(q.answer) : q.correct;
       return a + (given === right ? 1 : 0);
     }, 0);
-    const session = { name:studentName, score, total:TOTAL, pct:pct(score,TOTAL), submitted:now(), timeUsed:fmtTime(START_SECS-secs), answers:{...ans} };
+    const session = { name:studentName, score, total:TOTAL, pct:pct(score,TOTAL), submitted:now(), timeUsed:fmtTime(START_SECS-secs), answers:{...ans}, violations };
     await saveSession(session);
     onFinish(session);
   }
 
   return (
-    <div style={{display:"flex",flexDirection:"column",height:"100vh",fontFamily:"sans-serif",background:"#e8edf2",overflow:"hidden"}}>
+    <div ref={containerRef} style={{display:"flex",flexDirection:"column",height:"100vh",fontFamily:"sans-serif",background:"#e8edf2",overflow:"hidden",userSelect:"none",WebkitUserSelect:"none"}}>
+
+      {/* Lockdown warning overlay */}
+      {lockWarning && (
+        <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.85)",display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem"}}>
+          <div style={{background:"#fff",borderRadius:"8px",maxWidth:"420px",width:"100%",overflow:"hidden",boxShadow:"0 8px 40px rgba(0,0,0,.4)"}}>
+            <div style={{background:"#8b1a1a",color:"#fff",padding:"1rem 1.5rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+              <span style={{fontSize:"1.5rem"}}>⚠️</span>
+              <div>
+                <div style={{fontWeight:700,fontSize:"1rem"}}>Testing Violation</div>
+                <div style={{fontSize:"0.72rem",opacity:.8}}>This has been recorded</div>
+              </div>
+            </div>
+            <div style={{padding:"1.5rem"}}>
+              <div style={{fontSize:"0.92rem",color:"#333",marginBottom:"1.25rem",lineHeight:1.5}}>
+                {lockWarning}
+              </div>
+              <div style={{fontSize:"0.75rem",color:"#888",marginBottom:"1rem"}}>
+                Violation count: <strong style={{color:"#8b1a1a"}}>{violations}</strong> — your teacher will see this on your results.
+              </div>
+              <button onClick={reEnterFullscreen}
+                style={{width:"100%",background:"#003865",color:"#fff",border:"none",borderRadius:"4px",padding:"0.75rem",fontSize:"0.9rem",fontWeight:700,cursor:"pointer"}}>
+                Return to Test →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <TopBar title="Grade 5 Math" right={
         <div style={{display:"flex",gap:"1rem",alignItems:"center"}}>
+          {violations > 0 && (
+            <div style={{background:"#8b1a1a",borderRadius:"3px",padding:"2px 8px",fontSize:"0.65rem",fontWeight:700,color:"#fff"}}>
+              ⚠ {violations} violation{violations!==1?"s":""}
+            </div>
+          )}
           <div style={{textAlign:"right"}}>
             <div style={{fontSize:"0.55rem",opacity:.6,letterSpacing:"0.08em"}}>TIME</div>
             <div style={{fontSize:"1rem",fontWeight:"bold",fontFamily:"monospace",color:secs<300?"#ffaaaa":"#fff"}}>{fmtTime(secs)}</div>
