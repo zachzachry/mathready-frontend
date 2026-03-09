@@ -230,6 +230,12 @@ export default function Dashboard({ teacher }) {
                     <div style={{fontSize:"0.88rem",fontWeight:700,color:"#1a1a1a"}}>{name}</div>
                     {s.className&&<div style={{fontSize:"0.65rem",color:"#888"}}>{s.className}</div>}
                   </div>
+                  {s.violations > 0 && (
+                    <div title={`${s.violations} testing violation${s.violations!==1?"s":""} detected`}
+                      style={{background:"#8b1a1a",color:"#fff",borderRadius:"3px",padding:"2px 7px",fontSize:"0.65rem",fontWeight:700,flexShrink:0}}>
+                      ⚠ {s.violations}
+                    </div>
+                  )}
                   <div style={{textAlign:"right"}}>
                     <div style={{fontSize:"1rem",fontWeight:700,color:lvlC(p)}}>{p}%</div>
                     <div style={{fontSize:"0.65rem",color:"#888"}}>{s.score}/{s.total} · {s.timeUsed}</div>
