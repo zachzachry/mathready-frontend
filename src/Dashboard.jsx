@@ -7,6 +7,7 @@ const TABS = [
   ["items",     "📋 Item Analysis"],
   ["students",  "👤 Students"],
   ["growth",    "📈 Growth"],
+  ["controls",  "🎛 Test Controls"],
 ];
 
 // ── Focus student stats panel ──────────────────────────────
@@ -91,6 +92,103 @@ function LineChart({ points, width=320, height=80, color="#003865" }) {
         <circle key={i} cx={x} cy={ys[i]} r="4" fill={color} stroke="#fff" strokeWidth="1.5"/>
       ))}
     </svg>
+  );
+}
+
+// ── Test Controls ─────────────────────────────────────────
+function TestControls() {
+  const [ctrl,    setCtrl]    = useState({ paused: false, stopped: false });
+  const [loading, setLoading] = useState(true);
+  const [saving,  setSaving]  = useState(false);
+  const [msg,     setMsg]     = useState("");
+
+  useEffect(() => {
+    fetch(`${API}/test/control`).then(r=>r.json()).then(d=>{ setCtrl(d); setLoading(false); }).catch(()=>setLoading(false));
+  }, []);
+
+  async function send(patch) {
+    setSaving(true);
+    try {
+      const r = await fetch(`${API}/test/control`, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify(patch),
+      });
+      const d = await r.json();
+      setCtrl(d);
+      setMsg(patch.paused != null
+        ? (patch.paused ? "Test paused — students see a waiting screen." : "Test resumed.")
+        : (patch.stopped ? "Test stopped — students prompted to submit." : "Stop cleared."));
+      setTimeout(() => setMsg(""), 4000);
+    } catch { setMsg("Failed to update."); }
+    setSaving(false);
+  }
+
+  if (loading) return <div style={{padding:"2rem",color:"#aaa"}}>Loading…</div>;
+
+  return (
+    <div style={{padding:"1.25rem",maxWidth:"560px",fontFamily:"sans-serif"}}>
+      <div style={{fontSize:"1rem",fontWeight:700,color:"#003865",marginBottom:"4px"}}>Live Test Controls</div>
+      <div style={{fontSize:"0.75rem",color:"#888",marginBottom:"1.5rem"}}>
+        Controls apply to all students currently taking a test. Students poll every 5 seconds.
+      </div>
+
+      {msg && (
+        <div style={{background:"#f0faf2",border:"1px solid #b3dfc0",borderRadius:"4px",padding:"0.6rem 0.9rem",fontSize:"0.78rem",color:"#1a6e2e",fontWeight:700,marginBottom:"1rem"}}>
+          ✓ {msg}
+        </div>
+      )}
+
+      {/* Pause / Resume */}
+      <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"6px",padding:"1.1rem 1.25rem",marginBottom:"0.85rem",display:"flex",alignItems:"center",gap:"1rem"}}>
+        <div style={{flex:1}}>
+          <div style={{fontWeight:700,fontSize:"0.92rem",color:"#1a1a1a",marginBottom:"2px"}}>
+            {ctrl.paused ? "⏸ Test is PAUSED" : "▶ Test is Running"}
+          </div>
+          <div style={{fontSize:"0.72rem",color:"#888"}}>
+            {ctrl.paused
+              ? "Students see a pause screen and cannot answer questions."
+              : "Students are actively working. Click Pause to freeze the test."}
+          </div>
+        </div>
+        <button onClick={()=>send({paused:!ctrl.paused})} disabled={saving||ctrl.stopped}
+          style={{background:ctrl.paused?"#1a6e2e":"#b8860b",color:"#fff",border:"none",borderRadius:"4px",
+            padding:"0.65rem 1.25rem",fontWeight:700,fontSize:"0.85rem",cursor:"pointer",
+            opacity:(saving||ctrl.stopped)?0.5:1,whiteSpace:"nowrap"}}>
+          {ctrl.paused ? "▶ Resume" : "⏸ Pause"}
+        </button>
+      </div>
+
+      {/* Stop */}
+      <div style={{background:"#fff",border:"1px solid #f0b8b8",borderRadius:"6px",padding:"1.1rem 1.25rem",marginBottom:"0.85rem",display:"flex",alignItems:"center",gap:"1rem"}}>
+        <div style={{flex:1}}>
+          <div style={{fontWeight:700,fontSize:"0.92rem",color:ctrl.stopped?"#8b1a1a":"#1a1a1a",marginBottom:"2px"}}>
+            {ctrl.stopped ? "🛑 Test is STOPPED" : "🛑 Stop Test"}
+          </div>
+          <div style={{fontSize:"0.72rem",color:"#888"}}>
+            {ctrl.stopped
+              ? "Students are prompted to submit. Click Clear to reset for next test."
+              : "Immediately prompts all students to submit their answers."}
+          </div>
+        </div>
+        {ctrl.stopped
+          ? <button onClick={()=>send({stopped:false,paused:false})} disabled={saving}
+              style={{background:"#003865",color:"#fff",border:"none",borderRadius:"4px",
+                padding:"0.65rem 1.25rem",fontWeight:700,fontSize:"0.85rem",cursor:"pointer",opacity:saving?0.5:1}}>
+              Clear Stop
+            </button>
+          : <button onClick={()=>{ if(window.confirm("Stop the test for all students now?")) send({stopped:true,paused:false}); }}
+              disabled={saving}
+              style={{background:"#8b1a1a",color:"#fff",border:"none",borderRadius:"4px",
+                padding:"0.65rem 1.25rem",fontWeight:700,fontSize:"0.85rem",cursor:"pointer",opacity:saving?0.5:1}}>
+              🛑 Stop Now
+            </button>
+        }
+      </div>
+
+      <div style={{fontSize:"0.7rem",color:"#aaa",marginTop:"0.5rem"}}>
+        These controls affect all active tests school-wide. Pause/stop state resets when you click Clear Stop.
+      </div>
+    </div>
   );
 }
 
@@ -347,6 +445,7 @@ export default function Dashboard({ teacher }) {
       );
     }
 
+    if (tab === "controls") return <TestControls/>;
     if (tab === "growth") {
       if (Object.keys(studentMap).length === 0) return (
         <div style={{maxWidth:"960px"}}>
