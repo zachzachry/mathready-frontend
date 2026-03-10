@@ -180,9 +180,12 @@ export default function PlotGrid({
               {/* Crosshair lines */}
               <line x1={p.x - 12} y1={p.y} x2={p.x + 12} y2={p.y} stroke={color} strokeWidth="1" opacity="0.5"/>
               <line x1={p.x} y1={p.y - 12} x2={p.x} y2={p.y + 12} stroke={color} strokeWidth="1" opacity="0.5"/>
-              <text x={p.x + 10} y={p.y - 8} fontSize="10" fill={color} fontWeight="bold" fontFamily="sans-serif">
-                ({placed[0]}, {placed[1]})
-              </text>
+              {/* Only show coordinates after submission, not while answering */}
+              {(revealed || readOnly) && (
+                <text x={p.x + 10} y={p.y - 8} fontSize="10" fill={color} fontWeight="bold" fontFamily="sans-serif">
+                  ({placed[0]}, {placed[1]})
+                </text>
+              )}
             </g>
           );
         })()}
