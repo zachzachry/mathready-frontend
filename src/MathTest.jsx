@@ -529,8 +529,19 @@ function PracticeResults({ session, history, onReset }) {
 }
 
 // ── Student Test ───────────────────────────────────────────
+function normalizeQuestion(q) {
+  // Normalize answer field — API may return it as string or array
+  let answer = q.answer;
+  if (typeof answer === "string") {
+    try { answer = JSON.parse(answer); } catch { answer = null; }
+  }
+  // Auto-detect plotpoint type if answer is [x,y] array but type is missing
+  const type = q.type || (Array.isArray(answer) && answer.length === 2 ? "plotpoint" : "mcq");
+  return { ...q, type, answer };
+}
+
 function StudentTest({ studentName, studentId, questions: initialQuestions, adaptive, onFinish }) {
-  const [questions, setQuestions] = useState(initialQuestions);
+  const [questions, setQuestions] = useState(initialQuestions.map(normalizeQuestion));
   const [weights,   setWeights]   = useState({});
   const [seenIds,   setSeenIds]   = useState(new Set(initialQuestions.map(q=>q.id)));
   const TOTAL = questions.length;
@@ -575,7 +586,7 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
         if (nextQ && nextQ.id !== questions[cur+1].id) {
           setQuestions(qs => {
             const updated = [...qs];
-            updated[cur+1] = nextQ;
+            updated[cur+1] = normalizeQuestion(nextQ);
             return updated;
           });
           setSeenIds(s => new Set([...s, nextQ.id]));
@@ -684,7 +695,14 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
   async function doSubmit() {
     const score = questions.reduce((a,q) => {
       const given = ans[q.id] ?? null;
-      const right = q.type==="plotpoint" ? JSON.stringify(q.answer) : q.correct;
+      let right;
+      if (q.type==="plotpoint") {
+        const ans = Array.isArray(q.answer) ? q.answer
+          : (()=>{ try { return JSON.parse(q.answer); } catch { return null; } })();
+        right = JSON.stringify(ans);
+      } else {
+        right = q.correct;
+      }
       return a + (given === right ? 1 : 0);
     }, 0);
     const session = { name:studentName, score, total:TOTAL, pct:pct(score,TOTAL), submitted:now(), timeUsed:fmtTime(START_SECS-secs), answers:{...ans}, violations };
@@ -797,7 +815,7 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
                 <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"0.9rem"}}>PLOT YOUR ANSWER</div>
                 <div style={{display:"flex",justifyContent:"center"}}>
                   <PlotGrid
-                    placed={sel ? JSON.parse(sel) : null}
+                    placed={sel ? (() => { try { return JSON.parse(sel); } catch { return null; } })() : null}
                     onPlace={pt => {
                       const v = JSON.stringify(pt);
                       setAns(p=>({...p,[q.id]:v}));
@@ -811,7 +829,11 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
               <>
                 <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"0.9rem"}}>SELECT ONE ANSWER</div>
                 <div style={{display:"flex",flexDirection:"column",gap:"0.55rem"}}>
-                  {q.choices.map((choice,i)=>{
+                  {(q.choices||[]).filter(c=>c).length === 0 ? (
+                    <div style={{color:"#aaa",fontSize:"0.85rem",padding:"1rem",textAlign:"center",border:"1px dashed #c8d3dd",borderRadius:"4px"}}>
+                      ⚠ This question has no answer choices. Contact your teacher.
+                    </div>
+                  ) : (q.choices||[]).map((choice,i)=>{
                     const chosen = sel===choice;
                     return <label key={i} onClick={()=>{ setAns(p=>({...p,[q.id]:choice})); handleAdaptiveAnswer(q.id, choice); }}
                       style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.8rem 1rem",border:`2px solid ${chosen?"#003865":"#c8d3dd"}`,borderRadius:"3px",background:chosen?"#ddeaf7":"#fafbfc",cursor:"pointer"}}>
