@@ -530,13 +530,18 @@ function PracticeResults({ session, history, onReset }) {
 
 // ── Student Test ───────────────────────────────────────────
 function normalizeQuestion(q) {
-  // Normalize answer field — API may return it as string or array
+  // Normalize answer field — may be stored as JSON string or array
   let answer = q.answer;
   if (typeof answer === "string") {
     try { answer = JSON.parse(answer); } catch { answer = null; }
   }
-  // Auto-detect plotpoint type if answer is [x,y] array but type is missing
-  const type = q.type || (Array.isArray(answer) && answer.length === 2 ? "plotpoint" : "mcq");
+  // Detect plotpoint: explicit type OR answer is [x,y] and choices are empty
+  const hasRealChoices = Array.isArray(q.choices) && q.choices.filter(c => c).length > 0;
+  const isPlotAnswer   = Array.isArray(answer) && answer.length === 2 &&
+                         typeof answer[0] === "number" && typeof answer[1] === "number";
+  const type = (q.type === "plotpoint" || (isPlotAnswer && !hasRealChoices))
+    ? "plotpoint"
+    : "mcq";
   return { ...q, type, answer };
 }
 
