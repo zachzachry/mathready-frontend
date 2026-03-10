@@ -447,10 +447,16 @@ export default function QuestionBuilder() {
     let count = 0;
     for (const q of complete_qs) {
       try {
+        // Ensure type is correct before saving
+        const toSave = {
+          ...q,
+          type: (Array.isArray(q.answer) && q.answer.length === 2 && q.choices.filter(c=>c).length === 0)
+            ? "plotpoint" : (q.type || "mcq")
+        };
         await fetch(`${API}/questions`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(q),
+          body: JSON.stringify(toSave),
         });
         count++;
       } catch {}
