@@ -195,7 +195,7 @@ export default function PlotGrid({
       {!readOnly && (
         <div style={{ fontSize: "0.72rem", color: "#888", marginTop: "4px", textAlign: "center" }}>
           {placed
-            ? `Point placed at (${placed[0]}, ${placed[1]}) — tap another point to move it`
+            ? "Point placed — tap another point to move it"
             : "Tap or click a grid point to place your answer"}
         </div>
       )}
