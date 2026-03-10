@@ -913,7 +913,31 @@ function StudentResults({ session, questions, onReset }) {
           <div style={{padding:"1.25rem 1.5rem"}}>
             <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"0.75rem"}}>ITEM REVIEW</div>
             {questions.map((q,i)=>{
-              const a=session.answers[q.id]; const ok=a===q.correct;
+              const a = session.answers[q.id];
+              const isPlot = q.type === "plotpoint";
+              // Normalize correct answer for plot point questions
+              const correctVal = isPlot
+                ? (() => {
+                    const ans = Array.isArray(q.answer) ? q.answer
+                      : (()=>{ try { return JSON.parse(q.answer); } catch { return null; } })();
+                    return JSON.stringify(ans);
+                  })()
+                : q.correct;
+              const ok = a != null && a === correctVal;
+              // Human-readable display
+              const correctDisplay = isPlot
+                ? (() => {
+                    try {
+                      const arr = Array.isArray(q.answer) ? q.answer : JSON.parse(q.answer);
+                      return `(${arr[0]}, ${arr[1]})`;
+                    } catch { return "?"; }
+                  })()
+                : q.correct;
+              const studentDisplay = isPlot && a
+                ? (() => {
+                    try { const arr = JSON.parse(a); return `(${arr[0]}, ${arr[1]})`; } catch { return a; }
+                  })()
+                : a;
               return <div key={q.id} style={{display:"flex",gap:"0.75rem",marginBottom:"0.6rem",padding:"0.7rem 0.85rem",background:ok?"#f0faf2":"#fdf2f2",border:`1px solid ${ok?"#b3dfc0":"#f0b8b8"}`,borderRadius:"3px"}}>
                 <div style={{width:"22px",height:"22px",borderRadius:"50%",background:ok?"#1a6e2e":"#8b1a1a",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:"1px"}}>
                   <span style={{color:"#fff",fontSize:"0.7rem",fontWeight:700}}>{i+1}</span>
@@ -921,7 +945,11 @@ function StudentResults({ session, questions, onReset }) {
                 <div style={{flex:1,fontSize:"0.82rem"}}>
                   <div style={{color:"#777",fontSize:"0.63rem",letterSpacing:"0.08em",marginBottom:"2px"}}>{q.standard}</div>
                   <div style={{color:"#1a1a1a",fontFamily:"Georgia,serif",marginBottom:ok?0:"4px"}}><MathText text={q.question}/></div>
-                  {!ok&&<div style={{fontSize:"0.78rem"}}><span style={{color:"#1a6e2e"}}>Correct: <strong><MathText text={q.correct}/></strong></span>{a&&<span style={{color:"#8b1a1a"}}> · Your answer: <MathText text={a}/></span>}</div>}
+                  {!ok&&<div style={{fontSize:"0.78rem"}}>
+                    <span style={{color:"#1a6e2e"}}>Correct: <strong>{correctDisplay}</strong></span>
+                    {studentDisplay&&<span style={{color:"#8b1a1a"}}> · Your answer: {studentDisplay}</span>}
+                    {!studentDisplay&&<span style={{color:"#8b1a1a"}}> · Not answered</span>}
+                  </div>}
                 </div>
                 <span style={{fontWeight:700,fontSize:"0.9rem",color:ok?"#1a6e2e":"#8b1a1a"}}>{ok?"✓":"✗"}</span>
               </div>;
