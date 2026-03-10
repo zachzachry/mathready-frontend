@@ -109,6 +109,9 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose }
   const [codeErr,   setCodeErr]   = useState("");
   const [adaptive,  setAdaptive]  = useState(false);
   const [overwriteWarning, setOverwriteWarning] = useState(false);
+  const [untimed,        setUntimed]        = useState(false);
+  const [timeMins,       setTimeMins]       = useState(30);
+  const [warnMins,       setWarnMins]       = useState(5);
 
   const duplicate = savedTests.find(t =>
     t.name?.trim().toLowerCase() === name.trim().toLowerCase()
@@ -122,10 +125,14 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose }
 
   async function handleSave() {
     if (!name.trim() || code.length < 4) return;
-    // If duplicate name and not yet confirmed, show warning
     if (duplicate && !overwriteWarning) { setOverwriteWarning(true); return; }
     setSaving(true);
-    const err = await onSave(name.trim(), code, adaptive);
+    const timerCfg = {
+      untimed,
+      timeLimitSecs: untimed ? 0 : Math.max(1, timeMins) * 60,
+      warnSecs:      untimed ? 0 : Math.max(1, warnMins) * 60,
+    };
+    const err = await onSave(name.trim(), code, adaptive, timerCfg);
     if (err) { setCodeErr(err); setSaving(false); setOverwriteWarning(false); }
   }
 
@@ -166,6 +173,36 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose }
               </div>
             </label>
           </div>
+        <div style={{borderTop:"1px solid #eef1f4",paddingTop:"0.85rem"}}>
+          <label style={{display:"flex",alignItems:"center",gap:"0.75rem",cursor:"pointer",marginBottom:"0.75rem",
+            padding:"0.65rem 0.85rem",background:untimed?"#fff3cd":"#fafbfc",
+            border:`1px solid ${untimed?"#ffc107":"#dde3e9"}`,borderRadius:"3px"}}
+            onClick={()=>setUntimed(u=>!u)}>
+            <div style={{width:"36px",height:"20px",borderRadius:"10px",background:untimed?"#b8860b":"#c8d3dd",position:"relative",flexShrink:0,transition:"background .2s"}}>
+              <div style={{position:"absolute",top:"2px",left:untimed?"18px":"2px",width:"16px",height:"16px",borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+            </div>
+            <div>
+              <div style={{fontSize:"0.82rem",fontWeight:700,color:untimed?"#7a4e00":"#333"}}>Untimed {untimed?"ON":"OFF"}</div>
+              <div style={{fontSize:"0.7rem",color:"#888",marginTop:"1px"}}>No countdown — students work at their own pace</div>
+            </div>
+          </label>
+          {!untimed && (
+            <div style={{display:"flex",gap:"0.75rem"}}>
+              <div style={{flex:1}}>
+                <label style={{display:"block",fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"4px"}}>TIME LIMIT (minutes)</label>
+                <input type="number" min="1" max="180" value={timeMins}
+                  onChange={e=>setTimeMins(Math.max(1,Math.min(180,Number(e.target.value))))}
+                  style={{...S.inp,fontFamily:"monospace",fontWeight:700,fontSize:"1rem"}}/>
+              </div>
+              <div style={{flex:1}}>
+                <label style={{display:"block",fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"4px"}}>WARN AT (minutes left)</label>
+                <input type="number" min="1" max={timeMins-1} value={warnMins}
+                  onChange={e=>setWarnMins(Math.max(1,Math.min(timeMins-1,Number(e.target.value))))}
+                  style={{...S.inp,fontFamily:"monospace",fontWeight:700,fontSize:"1rem"}}/>
+              </div>
+            </div>
+          )}
+        </div>
         </div>
         {overwriteWarning && (
           <div style={{padding:"0.75rem 1.25rem",background:"#fff8e1",borderTop:"1px solid #ffd166"}}>
@@ -275,9 +312,9 @@ export default function TestBuilder() {
 
   function handleSaveEdit(updated) { setBank(b=>b.map(q=>q.id===updated.id?updated:q)); setEditingQ(null); }
 
-  async function saveTest(name, code, adaptive=false) {
+  async function saveTest(name, code, adaptive=false, timerCfg={}) {
     try {
-      const r = await fetch(`${API}/tests/saved`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,code,title:testTitle,questions:selectedQuestions,adaptive})});
+      const r = await fetch(`${API}/tests/saved`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,code,title:testTitle,questions:selectedQuestions,adaptive,...timerCfg})});
       const data = await r.json();
       if (r.status===400) return data.detail || "Code already in use";
       await loadSavedTests();
