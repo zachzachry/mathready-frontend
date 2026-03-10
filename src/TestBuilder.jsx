@@ -180,7 +180,8 @@ export default function TestBuilder() {
 
   const [testTitle, setTestTitle]     = useState("Grade 5 Math — Practice");
   const [editingQ, setEditingQ]       = useState(null);
-  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [confirmDelete,     setConfirmDelete]     = useState(null);
+  const [confirmDeleteTest, setConfirmDeleteTest] = useState(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [savedTests, setSavedTests]   = useState([]);
   const [savedMsg, setSavedMsg]       = useState("");
@@ -553,7 +554,7 @@ export default function TestBuilder() {
                       </div>
                       <div style={{display:"flex",gap:"0.4rem",flexShrink:0}}>
                         <button onClick={()=>loadSavedTest(t.id)} style={{...S.smBtn,background:"#003865",color:"#fff",borderColor:"#003865",padding:"5px 12px"}}>Load</button>
-                        <button onClick={()=>deleteSavedTest(t.id)} style={{...S.smBtn,color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",padding:"5px 10px"}}>🗑</button>
+                        <button onClick={()=>setConfirmDeleteTest(t)} style={{...S.smBtn,color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",padding:"5px 10px"}}>🗑</button>
                       </div>
                     </div>
                     {/* Code badge */}
