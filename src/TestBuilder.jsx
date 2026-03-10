@@ -102,12 +102,17 @@ function EditModal({ question, onSave, onClose }) {
 }
 
 // ── Save Test Modal ────────────────────────────────────────
-function SaveTestModal({ count, currentTitle, onSave, onClose }) {
-  const [name, setName]   = useState(currentTitle || "");
-  const [code, setCode]   = useState(genCode());
-  const [saving, setSaving] = useState(false);
-  const [codeErr, setCodeErr] = useState("");
-  const [adaptive, setAdaptive] = useState(false);
+function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose }) {
+  const [name,      setName]      = useState(currentTitle || "");
+  const [code,      setCode]      = useState(genCode());
+  const [saving,    setSaving]    = useState(false);
+  const [codeErr,   setCodeErr]   = useState("");
+  const [adaptive,  setAdaptive]  = useState(false);
+  const [overwriteWarning, setOverwriteWarning] = useState(false);
+
+  const duplicate = savedTests.find(t =>
+    t.name?.trim().toLowerCase() === name.trim().toLowerCase()
+  );
 
   function handleCodeChange(val) {
     const clean = val.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,8);
@@ -117,9 +122,11 @@ function SaveTestModal({ count, currentTitle, onSave, onClose }) {
 
   async function handleSave() {
     if (!name.trim() || code.length < 4) return;
+    // If duplicate name and not yet confirmed, show warning
+    if (duplicate && !overwriteWarning) { setOverwriteWarning(true); return; }
     setSaving(true);
     const err = await onSave(name.trim(), code, adaptive);
-    if (err) { setCodeErr(err); setSaving(false); }
+    if (err) { setCodeErr(err); setSaving(false); setOverwriteWarning(false); }
   }
 
   return (
@@ -160,11 +167,21 @@ function SaveTestModal({ count, currentTitle, onSave, onClose }) {
             </label>
           </div>
         </div>
+        {overwriteWarning && (
+          <div style={{padding:"0.75rem 1.25rem",background:"#fff8e1",borderTop:"1px solid #ffd166"}}>
+            <div style={{fontSize:"0.82rem",color:"#7a4e00",fontWeight:700,marginBottom:"4px"}}>
+              ⚠ A test named "{name.trim()}" already exists.
+            </div>
+            <div style={{fontSize:"0.75rem",color:"#7a4e00"}}>
+              This will save as a second copy with a different code. Click Save again to confirm.
+            </div>
+          </div>
+        )}
         <div style={{display:"flex",gap:"0.65rem",padding:"0.9rem 1.25rem",borderTop:"1px solid #dde3e9"}}>
-          <button onClick={onClose} style={{flex:1,background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600,color:"#333"}}>Cancel</button>
+          <button onClick={()=>{ setOverwriteWarning(false); onClose(); }} style={{flex:1,background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600,color:"#333"}}>Cancel</button>
           <button onClick={handleSave} disabled={saving||!name.trim()||code.length<4}
-            style={{flex:1,background:(!name.trim()||code.length<4)?"#c8d3dd":"#003865",border:"none",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:(!name.trim()||code.length<4)?"not-allowed":"pointer",color:"#fff",fontWeight:700}}>
-            {saving?"Saving…":"💾 Save"}
+            style={{flex:1,background:(!name.trim()||code.length<4)?"#c8d3dd":overwriteWarning?"#b8860b":"#003865",border:"none",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:(!name.trim()||code.length<4)?"not-allowed":"pointer",color:"#fff",fontWeight:700}}>
+            {saving?"Saving…":overwriteWarning?"Save Anyway →":"💾 Save"}
           </button>
         </div>
       </div>
@@ -576,7 +593,7 @@ export default function TestBuilder() {
 
       {/* Modals */}
       {editingQ&&<EditModal question={editingQ} onSave={handleSaveEdit} onClose={()=>setEditingQ(null)}/>}
-      {showSaveModal&&<SaveTestModal count={selected.length} currentTitle={testTitle} onSave={saveTest} onClose={()=>setShowSaveModal(false)}/>}
+      {showSaveModal&&<SaveTestModal count={selected.length} currentTitle={testTitle} savedTests={savedTests} onSave={saveTest} onClose={()=>setShowSaveModal(false)}/>}
 
       {confirmDelete&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
