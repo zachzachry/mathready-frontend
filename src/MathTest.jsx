@@ -545,7 +545,7 @@ function normalizeQuestion(q) {
   return { ...q, type, answer };
 }
 
-function StudentTest({ studentName, studentId, questions: initialQuestions, adaptive, onFinish }) {
+function StudentTest({ studentName, studentId, questions: initialQuestions, adaptive, onFinish, untimed=false, timeLimitSecs=1800, warnSecs=300 }) {
   const [questions, setQuestions] = useState(initialQuestions.map(normalizeQuestion));
   const [weights,   setWeights]   = useState({});
   const [seenIds,   setSeenIds]   = useState(new Set(initialQuestions.map(q=>q.id)));
@@ -553,7 +553,9 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
   const [cur,   setCur]   = useState(0);
   const [ans,   setAns]   = useState({});
   const [flg,   setFlg]   = useState({});
-  const [secs,  setSecs]  = useState(START_SECS);
+  const [secs,     setSecs]     = useState(untimed ? 0 : timeLimitSecs);
+  const [paused,   setPaused]   = useState(false);
+  const [stopped,  setStopped]  = useState(false);
   const [modal, setModal] = useState(false);
   const [nav,   setNav]   = useState(window.innerWidth > 640);
 
@@ -601,7 +603,27 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
     });
   }
 
-  useEffect(()=>{ const t=setInterval(()=>setSecs(s=>s>0?s-1:0),1000); return()=>clearInterval(t); },[]);
+  // Countdown timer (skipped if untimed)
+  useEffect(()=>{
+    if (untimed) return;
+    const t = setInterval(()=>{
+      if (!paused) setSecs(s => s > 0 ? s - 1 : 0);
+    }, 1000);
+    return () => clearInterval(t);
+  }, [paused, untimed]);
+
+  // Poll for teacher pause/stop every 5s
+  useEffect(()=>{
+    const t = setInterval(async () => {
+      try {
+        const r = await fetch(`${API}/test/control`);
+        const d = await r.json();
+        setPaused(!!d.paused);
+        if (d.stopped && !stopped) { setStopped(true); }
+      } catch {}
+    }, 5000);
+    return () => clearInterval(t);
+  }, [stopped]);
   useEffect(()=>{
     sendHeartbeat(studentName, cur);
     const t = setInterval(()=>sendHeartbeat(studentName, cur), 30000);
@@ -710,13 +732,43 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
       }
       return a + (given === right ? 1 : 0);
     }, 0);
-    const session = { name:studentName, score, total:TOTAL, pct:pct(score,TOTAL), submitted:now(), timeUsed:fmtTime(START_SECS-secs), answers:{...ans}, violations };
+    const session = { name:studentName, score, total:TOTAL, pct:pct(score,TOTAL), submitted:now(), timeUsed:untimed ? fmtTime(0) : fmtTime(timeLimitSecs-secs), answers:{...ans}, violations };
     await saveSession(session);
     onFinish(session);
   }
 
   return (
     <div ref={containerRef} style={{display:"flex",flexDirection:"column",height:"100vh",fontFamily:"sans-serif",background:"#e8edf2",overflow:"hidden",userSelect:"none",WebkitUserSelect:"none"}}>
+
+      {/* Teacher stopped the test */}
+      {stopped && (
+        <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.92)",display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem"}}>
+          <div style={{background:"#fff",borderRadius:"8px",maxWidth:"420px",width:"100%",overflow:"hidden",textAlign:"center",boxShadow:"0 8px 40px rgba(0,0,0,.5)"}}>
+            <div style={{background:"#8b1a1a",color:"#fff",padding:"1.25rem"}}>
+              <div style={{fontSize:"1.5rem",marginBottom:"4px"}}>🛑</div>
+              <div style={{fontWeight:700,fontSize:"1.1rem"}}>Test Stopped by Teacher</div>
+            </div>
+            <div style={{padding:"1.5rem"}}>
+              <p style={{fontSize:"0.92rem",color:"#333",marginBottom:"1.25rem"}}>Your teacher has ended the test. Please submit your answers now.</p>
+              <button onClick={()=>{ setStopped(false); setModal(true); }}
+                style={{width:"100%",background:"#003865",color:"#fff",border:"none",borderRadius:"4px",padding:"0.85rem",fontSize:"0.95rem",fontWeight:700,cursor:"pointer"}}>
+                Submit My Answers →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Teacher paused the test */}
+      {paused && !stopped && (
+        <div style={{position:"fixed",inset:0,zIndex:9998,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div style={{background:"#fff",borderRadius:"8px",maxWidth:"360px",width:"100%",padding:"2rem",textAlign:"center",boxShadow:"0 8px 40px rgba(0,0,0,.4)"}}>
+            <div style={{fontSize:"2.5rem",marginBottom:"0.5rem"}}>⏸</div>
+            <div style={{fontWeight:700,fontSize:"1.1rem",color:"#003865",marginBottom:"0.5rem"}}>Test Paused</div>
+            <div style={{fontSize:"0.85rem",color:"#666"}}>Your teacher has paused the test. Please wait.</div>
+          </div>
+        </div>
+      )}
 
       {/* Lockdown warning overlay */}
       {lockWarning && (
@@ -754,7 +806,9 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
           )}
           <div style={{textAlign:"right"}}>
             <div style={{fontSize:"0.55rem",opacity:.6,letterSpacing:"0.08em"}}>TIME</div>
-            <div style={{fontSize:"1rem",fontWeight:"bold",fontFamily:"monospace",color:secs<300?"#ffaaaa":"#fff"}}>{fmtTime(secs)}</div>
+            <div style={{fontSize:"1rem",fontWeight:"bold",fontFamily:"monospace",color:(!untimed&&secs<warnSecs)?"#ffaaaa":"#fff"}}>
+              {untimed ? "∞" : fmtTime(secs)}
+            </div>
           </div>
           <div style={{textAlign:"right",display:window.innerWidth>480?"block":"none"}}>
             <div style={{fontSize:"0.55rem",opacity:.6,letterSpacing:"0.08em"}}>STUDENT</div>
@@ -999,6 +1053,9 @@ export default function MathTest({ onBack, identity }) {
     } else if (testInfo?.questions?.length) {
       setQuestions(testInfo.questions);
     }
+    setUntimed(!!testInfo?.untimed);
+    setTimeLimitSecs(testInfo?.timeLimitSecs ?? 1800);
+    setWarnSecs(testInfo?.warnSecs ?? 300);
     setScreen("test");
   }
 
