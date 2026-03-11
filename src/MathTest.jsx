@@ -774,21 +774,39 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
   }, []);
 
   // Block keyboard shortcuts and right-click
+  const [devToolsOpen, setDevToolsOpen] = useState(false);
+
   useEffect(() => {
+    // Block keyboard shortcuts
     function onKey(e) {
       const bad = (
         (e.ctrlKey || e.metaKey) && ["c","v","u","a","s","p"].includes(e.key.toLowerCase()) ||
-        (e.ctrlKey && e.shiftKey && ["i","j","c"].includes(e.key.toLowerCase())) ||
-        e.key === "F12" || e.key === "PrintScreen"
+        (e.ctrlKey && e.shiftKey && ["i","j","c","k"].includes(e.key.toLowerCase())) ||
+        e.key === "F12" || e.key === "PrintScreen" || e.key === "F5"
       );
-      if (bad) { e.preventDefault(); e.stopPropagation(); }
+      if (bad) { e.preventDefault(); e.stopPropagation(); setDevToolsOpen(true); setViolations(v=>v+1); }
     }
     function onContext(e) { e.preventDefault(); }
     document.addEventListener("keydown", onKey, true);
     document.addEventListener("contextmenu", onContext, true);
+
+    // Devtools size detection — fires when devtools panel opens/closes
+    function checkDevTools() {
+      const threshold = 160;
+      const widthDiff  = window.outerWidth  - window.innerWidth;
+      const heightDiff = window.outerHeight - window.innerHeight;
+      const open = widthDiff > threshold || heightDiff > threshold;
+      setDevToolsOpen(prev => {
+        if (open && !prev) setViolations(v => v + 1);
+        return open;
+      });
+    }
+    const dtInterval = setInterval(checkDevTools, 800);
+
     return () => {
       document.removeEventListener("keydown", onKey, true);
       document.removeEventListener("contextmenu", onContext, true);
+      clearInterval(dtInterval);
     };
   }, []);
 
@@ -905,7 +923,20 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
 
       <TopBar title="Grade 5 Math" right={
         <div style={{display:"flex",gap:"1rem",alignItems:"center"}}>
-          {violations > 0 && (
+          {devToolsOpen && (
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:"1.5rem"}}>
+            <div style={{fontSize:"3rem"}}>🚫</div>
+            <div style={{color:"#fff",fontSize:"1.3rem",fontWeight:700,textAlign:"center",maxWidth:"380px"}}>
+              Developer Tools Detected
+            </div>
+            <div style={{color:"#ffb3b3",fontSize:"0.95rem",textAlign:"center",maxWidth:"340px",lineHeight:1.5}}>
+              Close the browser developer tools to continue your test.<br/>
+              <strong>This incident has been logged for your teacher.</strong>
+            </div>
+            <div style={{color:"#888",fontSize:"0.75rem"}}>Press F12 or close the DevTools panel to dismiss this screen.</div>
+          </div>
+        )}
+        {violations > 0 && (
             <div style={{background:"#8b1a1a",borderRadius:"3px",padding:"2px 8px",fontSize:"0.65rem",fontWeight:700,color:"#fff"}}>
               ⚠ {violations} violation{violations!==1?"s":""}
             </div>
@@ -1183,6 +1214,9 @@ export default function MathTest({ onBack, identity }) {
   const [questions,       setQuestions]       = useState(FALLBACK_QUESTIONS);
   const [isAdaptive,      setIsAdaptive]      = useState(false);
   const [isDrill,         setIsDrill]         = useState(false);
+  const [untimed,         setUntimed]         = useState(false);
+  const [timeLimitSecs,   setTimeLimitSecs]   = useState(1800);
+  const [warnSecs,        setWarnSecs]        = useState(300);
 
   function reset() {
     setFinalSession(null); setPracticeHistory([]);
@@ -1304,7 +1338,7 @@ export default function MathTest({ onBack, identity }) {
     return <PracticeResults session={finalSession} history={practiceHistory} onReset={reset}/>;
 
   if (screen === "test")
-    return <StudentTest studentName={student?.name || ""} studentId={student?.id || ""} questions={questions} adaptive={isAdaptive} onFinish={handleFinishTest}/>;
+    return <StudentTest studentName={student?.name || ""} studentId={student?.id || ""} questions={questions} adaptive={isAdaptive} onFinish={handleFinishTest} untimed={untimed} timeLimitSecs={timeLimitSecs} warnSecs={warnSecs}/>;
 
   if (screen === "results")
     return <StudentResults session={finalSession} questions={questions} onReset={()=>{ reset(); onBack(); }}/>;
