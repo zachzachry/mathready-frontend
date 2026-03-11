@@ -53,13 +53,17 @@ function StudentLogin({ onStartTest, onStartPractice, onBack, prefill, codeOnly 
         setChecking(false); return;
       }
       // One-attempt check
-      if (data.oneAttempt && selectedStudent?.id) {
+      if (data.oneAttempt) {
         try {
-          const ar = await fetch(`${API}/test/attempt-check?code=${encodeURIComponent(c)}&studentId=${encodeURIComponent(selectedStudent.id)}`);
-          const ad = await ar.json();
-          if (ad.attempted) {
-            setErr("You have already submitted this test. Only one attempt is allowed.");
-            setChecking(false); return;
+          const sid  = selectedStudent?.id   ? `&studentId=${encodeURIComponent(selectedStudent.id)}`   : "";
+          const snam = selectedStudent?.name ? `&studentName=${encodeURIComponent(selectedStudent.name)}` : "";
+          if (sid || snam) {
+            const ar = await fetch(`${API}/test/attempt-check?code=${encodeURIComponent(c)}${sid}${snam}`);
+            const ad = await ar.json();
+            if (ad.attempted) {
+              setErr("You have already submitted this test. Only one attempt is allowed.");
+              setChecking(false); return;
+            }
           }
         } catch { /* allow through if check fails */ }
       }
