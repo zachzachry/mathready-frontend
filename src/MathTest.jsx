@@ -52,6 +52,17 @@ function StudentLogin({ onStartTest, onStartPractice, onBack, prefill, codeOnly 
         setErr("Invalid test code. Check with your teacher.");
         setChecking(false); return;
       }
+      // One-attempt check
+      if (data.oneAttempt && selectedStudent?.id) {
+        try {
+          const ar = await fetch(`${API}/test/attempt-check?code=${encodeURIComponent(c)}&studentId=${encodeURIComponent(selectedStudent.id)}`);
+          const ad = await ar.json();
+          if (ad.attempted) {
+            setErr("You have already submitted this test. Only one attempt is allowed.");
+            setChecking(false); return;
+          }
+        } catch { /* allow through if check fails */ }
+      }
       setTestInfo(data);
       setStep("confirm");
     } catch {
@@ -76,8 +87,9 @@ function StudentLogin({ onStartTest, onStartPractice, onBack, prefill, codeOnly 
               ["TEST",         testInfo.title || "Grade 5 Mathematics"],
               ["TEST CODE",    code.toUpperCase()],
               ["QUESTIONS",    String(testInfo.questions.length)],
-              ["TIME LIMIT",   "30 Minutes"],
+              ["TIME LIMIT",   testInfo.untimed ? "No Time Limit" : `${Math.round((testInfo.timeLimitSecs||1800)/60)} Minutes`],
               ["CALCULATOR",   "Not Permitted"],
+              ...(testInfo.oneAttempt ? [["ATTEMPTS", "1 — Cannot retake"]] : []),
             ].map(([k,v],i,a) => (
               <div key={k} style={{...S.confirmRow, borderBottom:i<a.length-1?"1px solid #eef1f4":"none"}}>
                 <span style={S.confirmK}>{k}</span>
@@ -85,9 +97,14 @@ function StudentLogin({ onStartTest, onStartPractice, onBack, prefill, codeOnly 
               </div>
             ))}
           </div>
-          <div style={{background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"3px",padding:"0.65rem 1rem",marginBottom:"1.25rem",fontSize:"0.8rem",color:"#7a4e00"}}>
+          <div style={{background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"3px",padding:"0.65rem 1rem",marginBottom:"0.75rem",fontSize:"0.8rem",color:"#7a4e00"}}>
             ⚠ Once you click <strong>Begin Test</strong>, your timer starts immediately.
           </div>
+          {testInfo.oneAttempt && (
+            <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"3px",padding:"0.65rem 1rem",marginBottom:"1.25rem",fontSize:"0.8rem",color:"#8b1a1a",display:"flex",alignItems:"center",gap:"0.5rem"}}>
+              🚫 <span><strong>One attempt only.</strong> Once you submit, you cannot retake this test.</span>
+            </div>
+          )}
           <div style={{display:"flex",gap:"0.75rem"}}>
             <button onClick={()=>setStep("code")} style={S.btnSec}>← Go Back</button>
             <button onClick={()=>onStartTest(selectedStudent, selectedClass, code.toUpperCase(), testInfo)} style={S.btnPri}>Begin Test →</button>
@@ -271,9 +288,14 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
 
   function handleNext() {
     const timeSecs = Math.round((Date.now() - qStart) / 1000);
-    const isCorrect = curQ.type === "plotpoint"
-      ? selected === JSON.stringify(curQ.answer)
-      : selected === curQ.correct;
+    function gradeIt(q, sel) {
+      if (!sel) return false;
+      if (q.type === "plotpoint") return sel === JSON.stringify(Array.isArray(q.answer)?q.answer:(()=>{try{return JSON.parse(q.answer);}catch{return null;}})());
+      if (q.type === "multiselect") { try { return JSON.stringify([...JSON.parse(sel)].sort())===JSON.stringify([...(Array.isArray(q.answer)?q.answer:[])].sort()); } catch { return false; } }
+      if (q.type === "keypad") return String(q.answer??"").trim().toLowerCase()===String(sel).trim().toLowerCase();
+      return sel === q.correct;
+    }
+    const isCorrect = gradeIt(curQ, selected);
     const newHistory = [...history, { q: curQ, chosen: selected, correct: isCorrect, timeSecs }];
     setHistory(newHistory);
 
@@ -335,9 +357,12 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
   if (!curQ) return null;
 
   const q = curQ;
-  const correct = q.type === "plotpoint"
-    ? JSON.stringify(q.answer)
-    : q.correct;
+  const correct = (() => {
+    if (q.type === "plotpoint") return JSON.stringify(Array.isArray(q.answer)?q.answer:(()=>{try{return JSON.parse(q.answer);}catch{return null;}})());
+    if (q.type === "multiselect") return JSON.stringify([...(Array.isArray(q.answer)?q.answer:[])].sort());
+    if (q.type === "keypad") return String(q.answer??"").trim().toLowerCase();
+    return q.correct;
+  })();
   const streak  = (() => { let s=0; for(let i=history.length-1;i>=0;i--){ if(history[i].correct) s++; else break; } return s; })();
   const totalCorrect = history.filter(x=>x.correct).length;
   const questionNum  = history.length + 1;
@@ -388,7 +413,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
             </p>
           </div>
 
-          {/* Choices — MCQ or Plot Point */}
+          {/* Choices — by type */}
           {q.type === "plotpoint" ? (
             <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"0.75rem"}}>
               <PlotGrid
@@ -398,6 +423,60 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
                 revealed={revealed}
                 size={Math.min(320, window.innerWidth - 60)}
               />
+            </div>
+          ) : q.type === "keypad" ? (
+            <div style={{display:"flex",flexDirection:"column",gap:"0.65rem",alignItems:"flex-start"}}>
+              <input
+                type="text" inputMode="decimal"
+                value={selected ?? ""}
+                onChange={e => !revealed && handleChoose(e.target.value)}
+                disabled={revealed}
+                placeholder="Type your answer…"
+                style={{width:"100%",maxWidth:"260px",padding:"0.8rem 1rem",fontSize:"1.3rem",fontFamily:"monospace",fontWeight:700,border:`2px solid ${revealed?(String(selected??"").trim().toLowerCase()===correct?"#1a6e2e":"#8b1a1a"):"#003865"}`,borderRadius:"4px",outline:"none",background:"#fafbfc",color:"#0f0f0f"}}
+              />
+              {!revealed && selected && (
+                <button onClick={() => handleChoose(selected)}
+                  style={{background:"#003865",color:"#fff",border:"none",borderRadius:"4px",padding:"0.65rem 1.25rem",fontSize:"0.9rem",fontWeight:700,cursor:"pointer"}}>
+                  Submit →
+                </button>
+              )}
+            </div>
+          ) : q.type === "multiselect" ? (
+            <div style={{display:"flex",flexDirection:"column",gap:"0.6rem"}}>
+              <div style={{fontSize:"0.7rem",color:"#888",marginBottom:"4px"}}>Select all that apply.</div>
+              {q.choices.map((choice, i) => {
+                const selArr = (() => { try { return selected ? JSON.parse(selected) : []; } catch { return []; } })();
+                const isChosen = selArr.includes(choice);
+                const correctArr = Array.isArray(q.answer) ? q.answer : [];
+                const isInCorrect = correctArr.includes(choice);
+                let bg = "#fff", border = "2px solid #c8d3dd";
+                if (revealed) {
+                  if (isInCorrect)    { bg="#f0faf2"; border="2px solid #1a6e2e"; }
+                  else if (isChosen)  { bg="#fdf2f2"; border="2px solid #8b1a1a"; }
+                  else                { bg="#fafbfc"; border="2px solid #e0e0e0"; }
+                } else if (isChosen) { bg="#ddeaf7"; border="2px solid #003865"; }
+                return (
+                  <button key={i}
+                    onClick={() => {
+                      if (revealed) return;
+                      const next = isChosen ? selArr.filter(c=>c!==choice) : [...selArr, choice];
+                      setSelected(next.length ? JSON.stringify(next) : null);
+                    }}
+                    disabled={revealed}
+                    style={{background:bg,border,borderRadius:"6px",padding:"0.9rem 1.25rem",textAlign:"left",cursor:revealed?"default":"pointer",display:"flex",alignItems:"center",gap:"1rem",transition:"all .15s"}}>
+                    <div style={{width:"22px",height:"22px",borderRadius:"3px",border:`2px solid ${revealed?(isInCorrect?"#1a6e2e":isChosen?"#8b1a1a":"#ddd"):"#9aabba"}`,background:revealed?(isInCorrect?"#1a6e2e":isChosen?"#8b1a1a":"#f0f0f0"):(isChosen?"#003865":"#fff"),display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      {(isChosen || (revealed && isInCorrect)) && <span style={{color:"#fff",fontSize:"0.8rem",fontWeight:900}}>✓</span>}
+                    </div>
+                    <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",flex:1}}><MathText text={choice}/></span>
+                  </button>
+                );
+              })}
+              {!revealed && (
+                <button onClick={() => handleChoose(selected || "[]")}
+                  style={{background:"#003865",color:"#fff",border:"none",borderRadius:"4px",padding:"0.65rem 1.25rem",fontSize:"0.9rem",fontWeight:700,cursor:"pointer",marginTop:"0.25rem"}}>
+                  Submit Selections →
+                </button>
+              )}
             </div>
           ) : (
           <div style={{display:"flex",flexDirection:"column",gap:"0.6rem"}}>
@@ -430,9 +509,23 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
 
           {/* Feedback banner */}
           {revealed && (
-            <div style={{borderRadius:"6px",padding:"1rem 1.25rem",background:selected===correct?"#f0faf2":"#fdf2f2",border:`1px solid ${selected===correct?"#b3dfc0":"#f0b8b8"}`}}>
-              <div style={{fontSize:"1rem",fontWeight:700,color:selected===correct?"#1a6e2e":"#8b1a1a",marginBottom:q.explanation?"6px":0}}>
-                {selected===correct ? "✓ Correct!" : <span>✗ The correct answer is: <MathText text={correct}/></span>}
+            {(() => {
+              let isOk;
+              if (q.type === "multiselect") {
+                try { isOk = JSON.stringify([...JSON.parse(selected)].sort()) === correct; } catch { isOk = false; }
+              } else if (q.type === "keypad") {
+                isOk = String(selected??"").trim().toLowerCase() === correct;
+              } else {
+                isOk = selected === correct;
+              }
+              const correctLabel = q.type==="multiselect"
+                ? (Array.isArray(q.answer)?q.answer:[]).join(", ")
+                : q.type==="keypad" ? String(q.answer??"")
+                : correct;
+              return (
+            <div style={{borderRadius:"6px",padding:"1rem 1.25rem",background:isOk?"#f0faf2":"#fdf2f2",border:`1px solid ${isOk?"#b3dfc0":"#f0b8b8"}`}}>
+              <div style={{fontSize:"1rem",fontWeight:700,color:isOk?"#1a6e2e":"#8b1a1a",marginBottom:q.explanation?"6px":0}}>
+                {isOk ? "✓ Correct!" : <span>✗ The correct answer is: <MathText text={correctLabel}/></span>}
               </div>
               {q.explanation && (
                 <div style={{fontSize:"0.85rem",color:"#444",lineHeight:1.6}}>
@@ -440,6 +533,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
                 </div>
               )}
             </div>
+              ); })()}
           )}
 
           {/* Next button */}
@@ -447,7 +541,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
             <div style={{display:"flex",gap:"0.75rem"}}>
               <button onClick={handleNext}
                 style={{flex:1,background:"#003865",border:"none",borderRadius:"6px",padding:"0.85rem",fontSize:"0.95rem",cursor:"pointer",color:"#fff",fontWeight:700}}>
-                {q.type==="plotpoint" && !revealed ? "Submit Answer →" : "Next Question →"}
+                {(q.type==="plotpoint"||q.type==="keypad"||q.type==="multiselect") && !revealed ? "Submit Answer →" : "Next Question →"}
               </button>
               <button onClick={handleQuit}
                 style={{background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"6px",padding:"0.85rem 1.25rem",fontSize:"0.85rem",cursor:"pointer",color:"#555",fontWeight:600}}>
@@ -541,7 +635,7 @@ function normalizeQuestion(q) {
                          typeof answer[0] === "number" && typeof answer[1] === "number";
   const type = (q.type === "plotpoint" || (isPlotAnswer && !hasRealChoices))
     ? "plotpoint"
-    : "mcq";
+    : (["multiselect","keypad"].includes(q.type) ? q.type : "mcq");
   return { ...q, type, answer };
 }
 
@@ -719,18 +813,30 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
   const ansCount = Object.keys(ans).length;
   const flgCount = Object.values(flg).filter(Boolean).length;
 
+  function gradeAnswer(q, given) {
+    if (!given) return false;
+    if (q.type === "plotpoint") {
+      const ans = Array.isArray(q.answer) ? q.answer
+        : (()=>{ try { return JSON.parse(q.answer); } catch { return null; } })();
+      return given === JSON.stringify(ans);
+    }
+    if (q.type === "multiselect") {
+      const correct = Array.isArray(q.answer) ? q.answer : [];
+      try {
+        const given_arr = JSON.parse(given);
+        return JSON.stringify([...given_arr].sort()) === JSON.stringify([...correct].sort());
+      } catch { return false; }
+    }
+    if (q.type === "keypad") {
+      return String(q.answer ?? "").trim().toLowerCase() === String(given).trim().toLowerCase();
+    }
+    return given === q.correct;
+  }
+
   async function doSubmit() {
     const score = questions.reduce((a,q) => {
       const given = ans[q.id] ?? null;
-      let right;
-      if (q.type==="plotpoint") {
-        const ans = Array.isArray(q.answer) ? q.answer
-          : (()=>{ try { return JSON.parse(q.answer); } catch { return null; } })();
-        right = JSON.stringify(ans);
-      } else {
-        right = q.correct;
-      }
-      return a + (given === right ? 1 : 0);
+      return a + (gradeAnswer(q, given) ? 1 : 0);
     }, 0);
     const session = { name:studentName, score, total:TOTAL, pct:pct(score,TOTAL), submitted:now(), timeUsed:untimed ? fmtTime(0) : fmtTime(timeLimitSecs-secs), answers:{...ans}, violations };
     await saveSession(session);
@@ -884,6 +990,44 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
                   />
                 </div>
               </>
+            ) : q.type === "keypad" ? (
+              <>
+                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"0.9rem"}}>TYPE YOUR ANSWER</div>
+                <div style={{display:"flex",flexDirection:"column",gap:"0.65rem",alignItems:"flex-start"}}>
+                  <input
+                    type="text" inputMode="decimal"
+                    value={sel ?? ""}
+                    onChange={e => { setAns(p=>({...p,[q.id]:e.target.value})); handleAdaptiveAnswer(q.id, e.target.value); }}
+                    placeholder="Enter your answer…"
+                    style={{width:"100%",maxWidth:"260px",padding:"0.8rem 1rem",fontSize:"1.3rem",fontFamily:"monospace",fontWeight:700,border:"2px solid #003865",borderRadius:"4px",outline:"none",background:"#fafbfc",color:"#0f0f0f",letterSpacing:"0.05em"}}
+                  />
+                  {sel && <div style={{fontSize:"0.72rem",color:"#555"}}>Your answer: <strong>{sel}</strong></div>}
+                </div>
+              </>
+            ) : q.type === "multiselect" ? (
+              <>
+                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"4px"}}>SELECT ALL CORRECT ANSWERS</div>
+                <div style={{fontSize:"0.7rem",color:"#888",marginBottom:"0.75rem"}}>Choose all that apply — there may be more than one correct answer.</div>
+                <div style={{display:"flex",flexDirection:"column",gap:"0.55rem"}}>
+                  {(q.choices||[]).filter(c=>c).map((choice,i)=>{
+                    const selArr = (() => { try { return sel ? JSON.parse(sel) : []; } catch { return []; } })();
+                    const chosen = selArr.includes(choice);
+                    function toggleChoice() {
+                      const next = chosen ? selArr.filter(c=>c!==choice) : [...selArr, choice];
+                      const v = JSON.stringify(next);
+                      setAns(p=>({...p,[q.id]: next.length ? v : null}));
+                      handleAdaptiveAnswer(q.id, next.length ? v : null);
+                    }
+                    return <label key={i} onClick={toggleChoice}
+                      style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.8rem 1rem",border:`2px solid ${chosen?"#003865":"#c8d3dd"}`,borderRadius:"3px",background:chosen?"#ddeaf7":"#fafbfc",cursor:"pointer"}}>
+                      <div style={{width:"22px",height:"22px",borderRadius:"3px",border:`2px solid ${chosen?"#003865":"#9aabba"}`,background:chosen?"#003865":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        {chosen && <span style={{color:"#fff",fontSize:"0.8rem",fontWeight:900}}>✓</span>}
+                      </div>
+                      <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color:"#0f0f0f"}}><MathText text={choice}/></span>
+                    </label>;
+                  })}
+                </div>
+              </>
             ) : (
               <>
                 <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"0.9rem"}}>SELECT ONE ANSWER</div>
@@ -968,30 +1112,35 @@ function StudentResults({ session, questions, onReset }) {
             <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"0.75rem"}}>ITEM REVIEW</div>
             {questions.map((q,i)=>{
               const a = session.answers[q.id];
-              const isPlot = q.type === "plotpoint";
-              // Normalize correct answer for plot point questions
-              const correctVal = isPlot
-                ? (() => {
-                    const ans = Array.isArray(q.answer) ? q.answer
-                      : (()=>{ try { return JSON.parse(q.answer); } catch { return null; } })();
-                    return JSON.stringify(ans);
-                  })()
-                : q.correct;
-              const ok = a != null && a === correctVal;
-              // Human-readable display
-              const correctDisplay = isPlot
-                ? (() => {
-                    try {
-                      const arr = Array.isArray(q.answer) ? q.answer : JSON.parse(q.answer);
-                      return `(${arr[0]}, ${arr[1]})`;
-                    } catch { return "?"; }
-                  })()
-                : q.correct;
-              const studentDisplay = isPlot && a
-                ? (() => {
-                    try { const arr = JSON.parse(a); return `(${arr[0]}, ${arr[1]})`; } catch { return a; }
-                  })()
-                : a;
+              // Grade using same logic as doSubmit
+              function gradeAns(q, given) {
+                if (!given) return false;
+                if (q.type === "plotpoint") {
+                  const ans = Array.isArray(q.answer) ? q.answer : (()=>{try{return JSON.parse(q.answer);}catch{return null;}})();
+                  return given === JSON.stringify(ans);
+                }
+                if (q.type === "multiselect") {
+                  const correct = Array.isArray(q.answer) ? q.answer : [];
+                  try { const ga = JSON.parse(given); return JSON.stringify([...ga].sort())===JSON.stringify([...correct].sort()); } catch { return false; }
+                }
+                if (q.type === "keypad") return String(q.answer??"").trim().toLowerCase()===String(given).trim().toLowerCase();
+                return given === q.correct;
+              }
+              const ok = gradeAns(q, a);
+              // Human-readable correct answer
+              const correctDisplay = (() => {
+                if (q.type === "plotpoint") { try { const arr = Array.isArray(q.answer)?q.answer:JSON.parse(q.answer); return `(${arr[0]}, ${arr[1]})`; } catch { return "?"; } }
+                if (q.type === "multiselect") { const arr = Array.isArray(q.answer)?q.answer:[]; return arr.join(", ") || "?"; }
+                if (q.type === "keypad") return String(q.answer ?? "");
+                return q.correct;
+              })();
+              // Human-readable student answer
+              const studentDisplay = (() => {
+                if (!a) return null;
+                if (q.type === "plotpoint") { try { const arr=JSON.parse(a); return `(${arr[0]}, ${arr[1]})`; } catch { return a; } }
+                if (q.type === "multiselect") { try { return JSON.parse(a).join(", "); } catch { return a; } }
+                return a;
+              })();
               return <div key={q.id} style={{display:"flex",gap:"0.75rem",marginBottom:"0.6rem",padding:"0.7rem 0.85rem",background:ok?"#f0faf2":"#fdf2f2",border:`1px solid ${ok?"#b3dfc0":"#f0b8b8"}`,borderRadius:"3px"}}>
                 <div style={{width:"22px",height:"22px",borderRadius:"50%",background:ok?"#1a6e2e":"#8b1a1a",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:"1px"}}>
                   <span style={{color:"#fff",fontSize:"0.7rem",fontWeight:700}}>{i+1}</span>
