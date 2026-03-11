@@ -1,9 +1,16 @@
 import { useState, useEffect, useCallback } from "react";
 import TeacherManager from "./TeacherManager";
-import { API } from "./shared/constants";
+import { API, lvlC, lvlBg, lvl } from "./shared/constants";
 
 const NAVY = "#003865";
 const GREEN = "#1a6e2e";
+
+const DOMAINS = [
+  { key:"NR",  label:"Number & Operations",          color:"#003865", standards: s => s.startsWith("5.NR")  },
+  { key:"PAR", label:"Patterns, Algebra & Relations", color:"#7a4e00", standards: s => s.startsWith("5.PAR") },
+  { key:"MDR", label:"Measurement, Data & Results",   color:"#1a6e2e", standards: s => s.startsWith("5.MDR") },
+  { key:"GSR", label:"Geometry & Spatial Reasoning",  color:"#5b21b6", standards: s => s.startsWith("5.GSR") },
+];
 
 function pctColor(pct) {
   if (pct === null || pct === undefined) return "#aaa";
@@ -241,8 +248,11 @@ export default function AdminShell({ onBack }) {
   const [data,     setData]     = useState(null);
   const [loading,  setLoading]  = useState(true);
   const [selected, setSelected] = useState(null);
-  const [tab,      setTab]      = useState("overview"); // "overview" | "gaps"
+  const [tab,      setTab]      = useState("overview"); // "overview" | "gaps" | "profile"
   const [lastRefresh, setLastRefresh] = useState(null);
+  const [profileSessions, setProfileSessions] = useState([]);
+  const [bankQ,           setBankQ]           = useState([]);
+  const [profileLoading,  setProfileLoading]  = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -259,6 +269,19 @@ export default function AdminShell({ onBack }) {
     const t = setInterval(load, 30000);
     return () => clearInterval(t);
   }, [load]);
+
+  useEffect(() => {
+    if (tab !== "profile") return;
+    setProfileLoading(true);
+    Promise.all([
+      fetch(`${API}/sessions`).then(r=>r.json()).catch(()=>[]),
+      fetch(`${API}/questions`).then(r=>r.json()).catch(()=>[]),
+    ]).then(([sess, qs]) => {
+      setProfileSessions(Array.isArray(sess) ? sess.filter(s => s.mode !== "drill" && s.mode !== "practice") : []);
+      setBankQ(Array.isArray(qs) && qs.length ? qs : []);
+      setProfileLoading(false);
+    });
+  }, [tab]);
 
   if (loading) return (
     <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center",
@@ -331,7 +354,7 @@ export default function AdminShell({ onBack }) {
       {/* Tabs */}
       <div style={{ background:"#fff", borderBottom:"2px solid #c8d3dd", padding:"0 1.5rem",
         display:"flex", gap:"0", flexShrink:0 }}>
-        {[["overview","📊 Classes"], ["gaps","⚠ School-Wide Gaps"], ["teachers","👩‍🏫 Teachers"], ["classes","🏫 Manage Classes"]].map(([key, label]) => (
+        {[["overview","📊 Classes"], ["gaps","⚠ School-Wide Gaps"], ["profile","📋 Class Profile"], ["teachers","👩‍🏫 Teachers"], ["classes","🏫 Manage Classes"]].map(([key, label]) => (
           <button key={key} onClick={() => { setTab(key); setSelected(null); }}
             style={{ padding:"0.65rem 1.25rem", background:"none", border:"none",
               borderBottom: tab===key ? `3px solid ${NAVY}` : "3px solid transparent",
@@ -371,6 +394,183 @@ export default function AdminShell({ onBack }) {
 
         {tab === "teachers" && <TeacherManager/>}
         {tab === "classes"  && <ClassAdmin/>}
+
+        {tab === "profile" && (() => {
+          if (profileLoading) return <div style={{textAlign:"center",color:"#aaa",padding:"3rem"}}>Loading profile data…</div>;
+          if (!profileSessions.length) return (
+            <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"3rem",textAlign:"center",color:"#aaa",maxWidth:"600px"}}>
+              <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>📋</div>
+              <div style={{fontWeight:600,color:"#555",marginBottom:"4px"}}>No test data yet</div>
+              <div style={{fontSize:"0.82rem"}}>Class Profile populates once students submit tests.</div>
+            </div>
+          );
+
+          // Helper: compute domain accuracy from sessions+answers
+          function domainPct(sessions) {
+            const result = {};
+            DOMAINS.forEach(d => {
+              let correct = 0, total = 0;
+              sessions.forEach(sess => {
+                Object.entries(sess.answers||{}).forEach(([qid, ans]) => {
+                  const q = bankQ.find(x=>x.id===qid);
+                  if (!q || !d.standards(q.standard)) return;
+                  total++;
+                  if (ans === q.correct) correct++;
+                });
+              });
+              result[d.key] = total ? Math.round((correct/total)*100) : null;
+            });
+            return result;
+          }
+
+          // Group sessions by class
+          const classMap = {};
+          profileSessions.forEach(s => {
+            const key = s.classId || s.className || "Unassigned";
+            const label = s.className || s.classId || "Unassigned";
+            if (!classMap[key]) classMap[key] = { name: label, sessions: [] };
+            classMap[key].sessions.push(s);
+          });
+
+          // School-wide domain averages
+          const schoolDomains = domainPct(profileSessions);
+          const schoolAvgPct  = Math.round(profileSessions.reduce((a,s)=>a+s.pct,0)/profileSessions.length);
+
+          // Per-class domain scores
+          const classRows = Object.entries(classMap).map(([key, cls]) => ({
+            key, name: cls.name,
+            sessions: cls.sessions.length,
+            avg: Math.round(cls.sessions.reduce((a,s)=>a+s.pct,0)/cls.sessions.length),
+            domains: domainPct(cls.sessions),
+          })).sort((a,b) => b.avg - a.avg);
+
+          // Standard-level weaknesses school-wide
+          const stdMap = {};
+          profileSessions.forEach(sess => {
+            Object.entries(sess.answers||{}).forEach(([qid, ans]) => {
+              const q = bankQ.find(x=>x.id===qid);
+              if (!q) return;
+              if (!stdMap[q.standard]) stdMap[q.standard] = { std: q.standard, short: q.short||q.standard, correct:0, total:0 };
+              stdMap[q.standard].total++;
+              if (ans === q.correct) stdMap[q.standard].correct++;
+            });
+          });
+          const stdRows = Object.values(stdMap).map(r=>({...r,pct:Math.round((r.correct/r.total)*100)})).sort((a,b)=>a.pct-b.pct);
+          const weakest  = stdRows.slice(0,5);
+          const strongest = [...stdRows].sort((a,b)=>b.pct-a.pct).slice(0,5);
+
+          const DomainBar = ({p, color}) => (
+            <div style={{display:"flex",alignItems:"center",gap:"0.5rem",flex:1}}>
+              <div style={{flex:1,height:"10px",background:"#f0f4f8",borderRadius:"5px",overflow:"hidden"}}>
+                <div style={{width:`${p||0}%`,height:"100%",background:color,borderRadius:"5px"}}/>
+              </div>
+              <div style={{width:"36px",textAlign:"right",fontSize:"0.75rem",fontWeight:700,color:p===null?"#aaa":lvlC(p),flexShrink:0}}>
+                {p===null?"—":`${p}%`}
+              </div>
+            </div>
+          );
+
+          return (
+            <div style={{maxWidth:"1100px",display:"flex",flexDirection:"column",gap:"1.25rem"}}>
+
+              {/* School-wide domain cards */}
+              <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden"}}>
+                <div style={{padding:"0.75rem 1.25rem",background:NAVY,color:"#fff",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em"}}>
+                  SCHOOL-WIDE CLASS PROFILE — {profileSessions.length} TEST SESSIONS · {Object.keys(classMap).length} CLASSES
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"1px",background:"#e8edf2"}}>
+                  {DOMAINS.map(d => {
+                    const p = schoolDomains[d.key];
+                    return (
+                      <div key={d.key} style={{background:"#fff",padding:"1rem 1.25rem"}}>
+                        <div style={{fontSize:"0.58rem",fontWeight:700,letterSpacing:"0.12em",color:d.color,marginBottom:"6px"}}>{d.label.toUpperCase()}</div>
+                        <div style={{fontSize:"2rem",fontWeight:700,color:p===null?"#aaa":lvlC(p),marginBottom:"6px"}}>{p===null?"—":`${p}%`}</div>
+                        <DomainBar p={p} color={d.color}/>
+                        {p!==null && <div style={{fontSize:"0.65rem",color:"#888",marginTop:"4px"}}>{lvl(p)}</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Strength / Opportunity */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem"}}>
+                {[
+                  ["🏆 School Strengths", strongest, "#1a6e2e","#f0faf2","#b3dfc0"],
+                  ["⚠️ School Opportunities", weakest, "#8b1a1a","#fdf2f2","#f0b8b8"],
+                ].map(([title, rows, color, bg, bd]) => (
+                  <div key={title} style={{background:"#fff",border:`1px solid ${bd}`,borderRadius:"4px",overflow:"hidden"}}>
+                    <div style={{padding:"0.65rem 1rem",background:bg,borderBottom:`1px solid ${bd}`,fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color}}>{title.toUpperCase()}</div>
+                    {rows.length===0 ? <div style={{padding:"1rem",color:"#aaa",fontSize:"0.82rem",textAlign:"center"}}>No data yet</div>
+                    : rows.map(r => (
+                      <div key={r.std} style={{padding:"0.55rem 1rem",borderBottom:"1px solid #f5f5f5",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:"0.72rem",fontWeight:700,color:"#1a1a1a"}}>{r.std}</div>
+                          <div style={{fontSize:"0.62rem",color:"#888"}}>{r.short} · {r.total} attempts</div>
+                        </div>
+                        <div style={{fontWeight:700,fontSize:"0.88rem",color:lvlC(r.pct)}}>{r.pct}%</div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+
+              {/* Class × Domain table */}
+              <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden"}}>
+                <div style={{padding:"0.75rem 1.25rem",background:"#f0f4f8",borderBottom:"1px solid #dde3e9",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555"}}>
+                  CLASS DOMAIN BREAKDOWN
+                </div>
+                <div style={{overflowX:"auto"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:"0.82rem"}}>
+                    <thead>
+                      <tr style={{background:"#f8fafc",borderBottom:"2px solid #dde3e9"}}>
+                        <th style={{padding:"0.6rem 1rem",textAlign:"left",fontWeight:700,color:"#555",fontSize:"0.68rem",minWidth:"140px"}}>CLASS</th>
+                        <th style={{padding:"0.6rem 0.75rem",textAlign:"center",fontWeight:700,color:"#555",fontSize:"0.68rem",minWidth:"70px"}}>OVERALL</th>
+                        {DOMAINS.map(d=>(
+                          <th key={d.key} style={{padding:"0.6rem 0.75rem",textAlign:"center",fontWeight:700,color:d.color,fontSize:"0.65rem",minWidth:"80px"}}>{d.key}</th>
+                        ))}
+                        <th style={{padding:"0.6rem 0.75rem",textAlign:"center",fontWeight:700,color:"#555",fontSize:"0.65rem",minWidth:"60px"}}>TESTS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {classRows.map((cls,i) => (
+                        <tr key={cls.key} style={{borderBottom:"1px solid #f0f4f8",background:i%2===0?"#fff":"#fafbfc"}}>
+                          <td style={{padding:"0.6rem 1rem",fontWeight:600,color:"#1a1a1a"}}>{cls.name}</td>
+                          <td style={{padding:"0.6rem 0.75rem",textAlign:"center"}}>
+                            <span style={{display:"inline-block",padding:"2px 8px",borderRadius:"10px",background:lvlBg(cls.avg),color:lvlC(cls.avg),fontWeight:700,fontSize:"0.82rem"}}>{cls.avg}%</span>
+                          </td>
+                          {DOMAINS.map(d => {
+                            const p = cls.domains[d.key];
+                            return (
+                              <td key={d.key} style={{padding:"0.6rem 0.75rem",textAlign:"center"}}>
+                                {p===null ? <span style={{color:"#ccc"}}>—</span>
+                                  : <span style={{display:"inline-block",padding:"2px 8px",borderRadius:"10px",background:lvlBg(p),color:lvlC(p),fontWeight:700,fontSize:"0.8rem"}}>{p}%</span>}
+                              </td>
+                            );
+                          })}
+                          <td style={{padding:"0.6rem 0.75rem",textAlign:"center",color:"#888",fontSize:"0.8rem"}}>{cls.sessions}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{borderTop:"2px solid #dde3e9",background:"#f0f4f8"}}>
+                        <td style={{padding:"0.6rem 1rem",fontWeight:700,fontSize:"0.7rem",color:"#555",letterSpacing:"0.08em"}}>SCHOOL AVG</td>
+                        <td style={{padding:"0.6rem 0.75rem",textAlign:"center",fontWeight:700,color:lvlC(schoolAvgPct),fontSize:"0.82rem"}}>{schoolAvgPct}%</td>
+                        {DOMAINS.map(d=>{
+                          const p = schoolDomains[d.key];
+                          return <td key={d.key} style={{padding:"0.6rem 0.75rem",textAlign:"center"}}>
+                            {p===null?<span style={{color:"#ccc"}}>—</span>:<span style={{fontWeight:700,color:lvlC(p),fontSize:"0.82rem"}}>{p}%</span>}
+                          </td>;
+                        })}
+                        <td style={{padding:"0.6rem 0.75rem",textAlign:"center",color:"#888",fontSize:"0.8rem"}}>{profileSessions.length}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {tab === "gaps" && (
           <div style={{ maxWidth:"700px" }}>
