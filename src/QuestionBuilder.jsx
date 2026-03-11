@@ -1,1294 +1,863 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import MathText from "./shared/MathText";
-import TopBar from "./shared/TopBar";
-import { QUESTIONS as FALLBACK_QUESTIONS, START_SECS, LETTERS, S, pct, lvl, lvlC, lvlBg, lvlBd, fmtTime, now, saveSession, sendHeartbeat, API } from "./shared/constants";
-import { buildWeightMap, updateSessionWeights, pickAdaptiveQuestion, ALL_STANDARDS, generateDrill } from "./adaptive";
 import PlotGrid from "./shared/PlotGrid";
+import { API, QUESTIONS as BUILTIN_QUESTIONS } from "./shared/constants";
 
-// ── Student Login ──────────────────────────────────────────
-function StudentLogin({ onStartTest, onStartPractice, onBack, prefill, codeOnly }) {
-  const [classes,    setClasses]    = useState([]);
-  const [classId,    setClassId]    = useState("");
-  const [studentId,  setStudentId]  = useState("");
-  const [code,       setCode]       = useState("");
-  const [err,        setErr]        = useState("");
-  const [step,       setStep]       = useState(codeOnly ? "code" : "form");   // form → mode → code → confirm
-  const [loading,    setLoading]    = useState(true);
-  const [checking,   setChecking]   = useState(false);
-  const [testInfo,   setTestInfo]   = useState(null);
 
-  useEffect(() => {
-    fetch(`${API}/roster`)
-      .then(r => r.json())
-      .then(data => { setClasses(data); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, []);
+// ── Math snippet toolbar ───────────────────────────────────
+const MATH_SNIPPETS = [
+  { label: "½",        insert: "$\\frac{1}{2}$",      tip: "Fraction ½" },
+  { label: "¾",        insert: "$\\frac{3}{4}$",      tip: "Fraction ¾" },
+  { label: "a/b",      insert: "$\\frac{a}{b}$",      tip: "Custom fraction" },
+  { label: "×",        insert: " × ",                 tip: "Multiply" },
+  { label: "÷",        insert: " ÷ ",                 tip: "Divide" },
+  { label: "²",        insert: "$x^{2}$",             tip: "Squared" },
+  { label: "10²",      insert: "$10^{2}$",            tip: "Power of 10" },
+  { label: "√",        insert: "$\\sqrt{x}$",         tip: "Square root" },
+  { label: "≤",        insert: " ≤ ",                 tip: "Less than or equal" },
+  { label: "≥",        insert: " ≥ ",                 tip: "Greater than or equal" },
+  { label: "°",        insert: "°",                   tip: "Degrees" },
+  { label: "π",        insert: "$\\pi$",              tip: "Pi" },
+  { label: "cm²",      insert: " cm²",                tip: "Square centimeters" },
+  { label: "cm³",      insert: " cm³",                tip: "Cubic centimeters" },
+];
 
-  const selectedClass   = prefill?.cls     || classes.find(c => c.id === classId);
-  const selectedStudent = prefill?.student || selectedClass?.students?.find(s => s.id === studentId);
-
-  // Step 1: class + name selected → go to mode picker
-  function handleContinueToMode() {
-    if (!classId)   { setErr("Please select your class."); return; }
-    if (!studentId) { setErr("Please select your name.");  return; }
-    setErr("");
-    setStep("mode");
-  }
-
-  // Step 2b: practice → straight in
-  function handlePractice() {
-    onStartPractice(selectedStudent, selectedClass);
-  }
-
-  // Step 2a: test → code entry
-  async function checkCode() {
-    const c = code.trim().toUpperCase();
-    if (!c) { setErr("Please enter the test code."); return; }
-    setChecking(true); setErr("");
-    try {
-      const r    = await fetch(`${API}/test/code/${encodeURIComponent(c)}`);
-      const data = await r.json();
-      if (!data.found || (!data.questions?.length && data.type !== "drill")) {
-        setErr("Invalid test code. Check with your teacher.");
-        setChecking(false); return;
-      }
-      setTestInfo(data);
-      setStep("confirm");
-    } catch {
-      setErr("Could not connect to server. Try again.");
-    }
-    setChecking(false);
-  }
-
-  // ── Confirm screen ──
-  if (step === "confirm" && testInfo) return (
-    <div style={S.page}>
-      <div style={S.card}>
-        <div style={S.hdr}>
-          <div style={S.hdrSub}>STUDENT SIGN IN</div>
-          <div style={S.hdrTitle}>Confirm Your Information</div>
-        </div>
-        <div style={{padding:"1.75rem 2rem"}}>
-          <div style={S.confirmBox}>
-            {[
-              ["STUDENT NAME", selectedStudent?.name],
-              ["CLASS",        selectedClass?.name],
-              ["TEST",         testInfo.title || "Grade 5 Mathematics"],
-              ["TEST CODE",    code.toUpperCase()],
-              ["QUESTIONS",    String(testInfo.questions.length)],
-              ["TIME LIMIT",   "30 Minutes"],
-              ["CALCULATOR",   "Not Permitted"],
-            ].map(([k,v],i,a) => (
-              <div key={k} style={{...S.confirmRow, borderBottom:i<a.length-1?"1px solid #eef1f4":"none"}}>
-                <span style={S.confirmK}>{k}</span>
-                <span style={{...S.confirmV, fontFamily:k==="TEST CODE"?"monospace":"inherit", letterSpacing:k==="TEST CODE"?"0.18em":"inherit"}}>{v}</span>
-              </div>
-            ))}
-          </div>
-          <div style={{background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"3px",padding:"0.65rem 1rem",marginBottom:"1.25rem",fontSize:"0.8rem",color:"#7a4e00"}}>
-            ⚠ Once you click <strong>Begin Test</strong>, your timer starts immediately.
-          </div>
-          <div style={{display:"flex",gap:"0.75rem"}}>
-            <button onClick={()=>setStep("code")} style={S.btnSec}>← Go Back</button>
-            <button onClick={()=>onStartTest(selectedStudent, selectedClass, code.toUpperCase(), testInfo)} style={S.btnPri}>Begin Test →</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // ── Code entry screen ──
-  if (step === "code") return (
-    <div style={S.page}>
-      <div style={{background:"#003865",width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem"}}>
-        <button onClick={()=>setStep("mode")} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"4px 10px",cursor:"pointer",fontSize:"0.72rem"}}>← Back</button>
-        <div style={{color:"#fff",fontSize:"0.95rem",fontWeight:700}}>Enter Test Code</div>
-      </div>
-      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem 1rem",width:"100%"}}>
-        <div style={S.card}>
-          <div style={S.hdr}>
-            <div style={S.hdrSub}>{selectedStudent?.name} · {selectedClass?.name}</div>
-            <div style={S.hdrTitle}>Enter Your Test Code</div>
-          </div>
-          <div style={{padding:"1.75rem 2rem"}}>
-            <div style={{marginBottom:"1.25rem"}}>
-              <label style={S.lbl}>TEST CODE — given to you by your teacher</label>
-              <input style={{...S.inp,fontFamily:"monospace",fontSize:"1.3rem",letterSpacing:"0.25em",textTransform:"uppercase",fontWeight:700,textAlign:"center"}}
-                value={code} onChange={e=>{setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,""));setErr("");}}
-                onKeyDown={e=>e.key==="Enter"&&checkCode()} placeholder="e.g. FRACTIONS" maxLength={8} autoFocus/>
-            </div>
-            {err && <div style={S.errBox}>⚠ {err}</div>}
-            <button onClick={checkCode} disabled={checking}
-              style={{...S.btnPri,width:"100%",marginTop:"0.5rem",opacity:checking?0.7:1}}>
-              {checking ? "Checking code…" : "Continue →"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // ── Mode picker screen ──
-  if (step === "mode") return (
-    <div style={S.page}>
-      <div style={{background:"#003865",width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem"}}>
-        <button onClick={()=>setStep("form")} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"4px 10px",cursor:"pointer",fontSize:"0.72rem"}}>← Back</button>
-        <div style={{color:"#fff",fontSize:"0.95rem",fontWeight:700}}>Georgia Milestones Readiness Trainer</div>
-      </div>
-      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem 1rem",width:"100%"}}>
-        <div style={{width:"100%",maxWidth:"520px"}}>
-          <div style={{textAlign:"center",marginBottom:"2rem"}}>
-            <div style={{fontSize:"0.72rem",fontWeight:700,letterSpacing:"0.14em",color:"#888",marginBottom:"6px"}}>SIGNED IN AS</div>
-            <div style={{fontSize:"1.3rem",fontWeight:700,color:"#1a1a1a"}}>{selectedStudent?.name}</div>
-            <div style={{fontSize:"0.85rem",color:"#666"}}>{selectedClass?.name}</div>
-          </div>
-          <div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
-            {/* Practice card */}
-            <button onClick={handlePractice}
-              style={{background:"#fff",border:"2px solid #1a6e2e",borderRadius:"8px",padding:"1.75rem 2rem",textAlign:"left",cursor:"pointer",display:"flex",alignItems:"center",gap:"1.25rem",boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
-              <div style={{width:"52px",height:"52px",borderRadius:"50%",background:"#f0faf2",border:"2px solid #b3dfc0",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:"1.6rem"}}>🎯</div>
-              <div>
-                <div style={{fontSize:"1.05rem",fontWeight:700,color:"#1a6e2e",marginBottom:"4px"}}>Practice Mode</div>
-                <div style={{fontSize:"0.82rem",color:"#555",lineHeight:1.5}}>Random questions from the bank. See if you got it right after every answer. Practice as long as you want.</div>
-              </div>
-            </button>
-            {/* Test card */}
-            <button onClick={()=>setStep("code")}
-              style={{background:"#fff",border:"2px solid #003865",borderRadius:"8px",padding:"1.75rem 2rem",textAlign:"left",cursor:"pointer",display:"flex",alignItems:"center",gap:"1.25rem",boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
-              <div style={{width:"52px",height:"52px",borderRadius:"50%",background:"#ddeaf7",border:"2px solid #9dbfe0",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:"1.6rem"}}>📝</div>
-              <div>
-                <div style={{fontSize:"1.05rem",fontWeight:700,color:"#003865",marginBottom:"4px"}}>Take a Test</div>
-                <div style={{fontSize:"0.82rem",color:"#555",lineHeight:1.5}}>Enter a test code from your teacher. Timed, no feedback until the end.</div>
-              </div>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // ── Form screen (class + name) ──
+function MathToolbar({ onInsert }) {
   return (
-    <div style={S.page}>
-      <div style={{background:"#003865",width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem"}}>
-        <button onClick={onBack} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"4px 10px",cursor:"pointer",fontSize:"0.72rem"}}>← Back</button>
-        <div style={{color:"#fff",fontSize:"0.95rem",fontWeight:700}}>Georgia Milestones Readiness Trainer</div>
-      </div>
-      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem 1rem",width:"100%"}}>
-        <div style={S.card}>
-          <div style={S.hdr}>
-            <div style={S.hdrSub}>STUDENT SIGN IN</div>
-            <div style={S.hdrTitle}>Grade 5 Mathematics</div>
-          </div>
-          <div style={{padding:"1.75rem 2rem"}}>
-            {loading ? (
-              <div style={{textAlign:"center",color:"#aaa",padding:"2rem"}}>Loading class roster…</div>
-            ) : classes.length === 0 ? (
-              <div style={{background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"3px",padding:"1rem",marginBottom:"1rem",fontSize:"0.82rem",color:"#7a4e00"}}>
-                ⚠ No class roster found. Ask your teacher to set up the roster first.
-              </div>
-            ) : (
-              <>
-                <div style={{marginBottom:"1rem"}}>
-                  <label style={S.lbl}>CLASS / PERIOD</label>
-                  <select style={S.inp} value={classId} onChange={e=>{setClassId(e.target.value);setStudentId("");setErr("");}}>
-                    <option value="">— Select your class —</option>
-                    {classes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                </div>
-                <div style={{marginBottom:"1.25rem"}}>
-                  <label style={S.lbl}>YOUR NAME</label>
-                  <select style={S.inp} value={studentId} onChange={e=>{setStudentId(e.target.value);setErr("");}} disabled={!classId}>
-                    <option value="">— Select your name —</option>
-                    {(selectedClass?.students || []).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
-              </>
-            )}
-            {err && <div style={S.errBox}>⚠ {err}</div>}
-            <button onClick={handleContinueToMode} disabled={loading||classes.length===0}
-              style={{...S.btnPri,width:"100%",marginTop:"0.5rem"}}>
-              Continue →
-            </button>
-          </div>
-        </div>
-      </div>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginBottom: "6px" }}>
+      {MATH_SNIPPETS.map((s, i) => (
+        <button
+          key={i}
+          type="button"
+          onClick={() => onInsert(s.insert)}
+          title={s.tip}
+          style={{ background: "#f0f4f8", border: "1px solid #c8d3dd", borderRadius: "3px", padding: "3px 8px", fontSize: "0.82rem", cursor: "pointer", fontFamily: "serif", color: "#1a1a1a", lineHeight: 1.4 }}
+          onMouseEnter={e => e.currentTarget.style.background="#ddeaf7"}
+          onMouseLeave={e => e.currentTarget.style.background="#f0f4f8"}
+        >
+          {s.label}
+        </button>
+      ))}
+      <span style={{ fontSize: "0.62rem", color: "#aaa", alignSelf: "center", marginLeft: "4px" }}>
+        Wrap custom LaTeX in $…$ e.g. <code>$\frac{2}{3}$</code>
+      </span>
     </div>
   );
 }
 
-// ── Practice Mode ──────────────────────────────────────────
-function PracticeMode({ student, cls, onFinish, onQuit }) {
-  const [bankQ,       setBankQ]       = useState([]);
-  const [weights,     setWeights]     = useState({});
-  const [seenIds,     setSeenIds]     = useState(new Set());
-  const [loading,     setLoading]     = useState(true);
-  const [curQ,        setCurQ]        = useState(null);
-  const [selected,    setSelected]    = useState(null);
-  const [revealed,    setRevealed]    = useState(false);
-  const [history,     setHistory]     = useState([]);
-  const [qStart,      setQStart]      = useState(Date.now());
-  const [totalSecs,   setTotalSecs]   = useState(0);
-  const timerRef = useRef(null);
-  const LIMIT = 10;
+// ── Math-aware textarea ────────────────────────────────────
+function MathTextarea({ value, onChange, placeholder, height }) {
+  const ref = useRef();
 
-  // Fetch bank + student history to seed weights
-  useEffect(() => {
-    async function init() {
-      let bank = FALLBACK_QUESTIONS;
-      let initWeights = {};
-      try {
-        const [qRes, hRes] = await Promise.all([
-          fetch(`${API}/questions`).then(r=>r.json()).catch(()=>[]),
-          student?.id
-            ? fetch(`${API}/student/history/${encodeURIComponent(student.id)}`).then(r=>r.json()).catch(()=>[])
-            : Promise.resolve([]),
-        ]);
-        if (Array.isArray(qRes) && qRes.length) bank = qRes;
-        if (Array.isArray(hRes) && hRes.length)  initWeights = buildWeightMap(hRes);
-      } catch {}
-      // Seed all standards at 0.5 if not in history
-      ALL_STANDARDS.forEach(std => { if (!initWeights[std]) initWeights[std] = 0.5; });
-      setBankQ(bank);
-      setWeights(initWeights);
-      // Pick first question
-      const first = pickAdaptiveQuestion(bank, initWeights, new Set(), ALL_STANDARDS);
-      setCurQ(first);
-      setSeenIds(new Set([first.id]));
-      setLoading(false);
-      setQStart(Date.now());
-    }
-    init();
-    timerRef.current = setInterval(() => setTotalSecs(s => s + 1), 1000);
-    return () => clearInterval(timerRef.current);
-  }, []);  // eslint-disable-line
-
-  function handleChoose(choice) {
-    if (revealed) return;
-    setSelected(choice);
-    setRevealed(true);
-  }
-
-  function handleNext() {
-    const timeSecs = Math.round((Date.now() - qStart) / 1000);
-    function gradeIt(q, sel) {
-      if (!sel) return false;
-      if (q.type === "plotpoint") return sel === JSON.stringify(Array.isArray(q.answer)?q.answer:(()=>{try{return JSON.parse(q.answer);}catch{return null;}})());
-      if (q.type === "multiselect") { try { return JSON.stringify([...JSON.parse(sel)].sort())===JSON.stringify([...(Array.isArray(q.answer)?q.answer:[])].sort()); } catch { return false; } }
-      if (q.type === "keypad") return String(q.answer??"").trim().toLowerCase()===String(sel).trim().toLowerCase();
-      return sel === q.correct;
-    }
-    const isCorrect = gradeIt(curQ, selected);
-    const newHistory = [...history, { q: curQ, chosen: selected, correct: isCorrect, timeSecs }];
-    setHistory(newHistory);
-
-    if (newHistory.length >= LIMIT) {
-      handleFinish(newHistory);
-      return;
-    }
-
-    // Update weights based on session so far
-    const newWeights = updateSessionWeights(weights, newHistory, ALL_STANDARDS);
-    setWeights(newWeights);
-
-    // Pick next question adaptively
-    const newSeen = new Set([...seenIds, curQ.id]);
-    const next = pickAdaptiveQuestion(bankQ, newWeights, newSeen, ALL_STANDARDS);
-    setSeenIds(new Set([...newSeen, next.id]));
-    setCurQ(next);
-    setSelected(null);
-    setRevealed(false);
-    setQStart(Date.now());
-  }
-
-  function handleFinish(finalHistory) {
-    clearInterval(timerRef.current);
-    const h = finalHistory || history;
-    const score = h.filter(x => x.correct).length;
-    const session = {
-      name:        student?.name || "Student",
-      studentName: student?.name || "Student",
-      studentId:   student?.id   || "",
-      className:   cls?.name     || "",
-      classId:     cls?.id       || "",
-      score,
-      total:       h.length,
-      pct:         h.length ? pct(score, h.length) : 0,
-      submitted:   now(),
-      timeUsed:    fmtTime(totalSecs),
-      mode:        "practice",
-      testCode:    "PRACTICE",
-      answers:     Object.fromEntries(h.map(x => [x.q.id, x.chosen])),
-    };
-    onFinish(session, h);
-  }
-
-  function handleQuit() {
-    if (history.length === 0) { onQuit(); return; }
-    handleFinish();
-  }
-
-  if (loading) return (
-    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#e8edf2",fontFamily:"sans-serif"}}>
-      <div style={{textAlign:"center",color:"#aaa"}}>
-        <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>🎯</div>
-        <div>Building your practice session…</div>
-      </div>
-    </div>
-  );
-
-  if (!curQ) return null;
-
-  const q = curQ;
-  const correct = (() => {
-    if (q.type === "plotpoint") return JSON.stringify(Array.isArray(q.answer)?q.answer:(()=>{try{return JSON.parse(q.answer);}catch{return null;}})());
-    if (q.type === "multiselect") return JSON.stringify([...(Array.isArray(q.answer)?q.answer:[])].sort());
-    if (q.type === "keypad") return String(q.answer??"").trim().toLowerCase();
-    return q.correct;
-  })();
-  const streak  = (() => { let s=0; for(let i=history.length-1;i>=0;i--){ if(history[i].correct) s++; else break; } return s; })();
-  const totalCorrect = history.filter(x=>x.correct).length;
-  const questionNum  = history.length + 1;
-
-  return (
-    <div style={{display:"flex",flexDirection:"column",minHeight:"100vh",fontFamily:"sans-serif",background:"#e8edf2"}}>
-      {/* Header */}
-      <div style={{background:"#1a6e2e",color:"#fff",padding:"0.75rem 1.5rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
-        <div style={{fontSize:"1rem",fontWeight:700}}>🎯 Practice Mode</div>
-        <div style={{marginLeft:"auto",display:"flex",gap:"1.25rem",alignItems:"center"}}>
-          {streak >= 3 && <div style={{fontSize:"0.75rem",background:"rgba(255,255,255,.2)",padding:"3px 10px",borderRadius:"12px",fontWeight:700}}>🔥 {streak} streak!</div>}
-          <div style={{textAlign:"center"}}>
-            <div style={{fontSize:"0.55rem",opacity:.7,letterSpacing:"0.08em"}}>SCORE</div>
-            <div style={{fontSize:"0.9rem",fontWeight:700}}>{totalCorrect}/{history.length}</div>
-          </div>
-          <div style={{textAlign:"center"}}>
-            <div style={{fontSize:"0.55rem",opacity:.7,letterSpacing:"0.08em"}}>TIME</div>
-            <div style={{fontSize:"0.9rem",fontWeight:700,fontFamily:"monospace"}}>{fmtTime(totalSecs)}</div>
-          </div>
-          <div style={{textAlign:"center"}}>
-            <div style={{fontSize:"0.55rem",opacity:.7,letterSpacing:"0.08em"}}>STUDENT</div>
-            <div style={{fontSize:"0.82rem",fontWeight:600}}>{student?.name}</div>
-          </div>
-          <button onClick={handleQuit}
-            style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"5px 12px",cursor:"pointer",fontSize:"0.75rem",fontWeight:600}}>
-            Quit
-          </button>
-        </div>
-      </div>
-
-      {/* Question counter strip */}
-      <div style={{background:"#155a27",color:"#a8e6b8",padding:"0.4rem 1.5rem",fontSize:"0.7rem",display:"flex",gap:"1rem",alignItems:"center"}}>
-        <span>Question {questionNum} of {LIMIT}</span>
-        <span style={{opacity:.6}}>·</span>
-        <span style={{color:"#fff",fontWeight:700}}>{q.standard}</span>
-        {q.dok && <><span style={{opacity:.6}}>·</span><span>DOK {q.dok}</span></>}
-        {q.parametric && <span style={{background:"rgba(255,255,255,.2)",borderRadius:"8px",padding:"1px 7px",fontSize:"0.65rem",fontWeight:700}}>⚡ Generated</span>}
-      </div>
-
-      {/* Question area */}
-      <div style={{flex:1,display:"flex",justifyContent:"center",padding:"1.5rem 1rem 2rem",overflowY:"auto"}}>
-        <div style={{width:"100%",maxWidth:"680px",display:"flex",flexDirection:"column",gap:"1rem"}}>
-
-          {/* Question card */}
-          <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"6px",padding:"1.5rem 1.75rem",boxShadow:"0 2px 8px rgba(0,0,0,.05)"}}>
-            <p style={{fontSize:"1.08rem",fontFamily:"Georgia,serif",color:"#0f0f0f",lineHeight:1.75,margin:0}}>
-              <MathText text={q.question}/>
-            </p>
-          </div>
-
-          {/* Choices — by type */}
-          {q.type === "plotpoint" ? (
-            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"0.75rem"}}>
-              <PlotGrid
-                answer={revealed ? q.answer : null}
-                placed={selected ? JSON.parse(selected) : null}
-                onPlace={pt => !revealed && handleChoose(JSON.stringify(pt))}
-                revealed={revealed}
-                size={Math.min(320, window.innerWidth - 60)}
-              />
-            </div>
-          ) : q.type === "keypad" ? (
-            <div style={{display:"flex",flexDirection:"column",gap:"0.65rem",alignItems:"flex-start"}}>
-              <input
-                type="text" inputMode="decimal"
-                value={selected ?? ""}
-                onChange={e => !revealed && handleChoose(e.target.value)}
-                disabled={revealed}
-                placeholder="Type your answer…"
-                style={{width:"100%",maxWidth:"260px",padding:"0.8rem 1rem",fontSize:"1.3rem",fontFamily:"monospace",fontWeight:700,border:`2px solid ${revealed?(String(selected??"").trim().toLowerCase()===correct?"#1a6e2e":"#8b1a1a"):"#003865"}`,borderRadius:"4px",outline:"none",background:"#fafbfc",color:"#0f0f0f"}}
-              />
-              {!revealed && selected && (
-                <button onClick={() => handleChoose(selected)}
-                  style={{background:"#003865",color:"#fff",border:"none",borderRadius:"4px",padding:"0.65rem 1.25rem",fontSize:"0.9rem",fontWeight:700,cursor:"pointer"}}>
-                  Submit →
-                </button>
-              )}
-            </div>
-          ) : q.type === "multiselect" ? (
-            <div style={{display:"flex",flexDirection:"column",gap:"0.6rem"}}>
-              <div style={{fontSize:"0.7rem",color:"#888",marginBottom:"4px"}}>Select all that apply.</div>
-              {q.choices.map((choice, i) => {
-                const selArr = (() => { try { return selected ? JSON.parse(selected) : []; } catch { return []; } })();
-                const isChosen = selArr.includes(choice);
-                const correctArr = Array.isArray(q.answer) ? q.answer : [];
-                const isInCorrect = correctArr.includes(choice);
-                let bg = "#fff", border = "2px solid #c8d3dd";
-                if (revealed) {
-                  if (isInCorrect)    { bg="#f0faf2"; border="2px solid #1a6e2e"; }
-                  else if (isChosen)  { bg="#fdf2f2"; border="2px solid #8b1a1a"; }
-                  else                { bg="#fafbfc"; border="2px solid #e0e0e0"; }
-                } else if (isChosen) { bg="#ddeaf7"; border="2px solid #003865"; }
-                return (
-                  <button key={i}
-                    onClick={() => {
-                      if (revealed) return;
-                      const next = isChosen ? selArr.filter(c=>c!==choice) : [...selArr, choice];
-                      setSelected(next.length ? JSON.stringify(next) : null);
-                    }}
-                    disabled={revealed}
-                    style={{background:bg,border,borderRadius:"6px",padding:"0.9rem 1.25rem",textAlign:"left",cursor:revealed?"default":"pointer",display:"flex",alignItems:"center",gap:"1rem",transition:"all .15s"}}>
-                    <div style={{width:"22px",height:"22px",borderRadius:"3px",border:`2px solid ${revealed?(isInCorrect?"#1a6e2e":isChosen?"#8b1a1a":"#ddd"):"#9aabba"}`,background:revealed?(isInCorrect?"#1a6e2e":isChosen?"#8b1a1a":"#f0f0f0"):(isChosen?"#003865":"#fff"),display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                      {(isChosen || (revealed && isInCorrect)) && <span style={{color:"#fff",fontSize:"0.8rem",fontWeight:900}}>✓</span>}
-                    </div>
-                    <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",flex:1}}><MathText text={choice}/></span>
-                  </button>
-                );
-              })}
-              {!revealed && (
-                <button onClick={() => handleChoose(selected || "[]")}
-                  style={{background:"#003865",color:"#fff",border:"none",borderRadius:"4px",padding:"0.65rem 1.25rem",fontSize:"0.9rem",fontWeight:700,cursor:"pointer",marginTop:"0.25rem"}}>
-                  Submit Selections →
-                </button>
-              )}
-            </div>
-          ) : (
-          <div style={{display:"flex",flexDirection:"column",gap:"0.6rem"}}>
-            {q.choices.map((choice, i) => {
-              const isChosen  = selected === choice;
-              const isCorrect = choice === correct;
-              let bg = "#fff", border = "2px solid #c8d3dd", color = "#1a1a1a";
-              if (revealed) {
-                if (isCorrect)       { bg="#f0faf2"; border="2px solid #1a6e2e"; color="#1a6e2e"; }
-                else if (isChosen)   { bg="#fdf2f2"; border="2px solid #8b1a1a"; color="#8b1a1a"; }
-                else                 { bg="#fafbfc"; border="2px solid #e0e0e0"; color="#aaa"; }
-              } else if (isChosen)   { bg="#ddeaf7"; border="2px solid #003865"; }
-
-              return (
-                <button key={i} onClick={() => handleChoose(choice)} disabled={revealed}
-                  style={{background:bg,border,borderRadius:"6px",padding:"0.9rem 1.25rem",textAlign:"left",cursor:revealed?"default":"pointer",display:"flex",alignItems:"center",gap:"1rem",transition:"all .15s"}}>
-                  <div style={{width:"30px",height:"30px",borderRadius:"50%",border:`2px solid ${revealed?(isCorrect?"#1a6e2e":isChosen?"#8b1a1a":"#ddd"):"#9aabba"}`,background:revealed?(isCorrect?"#1a6e2e":isChosen?"#8b1a1a":"#f0f0f0"):(isChosen?"#003865":"#fff"),display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    <span style={{fontSize:"0.75rem",fontWeight:700,color:revealed?(isCorrect||isChosen?"#fff":"#aaa"):(isChosen?"#fff":"#667")}}>
-                      {revealed && isCorrect ? "✓" : revealed && isChosen ? "✗" : LETTERS[i]}
-                    </span>
-                  </div>
-                  <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color,flex:1}}>
-                    <MathText text={choice}/>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          )}
-
-          {/* Feedback banner */}
-          {revealed && (
-            {(() => {
-              let isOk;
-              if (q.type === "multiselect") {
-                try { isOk = JSON.stringify([...JSON.parse(selected)].sort()) === correct; } catch { isOk = false; }
-              } else if (q.type === "keypad") {
-                isOk = String(selected??"").trim().toLowerCase() === correct;
-              } else {
-                isOk = selected === correct;
-              }
-              const correctLabel = q.type==="multiselect"
-                ? (Array.isArray(q.answer)?q.answer:[]).join(", ")
-                : q.type==="keypad" ? String(q.answer??"")
-                : correct;
-              return (
-            <div style={{borderRadius:"6px",padding:"1rem 1.25rem",background:isOk?"#f0faf2":"#fdf2f2",border:`1px solid ${isOk?"#b3dfc0":"#f0b8b8"}`}}>
-              <div style={{fontSize:"1rem",fontWeight:700,color:isOk?"#1a6e2e":"#8b1a1a",marginBottom:q.explanation?"6px":0}}>
-                {isOk ? "✓ Correct!" : <span>✗ The correct answer is: <MathText text={correctLabel}/></span>}
-              </div>
-              {q.explanation && (
-                <div style={{fontSize:"0.85rem",color:"#444",lineHeight:1.6}}>
-                  <MathText text={q.explanation}/>
-                </div>
-              )}
-            </div>
-              ); })()}
-          )}
-
-          {/* Next button */}
-          {(revealed || (q.type==="plotpoint" && selected)) && (
-            <div style={{display:"flex",gap:"0.75rem"}}>
-              <button onClick={handleNext}
-                style={{flex:1,background:"#003865",border:"none",borderRadius:"6px",padding:"0.85rem",fontSize:"0.95rem",cursor:"pointer",color:"#fff",fontWeight:700}}>
-                {(q.type==="plotpoint"||q.type==="keypad"||q.type==="multiselect") && !revealed ? "Submit Answer →" : "Next Question →"}
-              </button>
-              <button onClick={handleQuit}
-                style={{background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"6px",padding:"0.85rem 1.25rem",fontSize:"0.85rem",cursor:"pointer",color:"#555",fontWeight:600}}>
-                Finish
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Practice Results ───────────────────────────────────────
-function PracticeResults({ session, history, onReset }) {
-  const p = session.pct;
-  return (
-    <div style={{minHeight:"100vh",background:"#e8edf2",fontFamily:"sans-serif",display:"flex",flexDirection:"column"}}>
-      <div style={{background:"#1a6e2e",color:"#fff",padding:"0.85rem 1.5rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
-        <div style={{fontSize:"1rem",fontWeight:700}}>🎯 Practice Session Complete</div>
-      </div>
-      <div style={{flex:1,display:"flex",justifyContent:"center",padding:"2rem 1rem"}}>
-        <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"6px",width:"100%",maxWidth:"640px",boxShadow:"0 2px 12px rgba(0,0,0,.07)",overflow:"hidden"}}>
-          {/* Score header */}
-          <div style={{background:"#f0faf2",borderBottom:"1px solid #c8d3dd",padding:"1.5rem 1.75rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div>
-              <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#888",marginBottom:"4px"}}>PRACTICE SCORE</div>
-              <div style={{fontSize:"1rem",fontWeight:700,color:"#1a1a1a"}}>{session.studentName}</div>
-              <div style={{fontSize:"2rem",fontWeight:700,color:lvlC(p),fontFamily:"Georgia,serif",marginTop:"4px"}}>{session.score}/{session.total} <span style={{fontSize:"1rem",opacity:.6}}>({p}%)</span></div>
-            </div>
-            <div style={{textAlign:"right"}}>
-              <div style={{fontSize:"0.62rem",color:"#888",marginBottom:"4px"}}>TIME</div>
-              <div style={{fontSize:"1.1rem",fontWeight:700,color:"#003865",fontFamily:"monospace"}}>{session.timeUsed}</div>
-              <div style={{marginTop:"8px",fontSize:"0.75rem",background:"#ddeaf7",color:"#003865",border:"1px solid #9dbfe0",borderRadius:"3px",padding:"3px 10px",fontWeight:700}}>📝 PRACTICE</div>
-            </div>
-          </div>
-
-          {/* Per-question review */}
-          <div style={{padding:"1.25rem 1.5rem"}}>
-            <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"0.75rem"}}>QUESTION REVIEW</div>
-            {history.map((item, i) => {
-              const { q, chosen, correct: isCorrect } = item;
-              return (
-                <div key={q.id} style={{display:"flex",gap:"0.75rem",marginBottom:"0.6rem",padding:"0.75rem 0.9rem",background:isCorrect?"#f0faf2":"#fdf2f2",border:`1px solid ${isCorrect?"#b3dfc0":"#f0b8b8"}`,borderRadius:"4px"}}>
-                  <div style={{width:"22px",height:"22px",borderRadius:"50%",background:isCorrect?"#1a6e2e":"#8b1a1a",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:"2px"}}>
-                    <span style={{color:"#fff",fontSize:"0.7rem",fontWeight:700}}>{i+1}</span>
-                  </div>
-                  <div style={{flex:1,fontSize:"0.82rem"}}>
-                    <div style={{color:"#777",fontSize:"0.63rem",letterSpacing:"0.08em",marginBottom:"2px"}}>{q.standard}{item.timeSecs ? ` · ${item.timeSecs}s` : ""}</div>
-                    <div style={{color:"#1a1a1a",fontFamily:"Georgia,serif",marginBottom:isCorrect?0:"4px"}}><MathText text={q.question}/></div>
-                    {q.type==="plotpoint" && !isCorrect && (
-                      <div style={{margin:"6px 0"}}>
-                        <PlotGrid answer={q.answer} placed={chosen?(()=>{try{return JSON.parse(chosen);}catch{return null;}})():null} revealed readOnly size={180}/>
-                      </div>
-                    )}
-                    {!isCorrect && q.type!=="plotpoint" && (
-                      <div style={{fontSize:"0.78rem"}}>
-                        <span style={{color:"#1a6e2e"}}>Correct: <strong><MathText text={q.correct}/></strong></span>
-                        {chosen && <span style={{color:"#8b1a1a"}}> · Your answer: <MathText text={chosen}/></span>}
-                      </div>
-                    )}
-                    {q.explanation && !isCorrect && (
-                      <div style={{fontSize:"0.75rem",color:"#555",marginTop:"4px",fontStyle:"italic"}}><MathText text={q.explanation}/></div>
-                    )}
-                  </div>
-                  <span style={{fontWeight:700,fontSize:"0.9rem",color:isCorrect?"#1a6e2e":"#8b1a1a"}}>{isCorrect?"✓":"✗"}</span>
-                </div>
-              );
-            })}
-          </div>
-
-          <div style={{padding:"1rem 1.5rem",borderTop:"1px solid #dde3e9",display:"flex",gap:"0.75rem",justifyContent:"flex-end"}}>
-            <button onClick={onReset} style={{background:"#1a6e2e",color:"#fff",border:"none",borderRadius:"3px",padding:"0.65rem 1.75rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600}}>Practice Again</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Student Test ───────────────────────────────────────────
-function normalizeQuestion(q) {
-  // Normalize answer field — may be stored as JSON string or array
-  let answer = q.answer;
-  if (typeof answer === "string") {
-    try { answer = JSON.parse(answer); } catch { answer = null; }
-  }
-  // Detect plotpoint: explicit type OR answer is [x,y] and choices are empty
-  const hasRealChoices = Array.isArray(q.choices) && q.choices.filter(c => c).length > 0;
-  const isPlotAnswer   = Array.isArray(answer) && answer.length === 2 &&
-                         typeof answer[0] === "number" && typeof answer[1] === "number";
-  const type = (q.type === "plotpoint" || (isPlotAnswer && !hasRealChoices))
-    ? "plotpoint"
-    : (["multiselect","keypad"].includes(q.type) ? q.type : "mcq");
-  return { ...q, type, answer };
-}
-
-function StudentTest({ studentName, studentId, questions: initialQuestions, adaptive, onFinish, untimed=false, timeLimitSecs=1800, warnSecs=300 }) {
-  const [questions, setQuestions] = useState(initialQuestions.map(normalizeQuestion));
-  const [weights,   setWeights]   = useState({});
-  const [seenIds,   setSeenIds]   = useState(new Set(initialQuestions.map(q=>q.id)));
-  const TOTAL = questions.length;
-  const [cur,   setCur]   = useState(0);
-  const [ans,   setAns]   = useState({});
-  const [flg,   setFlg]   = useState({});
-  const [secs,     setSecs]     = useState(untimed ? 0 : timeLimitSecs);
-  const [paused,   setPaused]   = useState(false);
-  const [stopped,  setStopped]  = useState(false);
-  const [modal, setModal] = useState(false);
-  const [nav,   setNav]   = useState(window.innerWidth > 640);
-
-  // Adaptive: fetch student history and seed weights
-  useEffect(() => {
-    if (!adaptive) return;
-    async function seedWeights() {
-      try {
-        const hRes = studentId
-          ? await fetch(`${API}/student/history/${encodeURIComponent(studentId)}`).then(r=>r.json()).catch(()=>[])
-          : [];
-        const initW = buildWeightMap(Array.isArray(hRes) ? hRes : []);
-        ALL_STANDARDS.forEach(std => { if (!initW[std]) initW[std] = 0.5; });
-        setWeights(initW);
-      } catch {}
-    }
-    seedWeights();
-  }, [adaptive, studentId]);  // eslint-disable-line
-
-  // Adaptive: when student answers, swap in an adaptive next question
-  function handleAdaptiveAnswer(qId, choice) {
-    if (!adaptive) return;
-    setAns(prev => {
-      const newAns = {...prev, [qId]: choice};
-      // Build mini history from current answers
-      const miniHistory = questions.slice(0, cur+1).map(q => ({
-        q, chosen: newAns[q.id], correct: newAns[q.id] === q.correct
-      }));
-      const newW = updateSessionWeights(weights, miniHistory, ALL_STANDARDS);
-      setWeights(newW);
-      // Replace the NEXT question in the queue if there is one
-      if (cur + 1 < questions.length) {
-        const newSeen = new Set([...seenIds]);
-        const nextQ = pickAdaptiveQuestion(initialQuestions, newW, newSeen, ALL_STANDARDS);
-        if (nextQ && nextQ.id !== questions[cur+1].id) {
-          setQuestions(qs => {
-            const updated = [...qs];
-            updated[cur+1] = normalizeQuestion(nextQ);
-            return updated;
-          });
-          setSeenIds(s => new Set([...s, nextQ.id]));
-        }
-      }
-      return newAns;
+  function insertAtCursor(text) {
+    const el = ref.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end   = el.selectionEnd;
+    const next  = value.slice(0, start) + text + value.slice(end);
+    onChange(next);
+    // restore cursor after inserted text
+    requestAnimationFrame(() => {
+      el.selectionStart = el.selectionEnd = start + text.length;
+      el.focus();
     });
   }
 
-  // Countdown timer (skipped if untimed)
-  useEffect(()=>{
-    if (untimed) return;
-    const t = setInterval(()=>{
-      if (!paused) setSecs(s => s > 0 ? s - 1 : 0);
-    }, 1000);
-    return () => clearInterval(t);
-  }, [paused, untimed]);
+  return (
+    <div>
+      <MathToolbar onInsert={insertAtCursor} />
+      <textarea
+        ref={ref}
+        style={{ ...inp, height: height || "72px", resize: "vertical", fontFamily: "monospace", fontSize: "0.88rem" }}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+      />
+    </div>
+  );
+}
 
-  // Poll for teacher pause/stop every 5s
-  useEffect(()=>{
-    const t = setInterval(async () => {
-      try {
-        const r = await fetch(`${API}/test/control`);
-        const d = await r.json();
-        setPaused(!!d.paused);
-        if (d.stopped && !stopped) { setStopped(true); }
-      } catch {}
-    }, 5000);
-    return () => clearInterval(t);
-  }, [stopped]);
-  useEffect(()=>{
-    sendHeartbeat(studentName, cur);
-    const t = setInterval(()=>sendHeartbeat(studentName, cur), 30000);
-    return()=>clearInterval(t);
-  },[studentName, cur]);
+// ── Constants ──────────────────────────────────────────────
+const LETTERS = ["A","B","C","D"];
+const uid = () => `q${String(Math.floor(Math.random()*9000)+1000)}`;
 
-  // ── Lockdown ────────────────────────────────────────────
-  const containerRef = useRef();
-  const [violations,    setViolations]    = useState(0);
-  const [lockWarning,   setLockWarning]   = useState(null); // message string or null
-  const [isFullscreen,  setIsFullscreen]  = useState(false);
+const STANDARD_MAP = {
+  // ── Mathematical Practices ─────────────────────────────
+  "5.MP.1": { short: "Make Sense & Persevere",      keywords: ["problem","solve","plan","approach","stuck","persevere","check"] },
+  "5.MP.2": { short: "Reason Abstractly",           keywords: ["abstract","quantitative","represent","symbol","reason"] },
+  "5.MP.3": { short: "Construct Arguments",         keywords: ["argument","explain","justify","critique","prove","convince"] },
+  "5.MP.4": { short: "Model with Math",             keywords: ["model","diagram","equation","real world","represent","draw"] },
+  "5.MP.5": { short: "Use Tools Strategically",     keywords: ["tool","ruler","calculator","manipulative","choose","strategy"] },
+  "5.MP.6": { short: "Attend to Precision",         keywords: ["precise","accurate","label","units","exact","careful"] },
+  "5.MP.7": { short: "Use Structure",               keywords: ["pattern","structure","property","rule","organize"] },
+  "5.MP.8": { short: "Repeated Reasoning",          keywords: ["repeat","shortcut","generalize","always","regularity"] },
 
-  function addViolation(reason) {
-    setViolations(v => v + 1);
-    setLockWarning(reason);
+  // ── NR.1: Place Value ──────────────────────────────────
+  "5.NR.1.1": { short: "Place Value Relationships", keywords: ["place value","digit","10 times","one-tenth","left","right","represents"] },
+  "5.NR.1.2": { short: "Powers of 10",              keywords: ["power of 10","exponent","pattern","multiply","divide","10²","10³"] },
+
+  // ── NR.2: Multiply & Divide Whole Numbers ─────────────
+  "5.NR.2.1": { short: "Multiply Multi-Digit",      keywords: ["multiply","product","multi-digit","3-digit","2-digit","factor","fluently"] },
+  "5.NR.2.2": { short: "Divide Multi-Digit",        keywords: ["divide","quotient","dividend","divisor","remainder","4-digit","fluently"] },
+
+  // ── NR.3: Fractions ───────────────────────────────────
+  "5.NR.3.1": { short: "Fractions as Division",     keywords: ["fraction","division","numerator","denominator","mixed number","divide","a÷b"] },
+  "5.NR.3.2": { short: "Compare & Order Fractions", keywords: ["compare","order","fraction","greater","less","benchmark","unlike"] },
+  "5.NR.3.3": { short: "Add/Subtract Fractions",    keywords: ["add","subtract","fraction","mixed number","unlike denominator","sum","difference"] },
+  "5.NR.3.4": { short: "Multiply Fraction × Whole", keywords: ["multiply","fraction","whole number","product","model"] },
+  "5.NR.3.5": { short: "Fraction Scaling",          keywords: ["greater than one","less than one","equal to one","scaling","result","product"] },
+  "5.NR.3.6": { short: "Divide Fractions",          keywords: ["divide","unit fraction","whole number","ribbon","split","÷"] },
+
+  // ── NR.4: Decimals ────────────────────────────────────
+  "5.NR.4.1": { short: "Read & Write Decimals",     keywords: ["decimal","standard form","expanded form","thousandths","read","write"] },
+  "5.NR.4.2": { short: "Compare & Order Decimals",  keywords: ["compare","order","decimal","greater","less","equal","thousandths",">","<"] },
+  "5.NR.4.3": { short: "Round Decimals",            keywords: ["round","decimal","hundredths","nearest","place value"] },
+  "5.NR.4.4": { short: "Add & Subtract Decimals",   keywords: ["add","subtract","decimal","hundredths","sum","difference","change","price","cost","money"] },
+
+  // ── NR.5: Numerical Expressions ───────────────────────
+  "5.NR.5.1": { short: "Numerical Expressions",     keywords: ["expression","evaluate","grouping","parentheses","brackets","order of operations","write","interpret"] },
+
+  // ── PAR.6: Patterns & Algebraic Reasoning ─────────────
+  "5.PAR.6.1": { short: "Generate Patterns",        keywords: ["pattern","rule","table","generate","sequence","relationship","terms"] },
+  "5.PAR.6.2": { short: "Coordinate Plane",         keywords: ["coordinate","ordered pair","plot","x-axis","y-axis","first quadrant","point","graph"] },
+
+  // ── MDR.7: Measurement & Data ─────────────────────────
+  "5.MDR.7.1": { short: "Measurement Problems",     keywords: ["distance","mass","weight","volume","time","measure","unit","realistic"] },
+  "5.MDR.7.2": { short: "Graphical Displays",       keywords: ["graph","data","display","bar graph","line plot","table","question","interpret"] },
+  "5.MDR.7.3": { short: "Metric Conversions",       keywords: ["metric","convert","kilometer","meter","centimeter","gram","kilogram","liter","milliliter"] },
+  "5.MDR.7.4": { short: "Customary Conversions",    keywords: ["customary","convert","inch","foot","yard","mile","ounce","pound","cup","pint","quart","gallon"] },
+
+  // ── GSR.8: Geometry & Spatial Reasoning ───────────────
+  "5.GSR.8.1": { short: "Classify Polygons",        keywords: ["polygon","classify","compare","contrast","property","triangle","quadrilateral","pentagon","hexagon"] },
+  "5.GSR.8.2": { short: "2D Figure Categories",     keywords: ["category","subcategory","attribute","belong","two-dimensional","rectangle","square","rhombus","trapezoid","parallel","perpendicular"] },
+  "5.GSR.8.3": { short: "Volume with Unit Cubes",   keywords: ["volume","unit cube","pack","rectangular prism","fill","layer","gap","overlap"] },
+  "5.GSR.8.4": { short: "Volume Formula",           keywords: ["volume","formula","base","height","area","length","width","multiply","rectangular prism","l×w×h"] },
+};
+
+const DOK_OPTIONS = [
+  { level: 1, label: "Recall",        desc: "Recall a fact, term, or simple procedure" },
+  { level: 2, label: "Skill/Concept", desc: "Use information or apply a concept" },
+  { level: 3, label: "Strategic",     desc: "Reason, plan, or use evidence" },
+  { level: 4, label: "Extended",      desc: "Connect ideas across content or time" },
+];
+
+function suggestStandard(text) {
+  if (!text || text.length < 8) return null;
+  const lower = text.toLowerCase();
+  let best = null; let bestScore = 0;
+  for (const [std, data] of Object.entries(STANDARD_MAP)) {
+    const score = data.keywords.reduce((acc, kw) => acc + (lower.includes(kw) ? 1 : 0), 0);
+    if (score > bestScore) { bestScore = score; best = std; }
+  }
+  return bestScore >= 1 ? best : null;
+}
+
+// ── Paste image zone ───────────────────────────────────────
+function PasteImageZone({ image, onImage, onClear, placeholder }) {
+  const ref = useRef();
+  const handlePaste = useCallback(e => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const blob = item.getAsFile();
+        const reader = new FileReader();
+        reader.onload = ev => onImage(ev.target.result);
+        reader.readAsDataURL(blob);
+        return;
+      }
+    }
+  }, [onImage]);
+
+  if (image) return (
+    <div style={{ position: "relative", display: "inline-block" }}>
+      <img src={image} alt="diagram" style={{ maxWidth: "100%", maxHeight: "180px", borderRadius: "3px", border: "1px solid #c8d3dd", display: "block" }} />
+      <button onClick={onClear} style={{ position: "absolute", top: "4px", right: "4px", background: "rgba(0,0,0,.6)", color: "#fff", border: "none", borderRadius: "50%", width: "20px", height: "20px", cursor: "pointer", fontSize: "0.65rem" }}>✕</button>
+    </div>
+  );
+
+  return (
+    <div ref={ref} tabIndex={0} onPaste={handlePaste} onClick={() => ref.current?.focus()}
+      style={{ border: "2px dashed #c8d3dd", borderRadius: "3px", padding: "0.5rem 0.85rem", fontSize: "0.74rem", color: "#bbb", cursor: "pointer", background: "#fafbfc", outline: "none" }}
+      onFocus={e => e.currentTarget.style.borderColor="#003865"}
+      onBlur={e  => e.currentTarget.style.borderColor="#c8d3dd"}>
+      📋 {placeholder || "Click here, then Ctrl+V / ⌘V to paste image"}
+    </div>
+  );
+}
+
+// ── Question editor ────────────────────────────────────────
+function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, isFirst, isLast }) {
+  const [open, setOpen]         = useState(index === 0);
+  const [suggestion, setSuggestion] = useState(null);
+  const isPlot   = q.type === "plotpoint";
+  const isMulti  = q.type === "multiselect";
+  const isKeypad = q.type === "keypad";
+  const isMCQ    = !isPlot && !isMulti && !isKeypad;
+
+  function update(field, value)  { onChange({ ...q, [field]: value }); }
+  function updateChoice(i, val)  { const c=[...q.choices]; c[i]=val; update("choices",c); }
+  function updateChoiceImage(i, img) { const ci=[...(q.choiceImages||[null,null,null,null])]; ci[i]=img; update("choiceImages",ci); }
+
+  function toggleCorrectMulti(choice) {
+    if (!choice) return;
+    const cur = Array.isArray(q.answer) ? q.answer : [];
+    const next = cur.includes(choice) ? cur.filter(c => c !== choice) : [...cur, choice];
+    update("answer", next);
   }
 
-  // Enter fullscreen on mount
-  useEffect(() => {
-    const el = document.documentElement;
-    if (el.requestFullscreen) el.requestFullscreen().then(()=>setIsFullscreen(true)).catch(()=>{});
-    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  const isComplete = (() => {
+    if (!q.question || !q.standard || !q.dok) return false;
+    if (isPlot)   return Array.isArray(q.answer) && q.answer.length === 2;
+    if (isKeypad) return q.answer != null && String(q.answer).trim() !== "";
+    if (isMulti)  return Array.isArray(q.answer) && q.answer.length >= 2 && q.choices.filter(c=>c).length >= 4;
+    return q.choices.filter(c=>c).length === 4 && !!q.correct;
+  })();
 
-    return () => {
-      if (document.exitFullscreen && document.fullscreenElement) document.exitFullscreen();
-    };
-  }, []);
-
-  // Detect fullscreen exit
-  useEffect(() => {
-    function onFsChange() {
-      const inFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
-      setIsFullscreen(inFs);
-      if (!inFs) addViolation("You exited fullscreen. Click below to return.");
-    }
-    document.addEventListener("fullscreenchange", onFsChange);
-    document.addEventListener("webkitfullscreenchange", onFsChange);
-    return () => {
-      document.removeEventListener("fullscreenchange", onFsChange);
-      document.removeEventListener("webkitfullscreenchange", onFsChange);
-    };
-  }, []);
-
-  // Detect tab/window blur
-  useEffect(() => {
-    function onBlur()       { addViolation("You left this window. Return to your test."); }
-    function onVisibility() { if (document.hidden) addViolation("You switched tabs. Return to your test."); }
-    window.addEventListener("blur", onBlur);
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      window.removeEventListener("blur", onBlur);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, []);
-
-  // Block keyboard shortcuts and right-click
-  useEffect(() => {
-    function onKey(e) {
-      const bad = (
-        (e.ctrlKey || e.metaKey) && ["c","v","u","a","s","p"].includes(e.key.toLowerCase()) ||
-        (e.ctrlKey && e.shiftKey && ["i","j","c"].includes(e.key.toLowerCase())) ||
-        e.key === "F12" || e.key === "PrintScreen"
-      );
-      if (bad) { e.preventDefault(); e.stopPropagation(); }
-    }
-    function onContext(e) { e.preventDefault(); }
-    document.addEventListener("keydown", onKey, true);
-    document.addEventListener("contextmenu", onContext, true);
-    return () => {
-      document.removeEventListener("keydown", onKey, true);
-      document.removeEventListener("contextmenu", onContext, true);
-    };
-  }, []);
-
-  // Warn before leaving page
-  useEffect(() => {
-    function onBeforeUnload(e) { e.preventDefault(); e.returnValue = ""; }
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, []);
-
-  function reEnterFullscreen() {
-    const el = document.documentElement;
-    if (el.requestFullscreen) el.requestFullscreen().then(()=>{ setIsFullscreen(true); setLockWarning(null); }).catch(()=>{});
-    else if (el.webkitRequestFullscreen) { el.webkitRequestFullscreen(); setLockWarning(null); }
+  function handleQuestionChange(text) {
+    update("question", text);
+    const s = suggestStandard(text);
+    setSuggestion(s && s !== q.standard ? s : null);
   }
 
-  const q = questions[cur];
-  if (!q) return <div style={{padding:"3rem",textAlign:"center",color:"#aaa"}}>Loading…</div>;
-
-  const sel  = ans[q.id] ?? null;
-  const isFl = flg[q.id] ?? false;
-  const ansCount = Object.keys(ans).length;
-  const flgCount = Object.values(flg).filter(Boolean).length;
-
-  function gradeAnswer(q, given) {
-    if (!given) return false;
-    if (q.type === "plotpoint") {
-      const ans = Array.isArray(q.answer) ? q.answer
-        : (()=>{ try { return JSON.parse(q.answer); } catch { return null; } })();
-      return given === JSON.stringify(ans);
-    }
-    if (q.type === "multiselect") {
-      const correct = Array.isArray(q.answer) ? q.answer : [];
-      try {
-        const given_arr = JSON.parse(given);
-        return JSON.stringify([...given_arr].sort()) === JSON.stringify([...correct].sort());
-      } catch { return false; }
-    }
-    if (q.type === "keypad") {
-      return String(q.answer ?? "").trim().toLowerCase() === String(given).trim().toLowerCase();
-    }
-    return given === q.correct;
-  }
-
-  async function doSubmit() {
-    const score = questions.reduce((a,q) => {
-      const given = ans[q.id] ?? null;
-      return a + (gradeAnswer(q, given) ? 1 : 0);
-    }, 0);
-    const session = { name:studentName, score, total:TOTAL, pct:pct(score,TOTAL), submitted:now(), timeUsed:untimed ? fmtTime(0) : fmtTime(timeLimitSecs-secs), answers:{...ans}, violations };
-    await saveSession(session);
-    onFinish(session);
+  function handleStandardChange(std) {
+    const data = STANDARD_MAP[std];
+    onChange({ ...q, standard: std, short: data?.short || q.short });
+    setSuggestion(null);
   }
 
   return (
-    <div ref={containerRef} style={{display:"flex",flexDirection:"column",height:"100vh",fontFamily:"sans-serif",background:"#e8edf2",overflow:"hidden",userSelect:"none",WebkitUserSelect:"none"}}>
+    <div style={{ background: "#fff", border: `1px solid ${isComplete ? "#b3dfc0" : "#c8d3dd"}`, borderLeft: `4px solid ${isComplete ? "#1a6e2e" : "#bcc8d4"}`, borderRadius: "4px", marginBottom: "0.7rem", overflow: "hidden" }}>
 
-      {/* Teacher stopped the test */}
-      {stopped && (
-        <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.92)",display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem"}}>
-          <div style={{background:"#fff",borderRadius:"8px",maxWidth:"420px",width:"100%",overflow:"hidden",textAlign:"center",boxShadow:"0 8px 40px rgba(0,0,0,.5)"}}>
-            <div style={{background:"#8b1a1a",color:"#fff",padding:"1.25rem"}}>
-              <div style={{fontSize:"1.5rem",marginBottom:"4px"}}>🛑</div>
-              <div style={{fontWeight:700,fontSize:"1.1rem"}}>Test Stopped by Teacher</div>
-            </div>
-            <div style={{padding:"1.5rem"}}>
-              <p style={{fontSize:"0.92rem",color:"#333",marginBottom:"1.25rem"}}>Your teacher has ended the test. Please submit your answers now.</p>
-              <button onClick={()=>{ setStopped(false); setModal(true); }}
-                style={{width:"100%",background:"#003865",color:"#fff",border:"none",borderRadius:"4px",padding:"0.85rem",fontSize:"0.95rem",fontWeight:700,cursor:"pointer"}}>
-                Submit My Answers →
-              </button>
-            </div>
+      {/* Header */}
+      <div onClick={() => setOpen(o=>!o)} style={{ padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: "0.7rem", cursor: "pointer", background: open ? "#f8fafc" : "#fff", borderBottom: open ? "1px solid #e8edf2" : "none" }}>
+        <div style={{ width: "26px", height: "26px", borderRadius: "50%", background: isComplete ? "#d4edda" : "#e8edf2", border: `2px solid ${isComplete ? "#1a6e2e" : "#bcc8d4"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <span style={{ fontSize: "0.68rem", fontWeight: 700, color: isComplete ? "#1a6e2e" : "#667" }}>{index+1}</span>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", gap: "0.4rem", marginBottom: "2px", flexWrap: "wrap", alignItems: "center" }}>
+            {q.id && <span style={{ fontSize: "0.65rem", fontWeight: 700, fontFamily: "monospace", color: "#fff", background: "#003865", padding: "1px 7px", borderRadius: "3px", letterSpacing:"0.05em" }}>{q.id}</span>}
+            {q.standard && <span style={{ fontSize: "0.6rem", fontWeight: 700, color: "#003865", background: "#ddeaf7", padding: "1px 6px", borderRadius: "2px", border: "1px solid #b3cde8" }}>{q.standard}</span>}
+            {q.short    && <span style={{ fontSize: "0.6rem", color: "#666", padding: "1px 6px" }}>{q.short}</span>}
+            {q.dok      && <span style={{ fontSize: "0.6rem", fontWeight: 700, color: "#7a4e00", background: "#fff3cd", padding: "1px 6px", borderRadius: "2px", border: "1px solid #ffc107" }}>DOK {q.dok}</span>}
+          </div>
+          <div style={{ fontSize: "0.83rem", color: q.question ? "#1a1a1a" : "#bbb", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {q.question || (q.questionImage ? "[diagram question]" : "Empty — click to edit")}
           </div>
         </div>
-      )}
-
-      {/* Teacher paused the test */}
-      {paused && !stopped && (
-        <div style={{position:"fixed",inset:0,zIndex:9998,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-          <div style={{background:"#fff",borderRadius:"8px",maxWidth:"360px",width:"100%",padding:"2rem",textAlign:"center",boxShadow:"0 8px 40px rgba(0,0,0,.4)"}}>
-            <div style={{fontSize:"2.5rem",marginBottom:"0.5rem"}}>⏸</div>
-            <div style={{fontWeight:700,fontSize:"1.1rem",color:"#003865",marginBottom:"0.5rem"}}>Test Paused</div>
-            <div style={{fontSize:"0.85rem",color:"#666"}}>Your teacher has paused the test. Please wait.</div>
-          </div>
+        <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>
+          {!isFirst && <button onClick={e=>{e.stopPropagation();onMoveUp();}} style={smBtn}>↑</button>}
+          {!isLast  && <button onClick={e=>{e.stopPropagation();onMoveDown();}} style={smBtn}>↓</button>}
+          <button onClick={e=>{e.stopPropagation();onRemove();}} style={{...smBtn,color:"#8b1a1a",borderColor:"#f0b8b8"}}>✕</button>
+          <span style={{ color: "#bbb", fontSize: "0.8rem", paddingLeft: "4px" }}>{open?"▲":"▼"}</span>
         </div>
-      )}
-
-      {/* Lockdown warning overlay */}
-      {lockWarning && (
-        <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.85)",display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem"}}>
-          <div style={{background:"#fff",borderRadius:"8px",maxWidth:"420px",width:"100%",overflow:"hidden",boxShadow:"0 8px 40px rgba(0,0,0,.4)"}}>
-            <div style={{background:"#8b1a1a",color:"#fff",padding:"1rem 1.5rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
-              <span style={{fontSize:"1.5rem"}}>⚠️</span>
-              <div>
-                <div style={{fontWeight:700,fontSize:"1rem"}}>Testing Violation</div>
-                <div style={{fontSize:"0.72rem",opacity:.8}}>This has been recorded</div>
-              </div>
-            </div>
-            <div style={{padding:"1.5rem"}}>
-              <div style={{fontSize:"0.92rem",color:"#333",marginBottom:"1.25rem",lineHeight:1.5}}>
-                {lockWarning}
-              </div>
-              <div style={{fontSize:"0.75rem",color:"#888",marginBottom:"1rem"}}>
-                Violation count: <strong style={{color:"#8b1a1a"}}>{violations}</strong> — your teacher will see this on your results.
-              </div>
-              <button onClick={reEnterFullscreen}
-                style={{width:"100%",background:"#003865",color:"#fff",border:"none",borderRadius:"4px",padding:"0.75rem",fontSize:"0.9rem",fontWeight:700,cursor:"pointer"}}>
-                Return to Test →
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <TopBar title="Grade 5 Math" right={
-        <div style={{display:"flex",gap:"1rem",alignItems:"center"}}>
-          {violations > 0 && (
-            <div style={{background:"#8b1a1a",borderRadius:"3px",padding:"2px 8px",fontSize:"0.65rem",fontWeight:700,color:"#fff"}}>
-              ⚠ {violations} violation{violations!==1?"s":""}
-            </div>
-          )}
-          <div style={{textAlign:"right"}}>
-            <div style={{fontSize:"0.55rem",opacity:.6,letterSpacing:"0.08em"}}>TIME</div>
-            <div style={{fontSize:"1rem",fontWeight:"bold",fontFamily:"monospace",color:(!untimed&&secs<warnSecs)?"#ffaaaa":"#fff"}}>
-              {untimed ? "∞" : fmtTime(secs)}
-            </div>
-          </div>
-          <div style={{textAlign:"right",display:window.innerWidth>480?"block":"none"}}>
-            <div style={{fontSize:"0.55rem",opacity:.6,letterSpacing:"0.08em"}}>STUDENT</div>
-            <div style={{fontSize:"0.78rem",fontWeight:600}}>{studentName}</div>
-          </div>
-        </div>
-      }/>
-
-      <div style={{background:"#004e94",color:"#cce0f5",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 0.75rem",height:"30px",flexShrink:0,fontSize:"0.7rem"}}>
-        <div style={{display:"flex",gap:"0.75rem",alignItems:"center"}}>
-          <button onClick={()=>setNav(o=>!o)} style={{background:"none",border:"none",color:"#cce0f5",cursor:"pointer",fontSize:"0.7rem",padding:0}}>{nav?"◀ Hide":"▶ Nav"}</button>
-          <span style={{opacity:.5}}>|</span>
-          <span>{ansCount}/{TOTAL} answered</span>
-          {flgCount>0&&<><span style={{opacity:.5}}>|</span><span style={{color:"#ffd166"}}>🚩{flgCount}</span></>}
-        </div>
-        <span style={{opacity:.65,fontSize:"0.65rem"}}>No Calculator</span>
       </div>
 
-      <div style={{display:"flex",flex:1,overflow:"hidden"}}>
-        {nav&&(
-          <div style={{width:"156px",background:"#fff",borderRight:"1px solid #c8d3dd",display:"flex",flexDirection:"column",flexShrink:0,overflowY:"auto"}}>
-            <div style={{padding:"0.65rem 0.9rem",background:"#f0f4f8",borderBottom:"1px solid #dde3e9",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.14em",color:"#555"}}>QUESTIONS</div>
-            <div style={{padding:"0.5rem",display:"flex",flexWrap:"wrap",gap:"4px"}}>
-              {questions.map((item,i)=>{
-                const isAns=!!ans[item.id]; const isCur=i===cur; const isFg=!!flg[item.id];
-                return <button key={item.id} onClick={()=>setCur(i)}
-                  style={{width:"35px",height:"35px",borderRadius:"3px",border:`2px solid ${isCur?"#003865":isAns?"#1a6e2e":"#bcc8d4"}`,background:isCur?"#003865":isAns?"#d4edda":"#fafbfc",color:isCur?"#fff":isAns?"#1a5c28":"#445",fontSize:"0.75rem",fontWeight:700,cursor:"pointer",position:"relative"}}>
-                  {i+1}{isFg&&<span style={{position:"absolute",top:"-5px",right:"-4px",fontSize:"0.5rem"}}>🚩</span>}
-                </button>;
+      {open && (
+        <div style={{ padding: "1.1rem 1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+
+          {/* Standard + skill + DOK */}
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            <div style={{ flex: 2, minWidth: "200px" }}>
+              <label style={lbl}>GSE STANDARD <span style={{ fontWeight: 400, color: "#aaa" }}>— auto-suggests as you type</span></label>
+              <select style={{ ...inp, fontFamily: "monospace", borderColor: suggestion ? "#ffc107" : "#c8d3dd" }} value={q.standard} onChange={e => handleStandardChange(e.target.value)}>
+                {Object.keys(STANDARD_MAP).map(s => <option key={s} value={s}>{s} — {STANDARD_MAP[s].short}</option>)}
+              </select>
+              {suggestion && (
+                <div style={{ marginTop: "5px", display: "flex", alignItems: "center", gap: "6px", fontSize: "0.73rem" }}>
+                  <span style={{ color: "#7a4e00" }}>💡 Suggested:</span>
+                  <button onClick={() => handleStandardChange(suggestion)} style={{ background: "#fff3cd", border: "1px solid #ffc107", borderRadius: "3px", padding: "2px 8px", cursor: "pointer", fontSize: "0.72rem", fontWeight: 700, color: "#7a4e00" }}>
+                    Use {suggestion} — {STANDARD_MAP[suggestion]?.short}
+                  </button>
+                  <button onClick={() => setSuggestion(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: "0.72rem" }}>dismiss</button>
+                </div>
+              )}
+            </div>
+            <div style={{ flex: 1, minWidth: "140px" }}>
+              <label style={lbl}>SKILL LABEL <span style={{ fontWeight: 400, color: "#aaa" }}>— auto-filled</span></label>
+              <input style={inp} value={q.short} onChange={e => update("short",e.target.value)} placeholder="e.g. Place Value" />
+            </div>
+            <div style={{ flex: 1, minWidth: "140px" }}>
+              <label style={lbl}>DEPTH OF KNOWLEDGE</label>
+              <div style={{ display: "flex", gap: "4px" }}>
+                {DOK_OPTIONS.map(d => (
+                  <button key={d.level} onClick={() => update("dok",d.level)} title={`DOK ${d.level} — ${d.label}: ${d.desc}`}
+                    style={{ flex: 1, padding: "6px 0", border: `2px solid ${q.dok===d.level?"#003865":"#c8d3dd"}`, borderRadius: "3px", background: q.dok===d.level?"#003865":"#fafbfc", color: q.dok===d.level?"#fff":"#555", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}>
+                    {d.level}
+                  </button>
+                ))}
+              </div>
+              {q.dok && <div style={{ fontSize: "0.67rem", color: "#888", marginTop: "4px" }}><strong>DOK {q.dok} — {DOK_OPTIONS[q.dok-1].label}</strong></div>}
+            </div>
+          </div>
+
+          {/* Question type toggle */}
+          <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
+            <span style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#555"}}>QUESTION TYPE</span>
+            {[["mcq","📝 Multiple Choice"],["multiselect","☑ Multi-Select"],["keypad","🔢 Numeric Answer"],["plotpoint","📍 Plot a Point"]].map(([t,lbl2])=>(
+              <button key={t} onClick={()=>update("type",t)}
+                style={{padding:"5px 12px",borderRadius:"4px",border:`2px solid ${q.type===t?"#003865":"#c8d3dd"}`,background:q.type===t?"#003865":"#fafbfc",color:q.type===t?"#fff":"#555",fontSize:"0.78rem",fontWeight:700,cursor:"pointer"}}>
+                {lbl2}
+              </button>
+            ))}
+          </div>
+
+          {/* Question text with math toolbar */}
+          <div>
+            <label style={lbl}>QUESTION TEXT <span style={{ fontWeight: 400, color: "#aaa" }}>— press Enter for new line · wrap math in $…$</span></label>
+            <MathTextarea value={q.question} onChange={text => handleQuestionChange(text)} placeholder={"Type the question here…\nPress Enter to start a new line.\nUse toolbar buttons or $\\frac{1}{2}$ for fractions."} height="90px" />
+          </div>
+
+          {/* Question image */}
+          <div>
+            <label style={lbl}>QUESTION DIAGRAM <span style={{ fontWeight: 400, color: "#aaa" }}>— optional</span></label>
+            <PasteImageZone image={q.questionImage} onImage={img=>update("questionImage",img)} onClear={()=>update("questionImage",null)} placeholder="Click here then Ctrl+V / ⌘V to paste a screenshot" />
+          </div>
+
+          {/* Answer choices — MCQ and Multi-Select */}
+          {(isMCQ || isMulti) && (
+          <div>
+            <label style={lbl}>ANSWER CHOICES <span style={{ fontWeight: 400, color: "#aaa" }}>— text, math, and/or diagram per choice</span></label>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              {q.choices.map((choice, i) => {
+                const isCorrect = isMulti
+                  ? (Array.isArray(q.answer) && q.answer.includes(choice) && !!choice)
+                  : (q.correct === choice && !!choice);
+                const ci = q.choiceImages?.[i] ?? null;
+                return (
+                  <div key={i} style={{ border: `1px solid ${isCorrect ? "#b3dfc0" : "#dde3e9"}`, borderRadius: "4px", background: isCorrect ? "#f0faf2" : "#fafbfc", padding: "0.6rem 0.8rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.4rem" }}>
+                      <div style={{ width: "22px", height: "22px", borderRadius: "50%", border: `2px solid ${isCorrect ? "#1a6e2e" : "#bcc8d4"}`, background: isCorrect ? "#1a6e2e" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <span style={{ fontSize: "0.65rem", fontWeight: 700, color: isCorrect ? "#fff" : "#667" }}>{LETTERS[i]}</span>
+                      </div>
+                      <input style={{ ...inp, flex: 1, padding: "0.4rem 0.65rem", fontFamily: "monospace", fontSize: "0.85rem" }} value={choice} onChange={e => updateChoice(i, e.target.value)} placeholder={`Choice ${LETTERS[i]} — use $\frac{1}{2}$ for fractions`} />
+                      {isMulti ? (
+                        <button onClick={() => toggleCorrectMulti(choice)}
+                          style={{ ...smBtn, background: isCorrect?"#1a6e2e":"#f0f4f8", color: isCorrect?"#fff":"#555", borderColor: isCorrect?"#1a6e2e":"#c8d3dd", padding: "5px 10px", whiteSpace: "nowrap" }}>
+                          {isCorrect ? "✓ Correct" : "+ Correct"}
+                        </button>
+                      ) : (
+                        <button onClick={() => update("correct", choice || null)}
+                          style={{ ...smBtn, background: isCorrect?"#1a6e2e":"#f0f4f8", color: isCorrect?"#fff":"#555", borderColor: isCorrect?"#1a6e2e":"#c8d3dd", padding: "5px 10px", whiteSpace: "nowrap" }}>
+                          {isCorrect ? "✓ Correct" : "Mark Correct"}
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ marginLeft: "30px" }}>
+                      <PasteImageZone image={ci} onImage={img=>updateChoiceImage(i,img)} onClear={()=>updateChoiceImage(i,null)} placeholder={`Paste diagram for choice ${LETTERS[i]} (optional)`} />
+                    </div>
+                  </div>
+                );
               })}
             </div>
-            <div style={{padding:"0.65rem 0.9rem",borderTop:"1px solid #dde3e9",marginTop:"auto"}}>
-              {[["#d4edda","#1a6e2e","Answered"],["#fafbfc","#bcc8d4","Unanswered"]].map(([bg,bd,lbl])=>(
-                <div key={lbl} style={{display:"flex",alignItems:"center",gap:"6px",marginBottom:"4px",fontSize:"0.65rem",color:"#555"}}>
-                  <div style={{width:"13px",height:"13px",background:bg,border:`2px solid ${bd}`,borderRadius:"2px"}}/>{lbl}
-                </div>
-              ))}
-              <div style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"0.65rem",color:"#555"}}><span>🚩</span>Flagged</div>
-            </div>
           </div>
-        )}
+          )}
 
-        <div style={{flex:1,overflowY:"auto",padding:window.innerWidth>640?"1.25rem 1.75rem":"0.75rem",display:"flex",flexDirection:"column",gap:"0.75rem"}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <div style={{display:"flex",alignItems:"center",gap:"0.75rem"}}>
-              <span style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#003865",background:"#ddeaf7",padding:"3px 8px",borderRadius:"2px",border:"1px solid #b3cde8"}}>{q.standard}</span>
-              <span style={{fontSize:"0.78rem",color:"#666"}}>Question {cur+1} of {TOTAL}</span>
+          {/* Multiselect helper */}
+          {isMulti && (
+            <div style={{background:"#f0f4f8",borderRadius:"4px",padding:"0.6rem 0.9rem",fontSize:"0.75rem",color:"#555"}}>
+              <strong>Multi-Select:</strong> Click "+ Correct" on 2–3 choices above.
+              Currently correct: {Array.isArray(q.answer) && q.answer.length > 0
+                ? q.answer.map((a,i) => <strong key={i} style={{color:"#1a6e2e"}}>{a}{i < q.answer.length-1 ? ", " : ""}</strong>)
+                : <span style={{color:"#8b1a1a"}}>None selected yet.</span>}
             </div>
-            <button onClick={()=>setFlg(p=>({...p,[q.id]:!p[q.id]}))}
-              style={{display:"flex",alignItems:"center",gap:"5px",background:isFl?"#fff8e1":"#f8f9fa",border:`1px solid ${isFl?"#ffc107":"#bcc8d4"}`,borderRadius:"3px",padding:"5px 12px",cursor:"pointer",fontSize:"0.73rem",color:isFl?"#7a4e00":"#555",fontWeight:isFl?700:400}}>
-              🚩 {isFl?"Flagged":"Flag for Review"}
-            </button>
+          )}
+
+          {/* Answer — Keypad / Numeric */}
+          {isKeypad && (
+          <div>
+            <label style={lbl}>CORRECT ANSWER <span style={{fontWeight:400,color:"#aaa"}}>— exact numeric value (decimals ok)</span></label>
+            <div style={{display:"flex",gap:"0.75rem",alignItems:"center"}}>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={q.answer ?? ""}
+                onChange={e => update("answer", e.target.value)}
+                placeholder="e.g.  3.5  or  1/4  or  12"
+                style={{...inp, fontFamily:"monospace", fontSize:"1.1rem", fontWeight:700, maxWidth:"200px", letterSpacing:"0.05em"}}
+              />
+              {q.answer && <span style={{fontSize:"0.78rem",color:"#1a6e2e",fontWeight:700}}>✓ Answer set: {q.answer}</span>}
+            </div>
+            <div style={{fontSize:"0.7rem",color:"#888",marginTop:"4px"}}>
+              Student types their answer — graded by exact match (trimmed, case-insensitive).
+            </div>
           </div>
-          <div style={{height:"1px",background:"#dde3e9"}}/>
-          <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"1.25rem 1.5rem"}}>
-            <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"0.65rem"}}>QUESTION</div>
-            <p style={{fontSize:"1.05rem",fontFamily:"Georgia,serif",color:"#0f0f0f",lineHeight:1.72,margin:0}}><MathText text={q.question}/></p>
-            {q.questionImage&&<img src={q.questionImage} alt="diagram" style={{maxWidth:"100%",maxHeight:"200px",marginTop:"0.75rem",borderRadius:"3px",display:"block"}}/>}
+          )}
+
+          {/* Answer — Plot Point */}
+          {isPlot && (
+          <div>
+            <label style={lbl}>CORRECT ANSWER — click the grid to set the answer point</label>
+            <div style={{display:"flex",gap:"1.5rem",alignItems:"flex-start",flexWrap:"wrap"}}>
+              <PlotGrid
+                answer={q.answer}
+                placed={q.answer}
+                onPlace={pt => update("answer", pt)}
+                size={260}
+              />
+              <div style={{fontSize:"0.82rem",color:"#555",lineHeight:1.7,paddingTop:"0.5rem"}}>
+                {q.answer
+                  ? <><strong style={{color:"#1a6e2e",fontSize:"1rem"}}>✓ ({q.answer[0]}, {q.answer[1]})</strong><br/>Click a different point to change it.</>
+                  : <span style={{color:"#8b1a1a"}}>Click a point on the grid to set the correct answer.</span>}
+              </div>
+            </div>
           </div>
-          <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"1.1rem 1.5rem"}}>
-            {q.type === "plotpoint" ? (
-              <>
-                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"0.9rem"}}>PLOT YOUR ANSWER</div>
-                <div style={{display:"flex",justifyContent:"center"}}>
-                  <PlotGrid
-                    placed={sel ? (() => { try { return JSON.parse(sel); } catch { return null; } })() : null}
-                    onPlace={pt => {
-                      const v = JSON.stringify(pt);
-                      setAns(p=>({...p,[q.id]:v}));
-                      handleAdaptiveAnswer(q.id, v);
-                    }}
-                    size={Math.min(300, window.innerWidth - 80)}
-                  />
+          )}
+
+          {/* Live preview */}
+          {(q.question || q.questionImage) && (
+            <div style={{ borderTop: "1px solid #eef1f4", paddingTop: "1rem" }}>
+              <div style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.12em", color: "#888", marginBottom: "0.65rem" }}>STUDENT PREVIEW — renders math & line breaks</div>
+              <div style={{ background: "#f8fafc", border: "1px solid #dde3e9", borderRadius: "4px", padding: "1rem 1.1rem" }}>
+                <div style={{ display: "flex", gap: "0.4rem", marginBottom: "0.5rem", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "0.6rem", fontWeight: 700, color: "#003865", background: "#ddeaf7", padding: "2px 7px", borderRadius: "2px", border: "1px solid #b3cde8" }}>{q.standard}</span>
+                  {q.dok && <span style={{ fontSize: "0.6rem", fontWeight: 700, color: "#7a4e00", background: "#fff3cd", padding: "2px 7px", borderRadius: "2px", border: "1px solid #ffc107" }}>DOK {q.dok}</span>}
                 </div>
-              </>
-            ) : q.type === "keypad" ? (
-              <>
-                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"0.9rem"}}>TYPE YOUR ANSWER</div>
-                <div style={{display:"flex",flexDirection:"column",gap:"0.65rem",alignItems:"flex-start"}}>
-                  <input
-                    type="text" inputMode="decimal"
-                    value={sel ?? ""}
-                    onChange={e => { setAns(p=>({...p,[q.id]:e.target.value})); handleAdaptiveAnswer(q.id, e.target.value); }}
-                    placeholder="Enter your answer…"
-                    style={{width:"100%",maxWidth:"260px",padding:"0.8rem 1rem",fontSize:"1.3rem",fontFamily:"monospace",fontWeight:700,border:"2px solid #003865",borderRadius:"4px",outline:"none",background:"#fafbfc",color:"#0f0f0f",letterSpacing:"0.05em"}}
-                  />
-                  {sel && <div style={{fontSize:"0.72rem",color:"#555"}}>Your answer: <strong>{sel}</strong></div>}
-                </div>
-              </>
-            ) : q.type === "multiselect" ? (
-              <>
-                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"4px"}}>SELECT ALL CORRECT ANSWERS</div>
-                <div style={{fontSize:"0.7rem",color:"#888",marginBottom:"0.75rem"}}>Choose all that apply — there may be more than one correct answer.</div>
-                <div style={{display:"flex",flexDirection:"column",gap:"0.55rem"}}>
-                  {(q.choices||[]).filter(c=>c).map((choice,i)=>{
-                    const selArr = (() => { try { return sel ? JSON.parse(sel) : []; } catch { return []; } })();
-                    const chosen = selArr.includes(choice);
-                    function toggleChoice() {
-                      const next = chosen ? selArr.filter(c=>c!==choice) : [...selArr, choice];
-                      const v = JSON.stringify(next);
-                      setAns(p=>({...p,[q.id]: next.length ? v : null}));
-                      handleAdaptiveAnswer(q.id, next.length ? v : null);
-                    }
-                    return <label key={i} onClick={toggleChoice}
-                      style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.8rem 1rem",border:`2px solid ${chosen?"#003865":"#c8d3dd"}`,borderRadius:"3px",background:chosen?"#ddeaf7":"#fafbfc",cursor:"pointer"}}>
-                      <div style={{width:"22px",height:"22px",borderRadius:"3px",border:`2px solid ${chosen?"#003865":"#9aabba"}`,background:chosen?"#003865":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                        {chosen && <span style={{color:"#fff",fontSize:"0.8rem",fontWeight:900}}>✓</span>}
+                {q.question && (
+                  <p style={{ fontFamily: "Georgia,serif", fontSize: "0.95rem", color: "#0f0f0f", lineHeight: 1.7, margin: "0 0 0.5rem" }}>
+                    <MathText text={q.question} />
+                  </p>
+                )}
+                {q.questionImage && <img src={q.questionImage} alt="diagram" style={{ maxWidth: "100%", maxHeight: "160px", borderRadius: "3px", marginBottom: "0.5rem", display: "block" }} />}
+                {isPlot ? (
+                  <div style={{marginTop:"0.5rem"}}>
+                    <PlotGrid answer={q.answer} placed={q.answer} readOnly size={220}/>
+                    {q.answer && <div style={{fontSize:"0.78rem",color:"#1a6e2e",marginTop:"4px",fontWeight:700}}>Answer: ({q.answer[0]}, {q.answer[1]})</div>}
+                  </div>
+                ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  {q.choices.map((c, i) => {
+                    const ci = q.choiceImages?.[i];
+                    if (!c && !ci) return null;
+                    const isC = q.correct === c && c;
+                    return (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.45rem 0.75rem", border: `1px solid ${isC?"#003865":"#dde3e9"}`, borderRadius: "3px", background: isC?"#ddeaf7":"#fff" }}>
+                        <div style={{ width: "20px", height: "20px", borderRadius: "50%", border: `2px solid ${isC?"#003865":"#9aabba"}`, background: isC?"#003865":"#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <span style={{ fontSize: "0.6rem", fontWeight: 700, color: isC?"#fff":"#667" }}>{LETTERS[i]}</span>
+                        </div>
+                        <div>
+                          {c && <MathText text={c} style={{ fontSize: "0.9rem", fontFamily: "Georgia,serif", color: "#0f0f0f" }} />}
+                          {ci && <img src={ci} alt={`choice ${LETTERS[i]}`} style={{ maxHeight: "55px", maxWidth: "160px", display: "block", marginTop: c?"3px":0, borderRadius: "2px" }} />}
+                        </div>
                       </div>
-                      <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color:"#0f0f0f"}}><MathText text={choice}/></span>
-                    </label>;
+                    );
                   })}
                 </div>
-              </>
-            ) : (
-              <>
-                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"0.9rem"}}>SELECT ONE ANSWER</div>
-                <div style={{display:"flex",flexDirection:"column",gap:"0.55rem"}}>
-                  {(q.choices||[]).filter(c=>c).length === 0 ? (
-                    <div style={{color:"#aaa",fontSize:"0.85rem",padding:"1rem",textAlign:"center",border:"1px dashed #c8d3dd",borderRadius:"4px"}}>
-                      ⚠ This question has no answer choices. Contact your teacher.
-                    </div>
-                  ) : (q.choices||[]).map((choice,i)=>{
-                    const chosen = sel===choice;
-                    return <label key={i} onClick={()=>{ setAns(p=>({...p,[q.id]:choice})); handleAdaptiveAnswer(q.id, choice); }}
-                      style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.8rem 1rem",border:`2px solid ${chosen?"#003865":"#c8d3dd"}`,borderRadius:"3px",background:chosen?"#ddeaf7":"#fafbfc",cursor:"pointer"}}>
-                      <div style={{width:"26px",height:"26px",borderRadius:"50%",border:`2px solid ${chosen?"#003865":"#9aabba"}`,background:chosen?"#003865":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                        <span style={{fontSize:"0.7rem",fontWeight:700,color:chosen?"#fff":"#667"}}>{LETTERS[i]}</span>
-                      </div>
-                      <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color:"#0f0f0f"}}><MathText text={choice}/></span>
-                    </label>;
-                  })}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div style={{background:"#fff",borderTop:"2px solid #c8d3dd",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0.65rem 1.5rem",flexShrink:0}}>
-        <button onClick={()=>setCur(c=>Math.max(0,c-1))} disabled={cur===0}
-          style={{background:cur===0?"#e8edf2":"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"7px 20px",fontSize:"0.83rem",cursor:cur===0?"not-allowed":"pointer",color:cur===0?"#aaa":"#333",fontWeight:600}}>◀ Back</button>
-        <div style={{display:"flex",gap:"4px"}}>
-          {questions.map((_,i)=><div key={i} onClick={()=>setCur(i)}
-            style={{width:"9px",height:"9px",borderRadius:"50%",background:i===cur?"#003865":ans[questions[i].id]?"#1a6e2e":"#c8d3dd",cursor:"pointer"}}/>)}
-        </div>
-        {cur<TOTAL-1
-          ?<button onClick={()=>setCur(c=>c+1)} style={{background:"#003865",border:"none",borderRadius:"3px",padding:"7px 20px",fontSize:"0.83rem",cursor:"pointer",color:"#fff",fontWeight:600}}>Next ▶</button>
-          :<button onClick={()=>setModal(true)} style={{background:"#1a6e2e",border:"none",borderRadius:"3px",padding:"7px 20px",fontSize:"0.83rem",cursor:"pointer",color:"#fff",fontWeight:700}}>Submit Test ✓</button>
-        }
-      </div>
-
-      {modal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999}}>
-          <div style={{background:"#fff",borderRadius:"4px",width:"100%",maxWidth:"400px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.22)"}}>
-            <div style={{background:"#003865",color:"#fff",padding:"0.9rem 1.25rem"}}>
-              <div style={{fontSize:"0.65rem",letterSpacing:"0.12em",opacity:.7,marginBottom:"2px"}}>CONFIRMATION</div>
-              <div style={{fontSize:"1rem",fontWeight:700}}>Submit Test?</div>
+                )}
+              </div>
             </div>
-            <div style={{padding:"1.25rem"}}>
-              <p style={{fontSize:"0.88rem",color:"#444",margin:"0 0 0.75rem"}}>You have answered <strong>{ansCount}</strong> of <strong>{TOTAL}</strong> questions.</p>
-              {ansCount<TOTAL&&<div style={{fontSize:"0.82rem",color:"#8b1a1a",background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"3px",padding:"0.55rem 0.85rem",marginBottom:"0.75rem"}}>⚠ {TOTAL-ansCount} question{TOTAL-ansCount>1?"s are":" is"} unanswered.</div>}
-              <p style={{fontSize:"0.82rem",color:"#666",margin:0}}>Once submitted you cannot return to change answers.</p>
-            </div>
-            <div style={{display:"flex",gap:"0.65rem",padding:"0.9rem 1.25rem",borderTop:"1px solid #dde3e9"}}>
-              <button onClick={()=>setModal(false)} style={{flex:1,background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600,color:"#333"}}>Go Back</button>
-              <button onClick={doSubmit} style={{flex:1,background:"#1a6e2e",border:"none",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",color:"#fff",fontWeight:700}}>Submit</button>
-            </div>
-          </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-// ── Student Results ────────────────────────────────────────
-function StudentResults({ session, questions, onReset }) {
-  const p = session.pct;
+// ── Main ───────────────────────────────────────────────────
+function EMPTY_Q() {
+  return { id: uid(), type: "mcq", standard: "5.NR.1.1", short: "Place Value Relationships", question: "", questionImage: null, choices: ["","","",""], choiceImages: [null,null,null,null], correct: "", answer: null, dok: null };
+}
+
+export default function QuestionBuilder() {
+  const [questions, setQuestions] = useState([EMPTY_Q()]);
+  const [copied, setCopied] = useState(false);
+
+  function addQuestion() {
+    setQuestions(qs => {
+      const last = qs[qs.length - 1];
+      return [...qs, {
+        ...EMPTY_Q(),
+        // carry forward standard, skill label, and DOK from the last question
+        standard: last?.standard || "MGSE5.NBT.1",
+        short:    last?.short    || "Place Value",
+        dok:      last?.dok      || null,
+      }];
+    });
+  }
+  function updateQ(i, updated) { setQuestions(qs => qs.map((q,j) => j===i ? updated : q)); }
+  function removeQ(i)          { setQuestions(qs => qs.filter((_,j) => j!==i)); }
+  function moveUp(i)           { if(i===0)return; setQuestions(qs=>{const a=[...qs];[a[i-1],a[i]]=[a[i],a[i-1]];return a;}); }
+  function moveDown(i)         { setQuestions(qs=>{if(i>=qs.length-1)return qs;const a=[...qs];[a[i],a[i+1]]=[a[i+1],a[i]];return a;}); }
+
+  function copyJSON() {
+    const out = questions.map((q,i) => ({
+      id: `q${String(i+1).padStart(3,"0")}`,
+      standard: q.standard, short: q.short, dok: q.dok,
+      question: q.question,
+      ...(q.questionImage ? { questionImage: q.questionImage } : {}),
+      choices: q.choices,
+      ...(q.choiceImages?.some(c=>c) ? { choiceImages: q.choiceImages } : {}),
+      correct: q.correct,
+    }));
+    navigator.clipboard.writeText(JSON.stringify(out, null, 2));
+    setCopied(true); setTimeout(()=>setCopied(false), 2500);
+  }
+
+  const [saving, setSaving]   = useState(false);
+  const [savedCount, setSavedCount] = useState(0);
+
+  async function saveToBank() {
+    const complete_qs = questions.filter(q => {
+      if (!q.question || !q.standard || !q.dok) return false;
+      if (q.type === "plotpoint") return Array.isArray(q.answer) && q.answer.length === 2;
+      if (q.type === "keypad")    return q.answer != null && String(q.answer).trim() !== "";
+      if (q.type === "multiselect") return Array.isArray(q.answer) && q.answer.length >= 2 && q.choices.filter(c=>c).length >= 4;
+      return q.choices.filter(c=>c).length === 4 && q.correct;
+    });
+    if (complete_qs.length === 0) return;
+    setSaving(true);
+    let count = 0;
+    for (const q of complete_qs) {
+      try {
+        // Ensure type is correct before saving
+        const toSave = {
+          ...q,
+          type: (Array.isArray(q.answer) && q.answer.length === 2 && q.choices.filter(c=>c).length === 0)
+            ? "plotpoint"
+          : (["multiselect","keypad","plotpoint","mcq"].includes(q.type) ? q.type : "mcq")
+        };
+        await fetch(`${API}/questions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(toSave),
+        });
+        count++;
+      } catch {}
+    }
+    setSaving(false);
+    setSavedCount(count);
+    setTimeout(() => setSavedCount(0), 3000);
+  }
+
+  async function seedBank() {
+    if (!window.confirm(`Re-seed the bank with ${BUILTIN_QUESTIONS.length} built-in questions? Only missing questions will be added.`)) return;
+    setSaving(true);
+    try {
+      const r = await fetch(`${API}/questions/seed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(BUILTIN_QUESTIONS),
+      });
+      const data = await r.json();
+      setSavedCount(data.added);
+      setTimeout(() => setSavedCount(0), 4000);
+    } catch {}
+    setSaving(false);
+  }
+
+  // ── CSV Import ──────────────────────────────────────────
+  const csvRef = useRef();
+  const [csvPanel,   setCsvPanel]   = useState(false);
+  const [csvPreview, setCsvPreview] = useState(null);
+  const [csvErr,     setCsvErr]     = useState("");
+  const [csvImporting, setCsvImporting] = useState(false);
+  const [csvResult,  setCsvResult]  = useState(null);
+
+  const CSV_COLS = ["id","standard","short","dok","question","choiceA","choiceB","choiceC","choiceD","correct"];
+
+  function downloadTemplate() {
+    const header = CSV_COLS.join(",");
+    const example = [
+      "","5.NR.2.1","Multiply whole numbers","1",
+      "What is 24 × 13?","302","312","322","332","312"
+    ].map(v => `"${v}"`).join(",");
+    const blob = new Blob([header + "\n" + example + "\n"], { type:"text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "mathready_questions_template.csv";
+    a.click();
+  }
+
+  function parseQuestionCSV(text) {
+    const lines = text.trim().replace(/\r/g,"").split("\n").filter(l=>l.trim());
+    if (!lines.length) return { rows:[], errs:["Empty file"] };
+    // Detect and skip header row
+    const first = lines[0].toLowerCase();
+    const hasHeader = CSV_COLS.some(c => first.includes(c));
+    const dataLines = hasHeader ? lines.slice(1) : lines;
+
+    const rows = [], errs = [];
+    dataLines.forEach((line, i) => {
+      const rowNum = i + (hasHeader ? 2 : 1);
+      // Parse CSV respecting quoted fields
+      const parts = [];
+      let cur = "", inQ = false;
+      for (let ci = 0; ci < line.length; ci++) {
+        const ch = line[ci];
+        if (ch === '"') { inQ = !inQ; }
+        else if (ch === ',' && !inQ) { parts.push(cur.trim()); cur = ""; }
+        else cur += ch;
+      }
+      parts.push(cur.trim());
+
+      // Support both with and without id column (9 or 10 cols)
+      let id, standard, short, dok, question, choiceA, choiceB, choiceC, choiceD, correct;
+      if (parts.length >= 10) {
+        [id,standard,short,dok,question,choiceA,choiceB,choiceC,choiceD,correct] = parts;
+      } else {
+        [standard,short,dok,question,choiceA,choiceB,choiceC,choiceD,correct] = parts;
+        id = "";
+      }
+      const rowErrs = [];
+      if (!standard?.trim()) rowErrs.push("missing standard");
+      if (!short?.trim())    rowErrs.push("missing skill label");
+      if (!dok?.trim() || isNaN(parseInt(dok))) rowErrs.push("dok must be 1-4");
+      if (!question?.trim()) rowErrs.push("missing question");
+      if (!choiceA?.trim() || !choiceB?.trim() || !choiceC?.trim() || !choiceD?.trim()) rowErrs.push("need 4 choices");
+      if (!correct?.trim()) rowErrs.push("missing correct answer");
+      if (correct?.trim() && ![choiceA,choiceB,choiceC,choiceD].map(c=>c?.trim()).includes(correct.trim())) {
+        rowErrs.push("correct answer must match one of the 4 choices exactly");
+      }
+      if (rowErrs.length) { errs.push(`Row ${rowNum}: ${rowErrs.join(", ")}`); return; }
+
+      rows.push({
+        ...(id?.trim() ? { id: id.trim() } : {}),
+        standard: standard.trim(),
+        short:    short.trim(),
+        dok:      parseInt(dok),
+        question: question.trim(),
+        choices:  [choiceA,choiceB,choiceC,choiceD].map(c=>c.trim()),
+        correct:  correct.trim(),
+      });
+    });
+    return { rows, errs };
+  }
+
+  function handleCSVFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCsvErr(""); setCsvPreview(null); setCsvResult(null);
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const { rows, errs } = parseQuestionCSV(ev.target.result);
+      if (errs.length && !rows.length) { setCsvErr(errs.join(" · ")); return; }
+      setCsvPreview({ rows, errs });
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }
+
+  async function importCSVQuestions(forceReassign = false) {
+    if (!csvPreview?.rows?.length) return;
+    setCsvImporting(true); setCsvErr("");
+    try {
+      // If forceReassign, strip IDs from rows that were flagged as duplicates
+      const toUpload = forceReassign
+        ? csvPreview.rows.map(r => csvPreview.duplicateIds?.includes(r.id) ? {...r, id:""} : r)
+        : csvPreview.rows;
+      const r = await fetch(`${API}/questions/seed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(toUpload),
+      });
+      const d = await r.json();
+      // Show duplicate warning before final success
+      if (d.duplicate_count > 0 && !forceReassign) {
+        setCsvPreview(prev => ({ ...prev, duplicateIds: d.duplicates }));
+        setCsvResult({ ...d, pendingDuplicates: true });
+      } else {
+        setCsvResult(d);
+        setCsvPreview(null);
+      }
+    } catch { setCsvErr("Upload failed. Check your connection."); }
+    setCsvImporting(false);
+  }
+
+  const complete = questions.filter(q => {
+    if (!q.question || !q.standard || !q.dok) return false;
+    if (q.type === "plotpoint") return Array.isArray(q.answer) && q.answer.length === 2;
+    if (q.type === "keypad")    return q.answer != null && String(q.answer).trim() !== "";
+    if (q.type === "multiselect") return Array.isArray(q.answer) && q.answer.length >= 2 && q.choices.filter(c=>c).length >= 4;
+    return q.choices.filter(c=>c).length === 4 && q.correct;
+  }).length;
+
   return (
-    <div style={{minHeight:"100vh",background:"#e8edf2",fontFamily:"sans-serif",display:"flex",flexDirection:"column"}}>
-      <TopBar title="Grade 5 Mathematics — Results"/>
-      <div style={{flex:1,display:"flex",justifyContent:"center",padding:"2rem 1rem"}}>
-        <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",width:"100%",maxWidth:"640px",boxShadow:"0 2px 12px rgba(0,0,0,.07)",overflow:"hidden"}}>
-          <div style={{background:"#f0f4f8",borderBottom:"1px solid #c8d3dd",padding:"1.25rem 1.5rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+    <div style={{ minHeight: "100vh", background: "#e8edf2", fontFamily: "sans-serif" }}>
+
+      {/* Header */}
+      <div style={{ background: "#003865", color: "#fff", padding: "0 1.5rem", height: "52px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 2px 6px rgba(0,0,0,.3)" }}>
+        <div>
+          <div style={{ fontSize: "0.58rem", opacity: .65, letterSpacing: "0.14em" }}>GEORGIA MILESTONES READINESS TRAINER</div>
+          <div style={{ fontSize: "0.9rem", fontWeight: 600 }}>Question Builder</div>
+        </div>
+        <div style={{ display: "flex", gap: "0.65rem", alignItems: "center" }}>
+          <span style={{ fontSize: "0.75rem", opacity: .75 }}>{complete}/{questions.length} complete</span>
+          <button onClick={()=>{setCsvPanel(p=>!p);setCsvPreview(null);setCsvErr("");setCsvResult(null);}}
+            style={{ background:"#4a7fa5", border:"none", borderRadius:"3px", padding:"6px 14px", fontSize:"0.78rem", fontWeight:700, color:"#fff", cursor:"pointer" }}>
+            📥 Import CSV
+          </button>
+          <button onClick={seedBank} disabled={saving}
+            style={{ background:"#7a4e00", border:"none", borderRadius:"3px", padding:"6px 14px", fontSize:"0.78rem", fontWeight:700, color:"#fff", cursor:"pointer", opacity:saving?0.6:1 }}
+            title="Re-load the 100 built-in questions into the bank">
+            🔄 Restore Built-in Questions
+          </button>
+          {savedCount>0&&<span style={{fontSize:"0.75rem",color:"#1a6e2e",fontWeight:700}}>+{savedCount} added</span>}
+          <button onClick={saveToBank} disabled={saving||complete===0}
+            style={{ background: savedCount>0?"#d4edda":complete===0?"#c8d3dd":"#1a6e2e", color: savedCount>0?"#1a6e2e":"#fff", border: "none", borderRadius: "3px", padding: "6px 14px", fontWeight: 700, fontSize: "0.8rem", cursor: complete===0?"not-allowed":"pointer" }}>
+            {savedCount>0 ? `✓ Saved ${savedCount} to Bank!` : saving ? "Saving…" : `💾 Save to Bank (${complete})`}
+          </button>
+          <button onClick={copyJSON} style={{ background: copied?"#d4edda":"#fff", color: copied?"#1a6e2e":"#003865", border: "none", borderRadius: "3px", padding: "6px 14px", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer" }}>
+            {copied ? "✓ Copied!" : "📋 Copy JSON"}
+          </button>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: "780px", margin: "0 auto", padding: "1.5rem 1rem" }}>
+
+        {/* CSV Import Panel */}
+      {csvPanel && (
+        <div style={{background:"#fff",border:"1px solid #b3cde8",borderRadius:"6px",padding:"1.25rem",marginBottom:"1rem",boxShadow:"0 2px 12px rgba(0,56,101,.08)"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1rem"}}>
             <div>
-              <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#888",marginBottom:"4px"}}>STUDENT</div>
-              <div style={{fontSize:"1rem",fontWeight:700,color:"#1a1a1a"}}>{session.name}</div>
-              <div style={{fontSize:"1.8rem",fontWeight:700,color:lvlC(p),fontFamily:"Georgia,serif",marginTop:"4px"}}>{session.score}/{session.total} <span style={{fontSize:"1rem",opacity:.6}}>({p}%)</span></div>
+              <div style={{fontSize:"0.95rem",fontWeight:700,color:"#003865"}}>Import Questions from CSV</div>
+              <div style={{fontSize:"0.75rem",color:"#888",marginTop:"2px"}}>
+                One question per row. ID column optional — leave blank to auto-assign (Q00001 format). Columns: id, standard, short, dok, question, choiceA–D, correct
+              </div>
             </div>
-            <div style={{textAlign:"right"}}>
-              <div style={{fontSize:"0.62rem",color:"#888",marginBottom:"4px"}}>PERFORMANCE LEVEL</div>
-              <div style={{fontSize:"1rem",fontWeight:700,color:lvlC(p),padding:"6px 16px",background:lvlBg(p),border:`1px solid ${lvlBd(p)}`,borderRadius:"3px"}}>{lvl(p)}</div>
+            <button onClick={downloadTemplate}
+              style={{background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"6px 14px",fontSize:"0.78rem",fontWeight:600,cursor:"pointer",color:"#003865"}}>
+              ⬇ Download Template
+            </button>
+          </div>
+
+          {/* Upload area */}
+          <input ref={csvRef} type="file" accept=".csv,.txt" onChange={handleCSVFile} style={{display:"none"}}/>
+          <div onClick={()=>csvRef.current?.click()}
+            style={{border:"2px dashed #b3cde8",borderRadius:"6px",padding:"1.5rem",textAlign:"center",cursor:"pointer",background:"#f7fafd",marginBottom:"1rem"}}
+            onDragOver={e=>{e.preventDefault();e.currentTarget.style.background="#ddeaf7";}}
+            onDragLeave={e=>{e.currentTarget.style.background="#f7fafd";}}
+            onDrop={e=>{e.preventDefault();e.currentTarget.style.background="#f7fafd";const f=e.dataTransfer.files[0];if(f){const dt=new DataTransfer();dt.items.add(f);csvRef.current.files=dt.files;handleCSVFile({target:{files:[f],value:""}})}}}>
+            <div style={{fontSize:"1.5rem",marginBottom:"6px"}}>📄</div>
+            <div style={{fontSize:"0.85rem",fontWeight:600,color:"#4a7fa5"}}>Click to choose a CSV file</div>
+            <div style={{fontSize:"0.72rem",color:"#aaa",marginTop:"4px"}}>or drag and drop here</div>
+          </div>
+
+          {/* Errors */}
+          {csvErr && (
+            <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"4px",padding:"0.65rem 0.9rem",fontSize:"0.78rem",color:"#8b1a1a",marginBottom:"0.75rem"}}>
+              ⚠ {csvErr}
             </div>
-          </div>
-          <div style={{padding:"1.25rem 1.5rem"}}>
-            <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"0.75rem"}}>ITEM REVIEW</div>
-            {questions.map((q,i)=>{
-              const a = session.answers[q.id];
-              // Grade using same logic as doSubmit
-              function gradeAns(q, given) {
-                if (!given) return false;
-                if (q.type === "plotpoint") {
-                  const ans = Array.isArray(q.answer) ? q.answer : (()=>{try{return JSON.parse(q.answer);}catch{return null;}})();
-                  return given === JSON.stringify(ans);
-                }
-                if (q.type === "multiselect") {
-                  const correct = Array.isArray(q.answer) ? q.answer : [];
-                  try { const ga = JSON.parse(given); return JSON.stringify([...ga].sort())===JSON.stringify([...correct].sort()); } catch { return false; }
-                }
-                if (q.type === "keypad") return String(q.answer??"").trim().toLowerCase()===String(given).trim().toLowerCase();
-                return given === q.correct;
-              }
-              const ok = gradeAns(q, a);
-              // Human-readable correct answer
-              const correctDisplay = (() => {
-                if (q.type === "plotpoint") { try { const arr = Array.isArray(q.answer)?q.answer:JSON.parse(q.answer); return `(${arr[0]}, ${arr[1]})`; } catch { return "?"; } }
-                if (q.type === "multiselect") { const arr = Array.isArray(q.answer)?q.answer:[]; return arr.join(", ") || "?"; }
-                if (q.type === "keypad") return String(q.answer ?? "");
-                return q.correct;
-              })();
-              // Human-readable student answer
-              const studentDisplay = (() => {
-                if (!a) return null;
-                if (q.type === "plotpoint") { try { const arr=JSON.parse(a); return `(${arr[0]}, ${arr[1]})`; } catch { return a; } }
-                if (q.type === "multiselect") { try { return JSON.parse(a).join(", "); } catch { return a; } }
-                return a;
-              })();
-              return <div key={q.id} style={{display:"flex",gap:"0.75rem",marginBottom:"0.6rem",padding:"0.7rem 0.85rem",background:ok?"#f0faf2":"#fdf2f2",border:`1px solid ${ok?"#b3dfc0":"#f0b8b8"}`,borderRadius:"3px"}}>
-                <div style={{width:"22px",height:"22px",borderRadius:"50%",background:ok?"#1a6e2e":"#8b1a1a",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:"1px"}}>
-                  <span style={{color:"#fff",fontSize:"0.7rem",fontWeight:700}}>{i+1}</span>
+          )}
+
+          {/* Row-level warnings */}
+          {csvPreview?.errs?.length > 0 && (
+            <div style={{background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"4px",padding:"0.65rem 0.9rem",fontSize:"0.75rem",color:"#7a4e00",marginBottom:"0.75rem"}}>
+              <strong>⚠ {csvPreview.errs.length} row{csvPreview.errs.length!==1?"s":""} skipped:</strong>
+              <ul style={{margin:"4px 0 0",paddingLeft:"1.25rem"}}>
+                {csvPreview.errs.map((e,i)=><li key={i}>{e}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {/* Preview table */}
+          {csvPreview?.rows?.length > 0 && (
+            <div>
+              <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"6px"}}>
+                PREVIEW — {csvPreview.rows.length} question{csvPreview.rows.length!==1?"s":""} ready to import
+              </div>
+              <div style={{border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden",marginBottom:"0.85rem"}}>
+                <div style={{display:"grid",gridTemplateColumns:"56px 110px 60px 30px 1fr 80px",background:"#f0f4f8",padding:"0.4rem 0.75rem",gap:"0.5rem",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.08em",color:"#555"}}>
+                  <span>ID</span><span>STANDARD</span><span>SKILL</span><span>DOK</span><span>QUESTION</span><span>CORRECT</span>
                 </div>
-                <div style={{flex:1,fontSize:"0.82rem"}}>
-                  <div style={{color:"#777",fontSize:"0.63rem",letterSpacing:"0.08em",marginBottom:"2px"}}>{q.standard}</div>
-                  <div style={{color:"#1a1a1a",fontFamily:"Georgia,serif",marginBottom:ok?0:"4px"}}><MathText text={q.question}/></div>
-                  {!ok&&<div style={{fontSize:"0.78rem"}}>
-                    <span style={{color:"#1a6e2e"}}>Correct: <strong>{correctDisplay}</strong></span>
-                    {studentDisplay&&<span style={{color:"#8b1a1a"}}> · Your answer: {studentDisplay}</span>}
-                    {!studentDisplay&&<span style={{color:"#8b1a1a"}}> · Not answered</span>}
-                  </div>}
+                <div style={{maxHeight:"220px",overflowY:"auto"}}>
+                  {csvPreview.rows.map((r,i)=>(
+                    <div key={i} style={{display:"grid",gridTemplateColumns:"56px 110px 60px 30px 1fr 80px",padding:"0.45rem 0.75rem",gap:"0.5rem",fontSize:"0.78rem",borderTop:"1px solid #eef1f4",alignItems:"center"}}>
+                      <span style={{fontFamily:"monospace",fontSize:"0.72rem",color:r.id?"#003865":"#bbb"}}>{r.id||"auto"}</span>
+                      <span style={{color:"#003865",fontWeight:700,fontSize:"0.72rem"}}>{r.standard}</span>
+                      <span style={{color:"#555",fontSize:"0.72rem"}}>{r.short}</span>
+                      <span style={{color:"#888",textAlign:"center"}}>{r.dok}</span>
+                      <span style={{color:"#1a1a1a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.question}</span>
+                      <span style={{color:"#1a6e2e",fontWeight:600,fontSize:"0.75rem",overflow:"hidden",textOverflow:"ellipsis"}}>{r.correct}</span>
+                    </div>
+                  ))}
                 </div>
-                <span style={{fontWeight:700,fontSize:"0.9rem",color:ok?"#1a6e2e":"#8b1a1a"}}>{ok?"✓":"✗"}</span>
-              </div>;
-            })}
-          </div>
-          <div style={{padding:"1rem 1.5rem",borderTop:"1px solid #dde3e9",display:"flex",justifyContent:"flex-end"}}>
-            <button onClick={onReset} style={{background:"#003865",color:"#fff",border:"none",borderRadius:"3px",padding:"0.65rem 1.75rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600}}>Start New Session</button>
-          </div>
+              </div>
+              <button onClick={importCSVQuestions} disabled={csvImporting}
+                style={{background:"#1a6e2e",color:"#fff",border:"none",borderRadius:"4px",padding:"0.65rem 1.5rem",fontSize:"0.85rem",fontWeight:700,cursor:"pointer",opacity:csvImporting?0.7:1,width:"100%"}}>
+                {csvImporting ? "Importing…" : `✓ Add ${csvPreview.rows.length} Question${csvPreview.rows.length!==1?"s":""} to Bank`}
+              </button>
+            </div>
+          )}
+
+          {/* Success / duplicate warning */}
+          {csvResult && (
+            <div>
+              {csvResult.added > 0 && (
+                <div style={{background:"#f0faf2",border:"1px solid #b3dfc0",borderRadius:"4px",padding:"0.75rem 1rem",marginBottom:"0.75rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+                  <span style={{fontSize:"1.3rem"}}>✅</span>
+                  <div>
+                    <div style={{fontWeight:700,color:"#1a6e2e",fontSize:"0.9rem"}}>{csvResult.added} question{csvResult.added!==1?"s":""} added to bank</div>
+                    <div style={{fontSize:"0.72rem",color:"#888"}}>Bank now has {csvResult.total} total questions</div>
+                  </div>
+                </div>
+              )}
+              {csvResult.pendingDuplicates && csvResult.duplicate_count > 0 && (
+                <div style={{background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"4px",padding:"0.85rem 1rem"}}>
+                  <div style={{fontWeight:700,color:"#7a4e00",marginBottom:"6px"}}>
+                    ⚠ {csvResult.duplicate_count} ID{csvResult.duplicate_count!==1?"s":""} already exist in the bank
+                  </div>
+                  <div style={{fontSize:"0.75rem",color:"#555",marginBottom:"8px"}}>
+                    <strong>Conflicting IDs:</strong> {csvResult.duplicates.join(", ")}
+                  </div>
+                  <div style={{fontSize:"0.75rem",color:"#555",marginBottom:"0.75rem"}}>
+                    These questions were skipped. What would you like to do?
+                  </div>
+                  <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap"}}>
+                    <button onClick={()=>importCSVQuestions(true)}
+                      style={{background:"#003865",color:"#fff",border:"none",borderRadius:"3px",padding:"6px 14px",cursor:"pointer",fontSize:"0.78rem",fontWeight:700}}>
+                      Auto-assign new IDs and import
+                    </button>
+                    <button onClick={()=>{ setCsvResult(null); setCsvPreview(null); setCsvPanel(false); }}
+                      style={{background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"6px 14px",cursor:"pointer",fontSize:"0.78rem",fontWeight:600}}>
+                      Skip them, I'll fix the CSV
+                    </button>
+                  </div>
+                </div>
+              )}
+              {!csvResult.pendingDuplicates && (
+                <button onClick={()=>{ setCsvPanel(false); setCsvResult(null); }}
+                  style={{width:"100%",marginTop:"0.5rem",background:"#1a6e2e",color:"#fff",border:"none",borderRadius:"3px",padding:"7px",cursor:"pointer",fontSize:"0.82rem",fontWeight:700}}>
+                  Done
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* DOK legend */}
+        <div style={{ background: "#fff", border: "1px solid #c8d3dd", borderRadius: "4px", padding: "0.75rem 1.1rem", marginBottom: "1rem", display: "flex", gap: "1.25rem", flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.1em", color: "#555" }}>DOK:</span>
+          {DOK_OPTIONS.map(d => (
+            <span key={d.level} style={{ fontSize: "0.72rem", color: "#555" }}>
+              <strong style={{ color: "#003865" }}>{d.level} {d.label}</strong> — <span style={{ color: "#888" }}>{d.desc}</span>
+            </span>
+          ))}
+        </div>
+
+        {questions.map((q, i) => (
+          <QuestionEditor key={q.id} q={q} index={i}
+            onChange={u => updateQ(i,u)} onRemove={() => removeQ(i)}
+            onMoveUp={() => moveUp(i)} onMoveDown={() => moveDown(i)}
+            isFirst={i===0} isLast={i===questions.length-1} />
+        ))}
+
+        <button onClick={addQuestion}
+          style={{ width: "100%", background: "#fff", border: "2px dashed #003865", borderRadius: "4px", padding: "0.85rem", fontSize: "0.88rem", fontWeight: 700, color: "#003865", cursor: "pointer" }}
+          onMouseEnter={e=>e.currentTarget.style.background="#f0f4f8"}
+          onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
+          + Add Question
+        </button>
+
+        <div style={{ marginTop: "1rem", background: "#f0f4f8", border: "1px solid #dde3e9", borderRadius: "3px", padding: "0.75rem 1.1rem", fontSize: "0.78rem", color: "#666" }}>
+          <strong>Math syntax:</strong> Wrap any LaTeX in dollar signs — <code>$\frac{2}{3}$</code> renders as a fraction, <code>$10^{2}$</code> renders as 10². Use the toolbar buttons for common symbols. Press <strong>Enter</strong> in the question box for a new line.
         </div>
       </div>
     </div>
   );
 }
 
-// ── Main shell ─────────────────────────────────────────────
-export default function MathTest({ onBack, identity }) {
-  // identity is pre-filled from PIN login: { studentId, studentName, classId, className }
-  const [screen,          setScreen]          = useState(identity ? "mode" : "login");
-  const [student,         setStudent]         = useState(
-    identity ? { id: identity.studentId, name: identity.studentName } : null
-  );
-  const [cls,             setCls]             = useState(
-    identity ? { id: identity.classId, name: identity.className } : null
-  );
-  const [testCode,        setTestCode]        = useState("");
-  const [finalSession,    setFinalSession]    = useState(null);
-  const [practiceHistory, setPracticeHistory] = useState([]);
-  const [questions,       setQuestions]       = useState(FALLBACK_QUESTIONS);
-  const [isAdaptive,      setIsAdaptive]      = useState(false);
-  const [isDrill,         setIsDrill]         = useState(false);
-
-  function reset() {
-    setFinalSession(null); setPracticeHistory([]);
-    setTestCode("");
-    // If came via PIN, go back to mode picker not login
-    setScreen(identity ? "mode" : "login");
-  }
-
-  function handleStartTest(studentObj, classObj, code, testInfo) {
-    setStudent(studentObj); setCls(classObj); setTestCode(code);
-    const drill = testInfo?.type === "drill";
-    setIsDrill(drill);
-    setIsAdaptive(!!testInfo?.adaptive && !drill);
-    if (drill) {
-      const qs = generateDrill(testInfo.drillStandards || [], testInfo.drillCount || 10);
-      setQuestions(qs.length ? qs : FALLBACK_QUESTIONS.slice(0, testInfo.drillCount || 10));
-    } else if (testInfo?.questions?.length) {
-      setQuestions(testInfo.questions);
-    }
-    setUntimed(!!testInfo?.untimed);
-    setTimeLimitSecs(testInfo?.timeLimitSecs ?? 1800);
-    setWarnSecs(testInfo?.warnSecs ?? 300);
-    setScreen("test");
-  }
-
-  function handleStartPractice(studentObj, classObj) {
-    setStudent(studentObj); setCls(classObj);
-    setScreen("practice");
-  }
-
-  async function handleFinishTest(session) {
-    const enriched = {
-      ...session,
-      studentId:   student?.id   || "",
-      studentName: student?.name || session.name,
-      classId:     cls?.id       || "",
-      className:   cls?.name     || "",
-      testCode,
-      mode: isDrill ? "drill" : "test",
-    };
-    try {
-      await fetch(`${API}/submit`, {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify(enriched),
-      });
-    } catch {}
-    setFinalSession(enriched);
-    setScreen("results");
-  }
-
-  async function handleFinishPractice(session, history) {
-    try {
-      await fetch(`${API}/submit`, {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify(session),
-      });
-    } catch {}
-    setFinalSession(session);
-    setPracticeHistory(history);
-    setScreen("practice-results");
-  }
-
-  // ── Mode picker — shown when identity is known (PIN login) ──
-  if (screen === "mode") {
-    const s = student || (identity ? { id: identity.studentId, name: identity.studentName } : null);
-    const c = cls    || (identity ? { id: identity.classId,   name: identity.className   } : null);
-    return (
-      <div style={{minHeight:"100vh",background:"#e8edf2",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontFamily:"sans-serif",padding:"2rem 1rem",gap:"1.5rem"}}>
-        <div style={{background:"#003865",borderRadius:"6px",padding:"1rem 2rem",color:"#fff",textAlign:"center",width:"100%",maxWidth:"480px"}}>
-          <div style={{fontSize:"0.6rem",letterSpacing:"0.16em",opacity:.65,marginBottom:"3px"}}>SIGNED IN</div>
-          <div style={{fontSize:"1.2rem",fontWeight:700}}>{s?.name}</div>
-          <div style={{fontSize:"0.8rem",opacity:.75,marginTop:"2px"}}>{c?.name}</div>
-        </div>
-        <div style={{display:"flex",flexDirection:"column",gap:"1rem",width:"100%",maxWidth:"480px"}}>
-          <button onClick={()=>handleStartPractice(s,c)}
-            style={{background:"#fff",border:"2px solid #1a6e2e",borderRadius:"8px",padding:"1.75rem 2rem",textAlign:"left",cursor:"pointer",display:"flex",alignItems:"center",gap:"1.25rem",boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
-            <div style={{width:"52px",height:"52px",borderRadius:"50%",background:"#f0faf2",border:"2px solid #b3dfc0",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:"1.6rem"}}>🎯</div>
-            <div>
-              <div style={{fontSize:"1.05rem",fontWeight:700,color:"#1a6e2e",marginBottom:"4px"}}>Practice Mode</div>
-              <div style={{fontSize:"0.82rem",color:"#555",lineHeight:1.5}}>Adaptive questions targeting your weak areas. Instant feedback after each answer.</div>
-            </div>
-          </button>
-          <button onClick={()=>setScreen("code")}
-            style={{background:"#fff",border:"2px solid #003865",borderRadius:"8px",padding:"1.75rem 2rem",textAlign:"left",cursor:"pointer",display:"flex",alignItems:"center",gap:"1.25rem",boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
-            <div style={{width:"52px",height:"52px",borderRadius:"50%",background:"#ddeaf7",border:"2px solid #9dbfe0",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:"1.6rem"}}>📝</div>
-            <div>
-              <div style={{fontSize:"1.05rem",fontWeight:700,color:"#003865",marginBottom:"4px"}}>Take a Test</div>
-              <div style={{fontSize:"0.82rem",color:"#555",lineHeight:1.5}}>Enter a test code from your teacher.</div>
-            </div>
-          </button>
-        </div>
-        <button onClick={onBack} style={{fontSize:"0.78rem",color:"#888",background:"none",border:"none",cursor:"pointer",textDecoration:"underline"}}>
-          ← Sign out
-        </button>
-      </div>
-    );
-  }
-
-  // ── Code entry (from mode picker) ──
-  if (screen === "code") {
-    const s = student || { id: identity?.studentId, name: identity?.studentName };
-    const c = cls    || { id: identity?.classId,   name: identity?.className };
-    return <StudentLogin
-      prefill={{ student: s, cls: c }}
-      onStartTest={handleStartTest}
-      onStartPractice={handleStartPractice}
-      onBack={()=>setScreen("mode")}
-      codeOnly
-    />;
-  }
-
-  if (screen === "login")
-    return <StudentLogin onStartTest={handleStartTest} onStartPractice={handleStartPractice} onBack={onBack}/>;
-
-  if (screen === "practice")
-    return <PracticeMode student={student} cls={cls} onFinish={handleFinishPractice} onQuit={reset}/>;
-
-  if (screen === "practice-results")
-    return <PracticeResults session={finalSession} history={practiceHistory} onReset={reset}/>;
-
-  if (screen === "test")
-    return <StudentTest studentName={student?.name || ""} studentId={student?.id || ""} questions={questions} adaptive={isAdaptive} onFinish={handleFinishTest}/>;
-
-  if (screen === "results")
-    return <StudentResults session={finalSession} questions={questions} onReset={()=>{ reset(); onBack(); }}/>;
-}
+const lbl   = { display: "block", fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.12em", color: "#555", marginBottom: "5px" };
+const inp   = { width: "100%", padding: "0.6rem 0.85rem", border: "1px solid #c8d3dd", borderRadius: "3px", fontSize: "0.9rem", color: "#1a1a1a", background: "#fafbfc", boxSizing: "border-box" };
+const smBtn = { background: "#f0f4f8", border: "1px solid #c8d3dd", borderRadius: "3px", padding: "4px 7px", cursor: "pointer", fontSize: "0.7rem", color: "#333", fontWeight: 600 };
