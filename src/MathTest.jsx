@@ -859,7 +859,6 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
       return a + (gradeAnswer(q, given) ? 1 : 0);
     }, 0);
     const session = { name:studentName, score, total:TOTAL, pct:pct(score,TOTAL), submitted:now(), timeUsed:untimed ? fmtTime(0) : fmtTime(timeLimitSecs-secs), answers:{...ans}, violations };
-    await saveSession(session);
     onFinish(session);
   }
 
