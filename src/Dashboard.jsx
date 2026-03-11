@@ -199,6 +199,7 @@ export default function Dashboard({ teacher }) {
   const [selected, setSelected] = useState(null);
   const [loading,  setLoading]  = useState(true);
   const [clearing, setClearing] = useState(false);
+  const [clearModal, setClearModal] = useState(false);
   const [roster,   setRoster]   = useState([]);
 
   // Growth filters
@@ -223,10 +224,16 @@ export default function Dashboard({ teacher }) {
 
   useEffect(() => { refresh(); const t=setInterval(refresh,3000); return()=>clearInterval(t); }, [refresh]);
 
-  async function handleClear() {
-    setClearing(true);
-    await clearSessions();
-    setSessions([]); setSelected(null); setClearing(false);
+  async function handleClearMode(mode) {
+    setClearing(true); setClearModal(false);
+    try {
+      const url = mode === "all" ? `${API}/sessions` : `${API}/sessions?mode=${mode}`;
+      await fetch(url, { method: "DELETE" });
+      if (mode === "all") setSessions([]);
+      else if (mode === "tests") setSessions(prev => prev.filter(s => s.mode === "drill" || s.mode === "practice"));
+      else if (mode === "drills") setSessions(prev => prev.filter(s => s.mode !== "drill" && s.mode !== "practice"));
+    } catch {}
+    setSelected(null); setClearing(false);
   }
 
   // ── Split sessions by mode ──
@@ -630,6 +637,43 @@ export default function Dashboard({ teacher }) {
 
   return (
     <div style={{display:"flex",flexDirection:"column",height:"100%",background:"#e8edf2",overflow:"hidden"}}>
+
+      {/* Clear confirmation modal */}
+      {clearModal && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}>
+          <div style={{background:"#fff",borderRadius:"6px",maxWidth:"420px",width:"100%",overflow:"hidden",boxShadow:"0 8px 40px rgba(0,0,0,.3)"}}>
+            <div style={{background:"#8b1a1a",color:"#fff",padding:"1.1rem 1.5rem"}}>
+              <div style={{fontWeight:700,fontSize:"1rem"}}>🗑 Clear Session Data</div>
+            </div>
+            <div style={{padding:"1.25rem 1.5rem",fontSize:"0.88rem",color:"#444",lineHeight:1.6}}>
+              Choose what to clear. <strong>This cannot be undone.</strong>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:"0.5rem",padding:"0 1.5rem 1.25rem"}}>
+              {[
+                ["tests",  "Clear Test Scores only",         `${testSessions.length} test session${testSessions.length!==1?"s":""}`,  "#003865","#ddeaf7"],
+                ["drills", "Clear Drill & Practice data only", `${drillSessions.length} drill session${drillSessions.length!==1?"s":""}`, "#7a4e00","#fff8e1"],
+                ["all",    "Clear Everything",               `All ${sessions.length} sessions`,                                        "#8b1a1a","#fdf2f2"],
+              ].map(([mode, label, sub, c, bg]) => (
+                <button key={mode} onClick={() => handleClearMode(mode)}
+                  style={{background:bg,border:`1px solid ${c}33`,borderRadius:"4px",padding:"0.75rem 1rem",textAlign:"left",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:"0.85rem",color:c}}>{label}</div>
+                    <div style={{fontSize:"0.72rem",color:"#888",marginTop:"2px"}}>{sub}</div>
+                  </div>
+                  <span style={{color:c,fontSize:"0.8rem"}}>→</span>
+                </button>
+              ))}
+            </div>
+            <div style={{padding:"0.75rem 1.5rem",borderTop:"1px solid #eee",display:"flex",justifyContent:"flex-end"}}>
+              <button onClick={() => setClearModal(false)}
+                style={{background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.5rem 1.25rem",fontSize:"0.82rem",cursor:"pointer",color:"#555",fontWeight:600}}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tab bar */}
       <div style={{background:"#004e94",display:"flex",alignItems:"flex-end",padding:"0 1.5rem",gap:"0.15rem",flexShrink:0}}>
         {TABS.map(([key,lbl])=>(
@@ -646,7 +690,7 @@ export default function Dashboard({ teacher }) {
             style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.35)",color:"#fff",borderRadius:"3px",padding:"4px 10px",cursor:sessions.length===0?"not-allowed":"pointer",fontSize:"0.68rem",fontWeight:700,opacity:sessions.length===0?.4:1}}>
             📄 Export PDF
           </button>
-          <button onClick={handleClear} disabled={clearing||sessions.length===0}
+          <button onClick={() => setClearModal(true)} disabled={clearing||sessions.length===0}
             style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.25)",color:"#fecaca",borderRadius:"3px",padding:"4px 10px",cursor:sessions.length===0?"not-allowed":"pointer",fontSize:"0.68rem",opacity:sessions.length===0?.4:1}}>
             {clearing?"Clearing…":"🗑 Clear"}
           </button>
