@@ -1,793 +1,558 @@
-import { useState, useRef, useCallback, useEffect } from "react";
-import MathText from "./shared/MathText";
-import PlotGrid from "./shared/PlotGrid";
-import { API, QUESTIONS as BUILTIN_QUESTIONS } from "./shared/constants";
+import { useState, useEffect, useCallback } from "react";
+import { QUESTIONS, lvl, lvlC, lvlBg, lvlBd, loadSessions, clearSessions, API } from "./shared/constants";
+import { generateClassReport } from "./generateReport";
 
-
-// ── Math snippet toolbar ───────────────────────────────────
-const MATH_SNIPPETS = [
-  { label: "½",        insert: "$\\frac{1}{2}$",      tip: "Fraction ½" },
-  { label: "¾",        insert: "$\\frac{3}{4}$",      tip: "Fraction ¾" },
-  { label: "a/b",      insert: "$\\frac{a}{b}$",      tip: "Custom fraction" },
-  { label: "×",        insert: " × ",                 tip: "Multiply" },
-  { label: "÷",        insert: " ÷ ",                 tip: "Divide" },
-  { label: "²",        insert: "$x^{2}$",             tip: "Squared" },
-  { label: "10²",      insert: "$10^{2}$",            tip: "Power of 10" },
-  { label: "√",        insert: "$\\sqrt{x}$",         tip: "Square root" },
-  { label: "≤",        insert: " ≤ ",                 tip: "Less than or equal" },
-  { label: "≥",        insert: " ≥ ",                 tip: "Greater than or equal" },
-  { label: "°",        insert: "°",                   tip: "Degrees" },
-  { label: "π",        insert: "$\\pi$",              tip: "Pi" },
-  { label: "cm²",      insert: " cm²",                tip: "Square centimeters" },
-  { label: "cm³",      insert: " cm³",                tip: "Cubic centimeters" },
+const TABS = [
+  ["overview",  "📊 Overview"],
+  ["items",     "📋 Item Analysis"],
+  ["students",  "👤 Students"],
+  ["growth",    "📈 Growth"],
+  ["controls",  "🎛 Test Controls"],
 ];
 
-function MathToolbar({ onInsert }) {
-  return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginBottom: "6px" }}>
-      {MATH_SNIPPETS.map((s, i) => (
-        <button
-          key={i}
-          type="button"
-          onClick={() => onInsert(s.insert)}
-          title={s.tip}
-          style={{ background: "#f0f4f8", border: "1px solid #c8d3dd", borderRadius: "3px", padding: "3px 8px", fontSize: "0.82rem", cursor: "pointer", fontFamily: "serif", color: "#1a1a1a", lineHeight: 1.4 }}
-          onMouseEnter={e => e.currentTarget.style.background="#ddeaf7"}
-          onMouseLeave={e => e.currentTarget.style.background="#f0f4f8"}
-        >
-          {s.label}
-        </button>
-      ))}
-      <span style={{ fontSize: "0.62rem", color: "#aaa", alignSelf: "center", marginLeft: "4px" }}>
-        Wrap custom LaTeX in $…$ e.g. <code>$\frac{2}{3}$</code>
-      </span>
-    </div>
-  );
-}
-
-// ── Math-aware textarea ────────────────────────────────────
-function MathTextarea({ value, onChange, placeholder, height }) {
-  const ref = useRef();
-
-  function insertAtCursor(text) {
-    const el = ref.current;
-    if (!el) return;
-    const start = el.selectionStart;
-    const end   = el.selectionEnd;
-    const next  = value.slice(0, start) + text + value.slice(end);
-    onChange(next);
-    // restore cursor after inserted text
-    requestAnimationFrame(() => {
-      el.selectionStart = el.selectionEnd = start + text.length;
-      el.focus();
-    });
-  }
+// ── Focus student stats panel ──────────────────────────────
+function FocusStudentStats({ student, standardMasteryFn, bankQ, lvlC, lvlBg, lvlBd }) {
+  const scores  = student.sessions.map(s => s.pct);
+  const fsFirst = scores[0];
+  const fsLast  = scores[scores.length - 1];
+  const fsDelta = scores.length >= 2 ? fsLast - fsFirst : null;
+  const mastery = standardMasteryFn(student.sessions);
 
   return (
-    <div>
-      <MathToolbar onInsert={insertAtCursor} />
-      <textarea
-        ref={ref}
-        style={{ ...inp, height: height || "72px", resize: "vertical", fontFamily: "monospace", fontSize: "0.88rem" }}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-      />
-    </div>
-  );
-}
-
-// ── Constants ──────────────────────────────────────────────
-const LETTERS = ["A","B","C","D"];
-const uid = () => `q${String(Math.floor(Math.random()*9000)+1000)}`;
-
-const STANDARD_MAP = {
-  // ── Mathematical Practices ─────────────────────────────
-  "5.MP.1": { short: "Make Sense & Persevere",      keywords: ["problem","solve","plan","approach","stuck","persevere","check"] },
-  "5.MP.2": { short: "Reason Abstractly",           keywords: ["abstract","quantitative","represent","symbol","reason"] },
-  "5.MP.3": { short: "Construct Arguments",         keywords: ["argument","explain","justify","critique","prove","convince"] },
-  "5.MP.4": { short: "Model with Math",             keywords: ["model","diagram","equation","real world","represent","draw"] },
-  "5.MP.5": { short: "Use Tools Strategically",     keywords: ["tool","ruler","calculator","manipulative","choose","strategy"] },
-  "5.MP.6": { short: "Attend to Precision",         keywords: ["precise","accurate","label","units","exact","careful"] },
-  "5.MP.7": { short: "Use Structure",               keywords: ["pattern","structure","property","rule","organize"] },
-  "5.MP.8": { short: "Repeated Reasoning",          keywords: ["repeat","shortcut","generalize","always","regularity"] },
-
-  // ── NR.1: Place Value ──────────────────────────────────
-  "5.NR.1.1": { short: "Place Value Relationships", keywords: ["place value","digit","10 times","one-tenth","left","right","represents"] },
-  "5.NR.1.2": { short: "Powers of 10",              keywords: ["power of 10","exponent","pattern","multiply","divide","10²","10³"] },
-
-  // ── NR.2: Multiply & Divide Whole Numbers ─────────────
-  "5.NR.2.1": { short: "Multiply Multi-Digit",      keywords: ["multiply","product","multi-digit","3-digit","2-digit","factor","fluently"] },
-  "5.NR.2.2": { short: "Divide Multi-Digit",        keywords: ["divide","quotient","dividend","divisor","remainder","4-digit","fluently"] },
-
-  // ── NR.3: Fractions ───────────────────────────────────
-  "5.NR.3.1": { short: "Fractions as Division",     keywords: ["fraction","division","numerator","denominator","mixed number","divide","a÷b"] },
-  "5.NR.3.2": { short: "Compare & Order Fractions", keywords: ["compare","order","fraction","greater","less","benchmark","unlike"] },
-  "5.NR.3.3": { short: "Add/Subtract Fractions",    keywords: ["add","subtract","fraction","mixed number","unlike denominator","sum","difference"] },
-  "5.NR.3.4": { short: "Multiply Fraction × Whole", keywords: ["multiply","fraction","whole number","product","model"] },
-  "5.NR.3.5": { short: "Fraction Scaling",          keywords: ["greater than one","less than one","equal to one","scaling","result","product"] },
-  "5.NR.3.6": { short: "Divide Fractions",          keywords: ["divide","unit fraction","whole number","ribbon","split","÷"] },
-
-  // ── NR.4: Decimals ────────────────────────────────────
-  "5.NR.4.1": { short: "Read & Write Decimals",     keywords: ["decimal","standard form","expanded form","thousandths","read","write"] },
-  "5.NR.4.2": { short: "Compare & Order Decimals",  keywords: ["compare","order","decimal","greater","less","equal","thousandths",">","<"] },
-  "5.NR.4.3": { short: "Round Decimals",            keywords: ["round","decimal","hundredths","nearest","place value"] },
-  "5.NR.4.4": { short: "Add & Subtract Decimals",   keywords: ["add","subtract","decimal","hundredths","sum","difference","change","price","cost","money"] },
-
-  // ── NR.5: Numerical Expressions ───────────────────────
-  "5.NR.5.1": { short: "Numerical Expressions",     keywords: ["expression","evaluate","grouping","parentheses","brackets","order of operations","write","interpret"] },
-
-  // ── PAR.6: Patterns & Algebraic Reasoning ─────────────
-  "5.PAR.6.1": { short: "Generate Patterns",        keywords: ["pattern","rule","table","generate","sequence","relationship","terms"] },
-  "5.PAR.6.2": { short: "Coordinate Plane",         keywords: ["coordinate","ordered pair","plot","x-axis","y-axis","first quadrant","point","graph"] },
-
-  // ── MDR.7: Measurement & Data ─────────────────────────
-  "5.MDR.7.1": { short: "Measurement Problems",     keywords: ["distance","mass","weight","volume","time","measure","unit","realistic"] },
-  "5.MDR.7.2": { short: "Graphical Displays",       keywords: ["graph","data","display","bar graph","line plot","table","question","interpret"] },
-  "5.MDR.7.3": { short: "Metric Conversions",       keywords: ["metric","convert","kilometer","meter","centimeter","gram","kilogram","liter","milliliter"] },
-  "5.MDR.7.4": { short: "Customary Conversions",    keywords: ["customary","convert","inch","foot","yard","mile","ounce","pound","cup","pint","quart","gallon"] },
-
-  // ── GSR.8: Geometry & Spatial Reasoning ───────────────
-  "5.GSR.8.1": { short: "Classify Polygons",        keywords: ["polygon","classify","compare","contrast","property","triangle","quadrilateral","pentagon","hexagon"] },
-  "5.GSR.8.2": { short: "2D Figure Categories",     keywords: ["category","subcategory","attribute","belong","two-dimensional","rectangle","square","rhombus","trapezoid","parallel","perpendicular"] },
-  "5.GSR.8.3": { short: "Volume with Unit Cubes",   keywords: ["volume","unit cube","pack","rectangular prism","fill","layer","gap","overlap"] },
-  "5.GSR.8.4": { short: "Volume Formula",           keywords: ["volume","formula","base","height","area","length","width","multiply","rectangular prism","l×w×h"] },
-};
-
-const DOK_OPTIONS = [
-  { level: 1, label: "Recall",        desc: "Recall a fact, term, or simple procedure" },
-  { level: 2, label: "Skill/Concept", desc: "Use information or apply a concept" },
-  { level: 3, label: "Strategic",     desc: "Reason, plan, or use evidence" },
-  { level: 4, label: "Extended",      desc: "Connect ideas across content or time" },
-];
-
-function suggestStandard(text) {
-  if (!text || text.length < 8) return null;
-  const lower = text.toLowerCase();
-  let best = null; let bestScore = 0;
-  for (const [std, data] of Object.entries(STANDARD_MAP)) {
-    const score = data.keywords.reduce((acc, kw) => acc + (lower.includes(kw) ? 1 : 0), 0);
-    if (score > bestScore) { bestScore = score; best = std; }
-  }
-  return bestScore >= 1 ? best : null;
-}
-
-// ── Paste image zone ───────────────────────────────────────
-function PasteImageZone({ image, onImage, onClear, placeholder }) {
-  const ref = useRef();
-  const handlePaste = useCallback(e => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-    for (const item of items) {
-      if (item.type.startsWith("image/")) {
-        e.preventDefault();
-        const blob = item.getAsFile();
-        const reader = new FileReader();
-        reader.onload = ev => onImage(ev.target.result);
-        reader.readAsDataURL(blob);
-        return;
-      }
-    }
-  }, [onImage]);
-
-  if (image) return (
-    <div style={{ position: "relative", display: "inline-block" }}>
-      <img src={image} alt="diagram" style={{ maxWidth: "100%", maxHeight: "180px", borderRadius: "3px", border: "1px solid #c8d3dd", display: "block" }} />
-      <button onClick={onClear} style={{ position: "absolute", top: "4px", right: "4px", background: "rgba(0,0,0,.6)", color: "#fff", border: "none", borderRadius: "50%", width: "20px", height: "20px", cursor: "pointer", fontSize: "0.65rem" }}>✕</button>
-    </div>
-  );
-
-  return (
-    <div ref={ref} tabIndex={0} onPaste={handlePaste} onClick={() => ref.current?.focus()}
-      style={{ border: "2px dashed #c8d3dd", borderRadius: "3px", padding: "0.5rem 0.85rem", fontSize: "0.74rem", color: "#bbb", cursor: "pointer", background: "#fafbfc", outline: "none" }}
-      onFocus={e => e.currentTarget.style.borderColor="#003865"}
-      onBlur={e  => e.currentTarget.style.borderColor="#c8d3dd"}>
-      📋 {placeholder || "Click here, then Ctrl+V / ⌘V to paste image"}
-    </div>
-  );
-}
-
-// ── Question editor ────────────────────────────────────────
-function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, isFirst, isLast }) {
-  const [open, setOpen]         = useState(index === 0);
-  const [suggestion, setSuggestion] = useState(null);
-  const isPlot = q.type === "plotpoint";
-  const isComplete = q.question && q.standard && q.dok && (isPlot ? (Array.isArray(q.answer) && q.answer.length === 2) : (q.choices.filter(c=>c).length===4 && q.correct));
-
-  function update(field, value)  { onChange({ ...q, [field]: value }); }
-  function updateChoice(i, val)  { const c=[...q.choices]; c[i]=val; update("choices",c); }
-  function updateChoiceImage(i, img) { const ci=[...(q.choiceImages||[null,null,null,null])]; ci[i]=img; update("choiceImages",ci); }
-
-  function handleQuestionChange(text) {
-    update("question", text);
-    const s = suggestStandard(text);
-    setSuggestion(s && s !== q.standard ? s : null);
-  }
-
-  function handleStandardChange(std) {
-    const data = STANDARD_MAP[std];
-    onChange({ ...q, standard: std, short: data?.short || q.short });
-    setSuggestion(null);
-  }
-
-  return (
-    <div style={{ background: "#fff", border: `1px solid ${isComplete ? "#b3dfc0" : "#c8d3dd"}`, borderLeft: `4px solid ${isComplete ? "#1a6e2e" : "#bcc8d4"}`, borderRadius: "4px", marginBottom: "0.7rem", overflow: "hidden" }}>
-
-      {/* Header */}
-      <div onClick={() => setOpen(o=>!o)} style={{ padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: "0.7rem", cursor: "pointer", background: open ? "#f8fafc" : "#fff", borderBottom: open ? "1px solid #e8edf2" : "none" }}>
-        <div style={{ width: "26px", height: "26px", borderRadius: "50%", background: isComplete ? "#d4edda" : "#e8edf2", border: `2px solid ${isComplete ? "#1a6e2e" : "#bcc8d4"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <span style={{ fontSize: "0.68rem", fontWeight: 700, color: isComplete ? "#1a6e2e" : "#667" }}>{index+1}</span>
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", gap: "0.4rem", marginBottom: "2px", flexWrap: "wrap", alignItems: "center" }}>
-            {q.id && <span style={{ fontSize: "0.65rem", fontWeight: 700, fontFamily: "monospace", color: "#fff", background: "#003865", padding: "1px 7px", borderRadius: "3px", letterSpacing:"0.05em" }}>{q.id}</span>}
-            {q.standard && <span style={{ fontSize: "0.6rem", fontWeight: 700, color: "#003865", background: "#ddeaf7", padding: "1px 6px", borderRadius: "2px", border: "1px solid #b3cde8" }}>{q.standard}</span>}
-            {q.short    && <span style={{ fontSize: "0.6rem", color: "#666", padding: "1px 6px" }}>{q.short}</span>}
-            {q.dok      && <span style={{ fontSize: "0.6rem", fontWeight: 700, color: "#7a4e00", background: "#fff3cd", padding: "1px 6px", borderRadius: "2px", border: "1px solid #ffc107" }}>DOK {q.dok}</span>}
-          </div>
-          <div style={{ fontSize: "0.83rem", color: q.question ? "#1a1a1a" : "#bbb", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {q.question || (q.questionImage ? "[diagram question]" : "Empty — click to edit")}
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>
-          {!isFirst && <button onClick={e=>{e.stopPropagation();onMoveUp();}} style={smBtn}>↑</button>}
-          {!isLast  && <button onClick={e=>{e.stopPropagation();onMoveDown();}} style={smBtn}>↓</button>}
-          <button onClick={e=>{e.stopPropagation();onRemove();}} style={{...smBtn,color:"#8b1a1a",borderColor:"#f0b8b8"}}>✕</button>
-          <span style={{ color: "#bbb", fontSize: "0.8rem", paddingLeft: "4px" }}>{open?"▲":"▼"}</span>
-        </div>
-      </div>
-
-      {open && (
-        <div style={{ padding: "1.1rem 1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
-
-          {/* Standard + skill + DOK */}
-          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <div style={{ flex: 2, minWidth: "200px" }}>
-              <label style={lbl}>GSE STANDARD <span style={{ fontWeight: 400, color: "#aaa" }}>— auto-suggests as you type</span></label>
-              <select style={{ ...inp, fontFamily: "monospace", borderColor: suggestion ? "#ffc107" : "#c8d3dd" }} value={q.standard} onChange={e => handleStandardChange(e.target.value)}>
-                {Object.keys(STANDARD_MAP).map(s => <option key={s} value={s}>{s} — {STANDARD_MAP[s].short}</option>)}
-              </select>
-              {suggestion && (
-                <div style={{ marginTop: "5px", display: "flex", alignItems: "center", gap: "6px", fontSize: "0.73rem" }}>
-                  <span style={{ color: "#7a4e00" }}>💡 Suggested:</span>
-                  <button onClick={() => handleStandardChange(suggestion)} style={{ background: "#fff3cd", border: "1px solid #ffc107", borderRadius: "3px", padding: "2px 8px", cursor: "pointer", fontSize: "0.72rem", fontWeight: 700, color: "#7a4e00" }}>
-                    Use {suggestion} — {STANDARD_MAP[suggestion]?.short}
-                  </button>
-                  <button onClick={() => setSuggestion(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: "0.72rem" }}>dismiss</button>
-                </div>
-              )}
-            </div>
-            <div style={{ flex: 1, minWidth: "140px" }}>
-              <label style={lbl}>SKILL LABEL <span style={{ fontWeight: 400, color: "#aaa" }}>— auto-filled</span></label>
-              <input style={inp} value={q.short} onChange={e => update("short",e.target.value)} placeholder="e.g. Place Value" />
-            </div>
-            <div style={{ flex: 1, minWidth: "140px" }}>
-              <label style={lbl}>DEPTH OF KNOWLEDGE</label>
-              <div style={{ display: "flex", gap: "4px" }}>
-                {DOK_OPTIONS.map(d => (
-                  <button key={d.level} onClick={() => update("dok",d.level)} title={`DOK ${d.level} — ${d.label}: ${d.desc}`}
-                    style={{ flex: 1, padding: "6px 0", border: `2px solid ${q.dok===d.level?"#003865":"#c8d3dd"}`, borderRadius: "3px", background: q.dok===d.level?"#003865":"#fafbfc", color: q.dok===d.level?"#fff":"#555", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}>
-                    {d.level}
-                  </button>
-                ))}
+    <div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
+      <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"1.25rem 1.5rem"}}>
+        <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"0.75rem"}}>{student.name.toUpperCase()} — SCORE TREND</div>
+        <div style={{display:"flex",alignItems:"center",gap:"2rem",flexWrap:"wrap"}}>
+          <LineChart points={scores} width={340} height={90}/>
+          {fsDelta !== null && (
+            <div style={{display:"flex",gap:"1.5rem"}}>
+              <div style={{textAlign:"center"}}>
+                <div style={{fontSize:"0.6rem",color:"#888",letterSpacing:"0.1em"}}>FIRST</div>
+                <div style={{fontSize:"1.4rem",fontWeight:700,color:lvlC(fsFirst)}}>{fsFirst}%</div>
               </div>
-              {q.dok && <div style={{ fontSize: "0.67rem", color: "#888", marginTop: "4px" }}><strong>DOK {q.dok} — {DOK_OPTIONS[q.dok-1].label}</strong></div>}
-            </div>
-          </div>
-
-          {/* Question type toggle */}
-          <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
-            <span style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#555"}}>QUESTION TYPE</span>
-            {[["mcq","📝 Multiple Choice"],["plotpoint","📍 Plot a Point"]].map(([t,lbl2])=>(
-              <button key={t} onClick={()=>update("type",t)}
-                style={{padding:"5px 12px",borderRadius:"4px",border:`2px solid ${q.type===t?"#003865":"#c8d3dd"}`,background:q.type===t?"#003865":"#fafbfc",color:q.type===t?"#fff":"#555",fontSize:"0.78rem",fontWeight:700,cursor:"pointer"}}>
-                {lbl2}
-              </button>
-            ))}
-          </div>
-
-          {/* Question text with math toolbar */}
-          <div>
-            <label style={lbl}>QUESTION TEXT <span style={{ fontWeight: 400, color: "#aaa" }}>— press Enter for new line · wrap math in $…$</span></label>
-            <MathTextarea value={q.question} onChange={text => handleQuestionChange(text)} placeholder={"Type the question here…\nPress Enter to start a new line.\nUse toolbar buttons or $\\frac{1}{2}$ for fractions."} height="90px" />
-          </div>
-
-          {/* Question image */}
-          <div>
-            <label style={lbl}>QUESTION DIAGRAM <span style={{ fontWeight: 400, color: "#aaa" }}>— optional</span></label>
-            <PasteImageZone image={q.questionImage} onImage={img=>update("questionImage",img)} onClear={()=>update("questionImage",null)} placeholder="Click here then Ctrl+V / ⌘V to paste a screenshot" />
-          </div>
-
-          {/* Answer choices — MCQ */}
-          {!isPlot && (
-          <div>
-            <label style={lbl}>ANSWER CHOICES <span style={{ fontWeight: 400, color: "#aaa" }}>— text, math, and/or diagram per choice</span></label>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              {q.choices.map((choice, i) => {
-                const isCorrect = q.correct === choice && choice;
-                const ci = q.choiceImages?.[i] ?? null;
-                return (
-                  <div key={i} style={{ border: `1px solid ${isCorrect ? "#b3dfc0" : "#dde3e9"}`, borderRadius: "4px", background: isCorrect ? "#f0faf2" : "#fafbfc", padding: "0.6rem 0.8rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.4rem" }}>
-                      <div style={{ width: "22px", height: "22px", borderRadius: "50%", border: `2px solid ${isCorrect ? "#1a6e2e" : "#bcc8d4"}`, background: isCorrect ? "#1a6e2e" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <span style={{ fontSize: "0.65rem", fontWeight: 700, color: isCorrect ? "#fff" : "#667" }}>{LETTERS[i]}</span>
-                      </div>
-                      <input style={{ ...inp, flex: 1, padding: "0.4rem 0.65rem", fontFamily: "monospace", fontSize: "0.85rem" }} value={choice} onChange={e => updateChoice(i, e.target.value)} placeholder={`Choice ${LETTERS[i]} — use $\frac{1}{2}$ for fractions`} />
-                      <button onClick={() => update("correct", choice || null)}
-                        style={{ ...smBtn, background: isCorrect?"#1a6e2e":"#f0f4f8", color: isCorrect?"#fff":"#555", borderColor: isCorrect?"#1a6e2e":"#c8d3dd", padding: "5px 10px", whiteSpace: "nowrap" }}>
-                        {isCorrect ? "✓ Correct" : "Mark Correct"}
-                      </button>
-                    </div>
-                    <div style={{ marginLeft: "30px" }}>
-                      <PasteImageZone image={ci} onImage={img=>updateChoiceImage(i,img)} onClear={()=>updateChoiceImage(i,null)} placeholder={`Paste diagram for choice ${LETTERS[i]} (optional)`} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          )}
-
-          {/* Answer — Plot Point */}
-          {isPlot && (
-          <div>
-            <label style={lbl}>CORRECT ANSWER — click the grid to set the answer point</label>
-            <div style={{display:"flex",gap:"1.5rem",alignItems:"flex-start",flexWrap:"wrap"}}>
-              <PlotGrid
-                answer={q.answer}
-                placed={q.answer}
-                onPlace={pt => update("answer", pt)}
-                size={260}
-              />
-              <div style={{fontSize:"0.82rem",color:"#555",lineHeight:1.7,paddingTop:"0.5rem"}}>
-                {q.answer
-                  ? <><strong style={{color:"#1a6e2e",fontSize:"1rem"}}>✓ ({q.answer[0]}, {q.answer[1]})</strong><br/>Click a different point to change it.</>
-                  : <span style={{color:"#8b1a1a"}}>Click a point on the grid to set the correct answer.</span>}
+              <div style={{textAlign:"center"}}>
+                <div style={{fontSize:"0.6rem",color:"#888",letterSpacing:"0.1em"}}>LATEST</div>
+                <div style={{fontSize:"1.4rem",fontWeight:700,color:lvlC(fsLast)}}>{fsLast}%</div>
               </div>
-            </div>
-          </div>
-          )}
-
-          {/* Live preview */}
-          {(q.question || q.questionImage) && (
-            <div style={{ borderTop: "1px solid #eef1f4", paddingTop: "1rem" }}>
-              <div style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.12em", color: "#888", marginBottom: "0.65rem" }}>STUDENT PREVIEW — renders math & line breaks</div>
-              <div style={{ background: "#f8fafc", border: "1px solid #dde3e9", borderRadius: "4px", padding: "1rem 1.1rem" }}>
-                <div style={{ display: "flex", gap: "0.4rem", marginBottom: "0.5rem", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "0.6rem", fontWeight: 700, color: "#003865", background: "#ddeaf7", padding: "2px 7px", borderRadius: "2px", border: "1px solid #b3cde8" }}>{q.standard}</span>
-                  {q.dok && <span style={{ fontSize: "0.6rem", fontWeight: 700, color: "#7a4e00", background: "#fff3cd", padding: "2px 7px", borderRadius: "2px", border: "1px solid #ffc107" }}>DOK {q.dok}</span>}
-                </div>
-                {q.question && (
-                  <p style={{ fontFamily: "Georgia,serif", fontSize: "0.95rem", color: "#0f0f0f", lineHeight: 1.7, margin: "0 0 0.5rem" }}>
-                    <MathText text={q.question} />
-                  </p>
-                )}
-                {q.questionImage && <img src={q.questionImage} alt="diagram" style={{ maxWidth: "100%", maxHeight: "160px", borderRadius: "3px", marginBottom: "0.5rem", display: "block" }} />}
-                {isPlot ? (
-                  <div style={{marginTop:"0.5rem"}}>
-                    <PlotGrid answer={q.answer} placed={q.answer} readOnly size={220}/>
-                    {q.answer && <div style={{fontSize:"0.78rem",color:"#1a6e2e",marginTop:"4px",fontWeight:700}}>Answer: ({q.answer[0]}, {q.answer[1]})</div>}
-                  </div>
-                ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                  {q.choices.map((c, i) => {
-                    const ci = q.choiceImages?.[i];
-                    if (!c && !ci) return null;
-                    const isC = q.correct === c && c;
-                    return (
-                      <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.45rem 0.75rem", border: `1px solid ${isC?"#003865":"#dde3e9"}`, borderRadius: "3px", background: isC?"#ddeaf7":"#fff" }}>
-                        <div style={{ width: "20px", height: "20px", borderRadius: "50%", border: `2px solid ${isC?"#003865":"#9aabba"}`, background: isC?"#003865":"#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          <span style={{ fontSize: "0.6rem", fontWeight: 700, color: isC?"#fff":"#667" }}>{LETTERS[i]}</span>
-                        </div>
-                        <div>
-                          {c && <MathText text={c} style={{ fontSize: "0.9rem", fontFamily: "Georgia,serif", color: "#0f0f0f" }} />}
-                          {ci && <img src={ci} alt={`choice ${LETTERS[i]}`} style={{ maxHeight: "55px", maxWidth: "160px", display: "block", marginTop: c?"3px":0, borderRadius: "2px" }} />}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                )}
+              <div style={{textAlign:"center"}}>
+                <div style={{fontSize:"0.6rem",color:"#888",letterSpacing:"0.1em"}}>CHANGE</div>
+                <div style={{fontSize:"1.4rem",fontWeight:700,color:fsDelta>0?"#1a6e2e":fsDelta<0?"#8b1a1a":"#888"}}>{fsDelta>0?"+":""}{fsDelta}%</div>
               </div>
             </div>
           )}
         </div>
-      )}
-    </div>
-  );
-}
-
-// ── Main ───────────────────────────────────────────────────
-function EMPTY_Q() {
-  return { id: uid(), type: "mcq", standard: "5.NR.1.1", short: "Place Value Relationships", question: "", questionImage: null, choices: ["","","",""], choiceImages: [null,null,null,null], correct: "", answer: null, dok: null };
-}
-
-export default function QuestionBuilder() {
-  const [questions, setQuestions] = useState([EMPTY_Q()]);
-  const [copied, setCopied] = useState(false);
-
-  function addQuestion() {
-    setQuestions(qs => {
-      const last = qs[qs.length - 1];
-      return [...qs, {
-        ...EMPTY_Q(),
-        // carry forward standard, skill label, and DOK from the last question
-        standard: last?.standard || "MGSE5.NBT.1",
-        short:    last?.short    || "Place Value",
-        dok:      last?.dok      || null,
-      }];
-    });
-  }
-  function updateQ(i, updated) { setQuestions(qs => qs.map((q,j) => j===i ? updated : q)); }
-  function removeQ(i)          { setQuestions(qs => qs.filter((_,j) => j!==i)); }
-  function moveUp(i)           { if(i===0)return; setQuestions(qs=>{const a=[...qs];[a[i-1],a[i]]=[a[i],a[i-1]];return a;}); }
-  function moveDown(i)         { setQuestions(qs=>{if(i>=qs.length-1)return qs;const a=[...qs];[a[i],a[i+1]]=[a[i+1],a[i]];return a;}); }
-
-  function copyJSON() {
-    const out = questions.map((q,i) => ({
-      id: `q${String(i+1).padStart(3,"0")}`,
-      standard: q.standard, short: q.short, dok: q.dok,
-      question: q.question,
-      ...(q.questionImage ? { questionImage: q.questionImage } : {}),
-      choices: q.choices,
-      ...(q.choiceImages?.some(c=>c) ? { choiceImages: q.choiceImages } : {}),
-      correct: q.correct,
-    }));
-    navigator.clipboard.writeText(JSON.stringify(out, null, 2));
-    setCopied(true); setTimeout(()=>setCopied(false), 2500);
-  }
-
-  const [saving, setSaving]   = useState(false);
-  const [savedCount, setSavedCount] = useState(0);
-
-  async function saveToBank() {
-    const complete_qs = questions.filter(q => q.question && q.standard && q.dok && (q.type==="plotpoint" ? (Array.isArray(q.answer)&&q.answer.length===2) : (q.choices.filter(c=>c).length===4 && q.correct)));
-    if (complete_qs.length === 0) return;
-    setSaving(true);
-    let count = 0;
-    for (const q of complete_qs) {
-      try {
-        // Ensure type is correct before saving
-        const toSave = {
-          ...q,
-          type: (Array.isArray(q.answer) && q.answer.length === 2 && q.choices.filter(c=>c).length === 0)
-            ? "plotpoint" : (q.type || "mcq")
-        };
-        await fetch(`${API}/questions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(toSave),
-        });
-        count++;
-      } catch {}
-    }
-    setSaving(false);
-    setSavedCount(count);
-    setTimeout(() => setSavedCount(0), 3000);
-  }
-
-  async function seedBank() {
-    if (!window.confirm(`Re-seed the bank with ${BUILTIN_QUESTIONS.length} built-in questions? Only missing questions will be added.`)) return;
-    setSaving(true);
-    try {
-      const r = await fetch(`${API}/questions/seed`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(BUILTIN_QUESTIONS),
-      });
-      const data = await r.json();
-      setSavedCount(data.added);
-      setTimeout(() => setSavedCount(0), 4000);
-    } catch {}
-    setSaving(false);
-  }
-
-  // ── CSV Import ──────────────────────────────────────────
-  const csvRef = useRef();
-  const [csvPanel,   setCsvPanel]   = useState(false);
-  const [csvPreview, setCsvPreview] = useState(null);
-  const [csvErr,     setCsvErr]     = useState("");
-  const [csvImporting, setCsvImporting] = useState(false);
-  const [csvResult,  setCsvResult]  = useState(null);
-
-  const CSV_COLS = ["id","standard","short","dok","question","choiceA","choiceB","choiceC","choiceD","correct"];
-
-  function downloadTemplate() {
-    const header = CSV_COLS.join(",");
-    const example = [
-      "","5.NR.2.1","Multiply whole numbers","1",
-      "What is 24 × 13?","302","312","322","332","312"
-    ].map(v => `"${v}"`).join(",");
-    const blob = new Blob([header + "\n" + example + "\n"], { type:"text/csv" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "mathready_questions_template.csv";
-    a.click();
-  }
-
-  function parseQuestionCSV(text) {
-    const lines = text.trim().replace(/\r/g,"").split("\n").filter(l=>l.trim());
-    if (!lines.length) return { rows:[], errs:["Empty file"] };
-    // Detect and skip header row
-    const first = lines[0].toLowerCase();
-    const hasHeader = CSV_COLS.some(c => first.includes(c));
-    const dataLines = hasHeader ? lines.slice(1) : lines;
-
-    const rows = [], errs = [];
-    dataLines.forEach((line, i) => {
-      const rowNum = i + (hasHeader ? 2 : 1);
-      // Parse CSV respecting quoted fields
-      const parts = [];
-      let cur = "", inQ = false;
-      for (let ci = 0; ci < line.length; ci++) {
-        const ch = line[ci];
-        if (ch === '"') { inQ = !inQ; }
-        else if (ch === ',' && !inQ) { parts.push(cur.trim()); cur = ""; }
-        else cur += ch;
-      }
-      parts.push(cur.trim());
-
-      // Support both with and without id column (9 or 10 cols)
-      let id, standard, short, dok, question, choiceA, choiceB, choiceC, choiceD, correct;
-      if (parts.length >= 10) {
-        [id,standard,short,dok,question,choiceA,choiceB,choiceC,choiceD,correct] = parts;
-      } else {
-        [standard,short,dok,question,choiceA,choiceB,choiceC,choiceD,correct] = parts;
-        id = "";
-      }
-      const rowErrs = [];
-      if (!standard?.trim()) rowErrs.push("missing standard");
-      if (!short?.trim())    rowErrs.push("missing skill label");
-      if (!dok?.trim() || isNaN(parseInt(dok))) rowErrs.push("dok must be 1-4");
-      if (!question?.trim()) rowErrs.push("missing question");
-      if (!choiceA?.trim() || !choiceB?.trim() || !choiceC?.trim() || !choiceD?.trim()) rowErrs.push("need 4 choices");
-      if (!correct?.trim()) rowErrs.push("missing correct answer");
-      if (correct?.trim() && ![choiceA,choiceB,choiceC,choiceD].map(c=>c?.trim()).includes(correct.trim())) {
-        rowErrs.push("correct answer must match one of the 4 choices exactly");
-      }
-      if (rowErrs.length) { errs.push(`Row ${rowNum}: ${rowErrs.join(", ")}`); return; }
-
-      rows.push({
-        ...(id?.trim() ? { id: id.trim() } : {}),
-        standard: standard.trim(),
-        short:    short.trim(),
-        dok:      parseInt(dok),
-        question: question.trim(),
-        choices:  [choiceA,choiceB,choiceC,choiceD].map(c=>c.trim()),
-        correct:  correct.trim(),
-      });
-    });
-    return { rows, errs };
-  }
-
-  function handleCSVFile(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setCsvErr(""); setCsvPreview(null); setCsvResult(null);
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const { rows, errs } = parseQuestionCSV(ev.target.result);
-      if (errs.length && !rows.length) { setCsvErr(errs.join(" · ")); return; }
-      setCsvPreview({ rows, errs });
-    };
-    reader.readAsText(file);
-    e.target.value = "";
-  }
-
-  async function importCSVQuestions(forceReassign = false) {
-    if (!csvPreview?.rows?.length) return;
-    setCsvImporting(true); setCsvErr("");
-    try {
-      // If forceReassign, strip IDs from rows that were flagged as duplicates
-      const toUpload = forceReassign
-        ? csvPreview.rows.map(r => csvPreview.duplicateIds?.includes(r.id) ? {...r, id:""} : r)
-        : csvPreview.rows;
-      const r = await fetch(`${API}/questions/seed`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(toUpload),
-      });
-      const d = await r.json();
-      // Show duplicate warning before final success
-      if (d.duplicate_count > 0 && !forceReassign) {
-        setCsvPreview(prev => ({ ...prev, duplicateIds: d.duplicates }));
-        setCsvResult({ ...d, pendingDuplicates: true });
-      } else {
-        setCsvResult(d);
-        setCsvPreview(null);
-      }
-    } catch { setCsvErr("Upload failed. Check your connection."); }
-    setCsvImporting(false);
-  }
-
-  const complete = questions.filter(q => q.question && q.standard && q.dok && (q.type==="plotpoint" ? (Array.isArray(q.answer)&&q.answer.length===2) : (q.choices.filter(c=>c).length===4 && q.correct))).length;
-
-  return (
-    <div style={{ minHeight: "100vh", background: "#e8edf2", fontFamily: "sans-serif" }}>
-
-      {/* Header */}
-      <div style={{ background: "#003865", color: "#fff", padding: "0 1.5rem", height: "52px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 2px 6px rgba(0,0,0,.3)" }}>
-        <div>
-          <div style={{ fontSize: "0.58rem", opacity: .65, letterSpacing: "0.14em" }}>GEORGIA MILESTONES READINESS TRAINER</div>
-          <div style={{ fontSize: "0.9rem", fontWeight: 600 }}>Question Builder</div>
-        </div>
-        <div style={{ display: "flex", gap: "0.65rem", alignItems: "center" }}>
-          <span style={{ fontSize: "0.75rem", opacity: .75 }}>{complete}/{questions.length} complete</span>
-          <button onClick={()=>{setCsvPanel(p=>!p);setCsvPreview(null);setCsvErr("");setCsvResult(null);}}
-            style={{ background:"#4a7fa5", border:"none", borderRadius:"3px", padding:"6px 14px", fontSize:"0.78rem", fontWeight:700, color:"#fff", cursor:"pointer" }}>
-            📥 Import CSV
-          </button>
-          <button onClick={seedBank} disabled={saving}
-            style={{ background:"#7a4e00", border:"none", borderRadius:"3px", padding:"6px 14px", fontSize:"0.78rem", fontWeight:700, color:"#fff", cursor:"pointer", opacity:saving?0.6:1 }}
-            title="Re-load the 100 built-in questions into the bank">
-            🔄 Restore Built-in Questions
-          </button>
-          {savedCount>0&&<span style={{fontSize:"0.75rem",color:"#1a6e2e",fontWeight:700}}>+{savedCount} added</span>}
-          <button onClick={saveToBank} disabled={saving||complete===0}
-            style={{ background: savedCount>0?"#d4edda":complete===0?"#c8d3dd":"#1a6e2e", color: savedCount>0?"#1a6e2e":"#fff", border: "none", borderRadius: "3px", padding: "6px 14px", fontWeight: 700, fontSize: "0.8rem", cursor: complete===0?"not-allowed":"pointer" }}>
-            {savedCount>0 ? `✓ Saved ${savedCount} to Bank!` : saving ? "Saving…" : `💾 Save to Bank (${complete})`}
-          </button>
-          <button onClick={copyJSON} style={{ background: copied?"#d4edda":"#fff", color: copied?"#1a6e2e":"#003865", border: "none", borderRadius: "3px", padding: "6px 14px", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer" }}>
-            {copied ? "✓ Copied!" : "📋 Copy JSON"}
-          </button>
-        </div>
-      </div>
-
-      <div style={{ maxWidth: "780px", margin: "0 auto", padding: "1.5rem 1rem" }}>
-
-        {/* CSV Import Panel */}
-      {csvPanel && (
-        <div style={{background:"#fff",border:"1px solid #b3cde8",borderRadius:"6px",padding:"1.25rem",marginBottom:"1rem",boxShadow:"0 2px 12px rgba(0,56,101,.08)"}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1rem"}}>
-            <div>
-              <div style={{fontSize:"0.95rem",fontWeight:700,color:"#003865"}}>Import Questions from CSV</div>
-              <div style={{fontSize:"0.75rem",color:"#888",marginTop:"2px"}}>
-                One question per row. ID column optional — leave blank to auto-assign (Q00001 format). Columns: id, standard, short, dok, question, choiceA–D, correct
-              </div>
+        {/* Session history */}
+        <div style={{marginTop:"1rem",display:"flex",gap:"0.5rem",flexWrap:"wrap"}}>
+          {student.sessions.map((s,i) => (
+            <div key={i} style={{background:lvlBg(s.pct),border:`1px solid ${lvlC(s.pct)}33`,borderRadius:"3px",padding:"0.4rem 0.65rem",textAlign:"center",minWidth:"70px"}}>
+              <div style={{fontSize:"0.6rem",color:"#888"}}>{s.submitted?.split(",")[0]||`Test ${i+1}`}</div>
+              <div style={{fontSize:"1rem",fontWeight:700,color:lvlC(s.pct)}}>{s.pct}%</div>
+              {s.testCode&&<div style={{fontSize:"0.58rem",color:"#aaa",fontFamily:"monospace"}}>{s.testCode}</div>}
             </div>
-            <button onClick={downloadTemplate}
-              style={{background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"6px 14px",fontSize:"0.78rem",fontWeight:600,cursor:"pointer",color:"#003865"}}>
-              ⬇ Download Template
-            </button>
-          </div>
-
-          {/* Upload area */}
-          <input ref={csvRef} type="file" accept=".csv,.txt" onChange={handleCSVFile} style={{display:"none"}}/>
-          <div onClick={()=>csvRef.current?.click()}
-            style={{border:"2px dashed #b3cde8",borderRadius:"6px",padding:"1.5rem",textAlign:"center",cursor:"pointer",background:"#f7fafd",marginBottom:"1rem"}}
-            onDragOver={e=>{e.preventDefault();e.currentTarget.style.background="#ddeaf7";}}
-            onDragLeave={e=>{e.currentTarget.style.background="#f7fafd";}}
-            onDrop={e=>{e.preventDefault();e.currentTarget.style.background="#f7fafd";const f=e.dataTransfer.files[0];if(f){const dt=new DataTransfer();dt.items.add(f);csvRef.current.files=dt.files;handleCSVFile({target:{files:[f],value:""}})}}}>
-            <div style={{fontSize:"1.5rem",marginBottom:"6px"}}>📄</div>
-            <div style={{fontSize:"0.85rem",fontWeight:600,color:"#4a7fa5"}}>Click to choose a CSV file</div>
-            <div style={{fontSize:"0.72rem",color:"#aaa",marginTop:"4px"}}>or drag and drop here</div>
-          </div>
-
-          {/* Errors */}
-          {csvErr && (
-            <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"4px",padding:"0.65rem 0.9rem",fontSize:"0.78rem",color:"#8b1a1a",marginBottom:"0.75rem"}}>
-              ⚠ {csvErr}
-            </div>
-          )}
-
-          {/* Row-level warnings */}
-          {csvPreview?.errs?.length > 0 && (
-            <div style={{background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"4px",padding:"0.65rem 0.9rem",fontSize:"0.75rem",color:"#7a4e00",marginBottom:"0.75rem"}}>
-              <strong>⚠ {csvPreview.errs.length} row{csvPreview.errs.length!==1?"s":""} skipped:</strong>
-              <ul style={{margin:"4px 0 0",paddingLeft:"1.25rem"}}>
-                {csvPreview.errs.map((e,i)=><li key={i}>{e}</li>)}
-              </ul>
-            </div>
-          )}
-
-          {/* Preview table */}
-          {csvPreview?.rows?.length > 0 && (
-            <div>
-              <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"6px"}}>
-                PREVIEW — {csvPreview.rows.length} question{csvPreview.rows.length!==1?"s":""} ready to import
-              </div>
-              <div style={{border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden",marginBottom:"0.85rem"}}>
-                <div style={{display:"grid",gridTemplateColumns:"56px 110px 60px 30px 1fr 80px",background:"#f0f4f8",padding:"0.4rem 0.75rem",gap:"0.5rem",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.08em",color:"#555"}}>
-                  <span>ID</span><span>STANDARD</span><span>SKILL</span><span>DOK</span><span>QUESTION</span><span>CORRECT</span>
-                </div>
-                <div style={{maxHeight:"220px",overflowY:"auto"}}>
-                  {csvPreview.rows.map((r,i)=>(
-                    <div key={i} style={{display:"grid",gridTemplateColumns:"56px 110px 60px 30px 1fr 80px",padding:"0.45rem 0.75rem",gap:"0.5rem",fontSize:"0.78rem",borderTop:"1px solid #eef1f4",alignItems:"center"}}>
-                      <span style={{fontFamily:"monospace",fontSize:"0.72rem",color:r.id?"#003865":"#bbb"}}>{r.id||"auto"}</span>
-                      <span style={{color:"#003865",fontWeight:700,fontSize:"0.72rem"}}>{r.standard}</span>
-                      <span style={{color:"#555",fontSize:"0.72rem"}}>{r.short}</span>
-                      <span style={{color:"#888",textAlign:"center"}}>{r.dok}</span>
-                      <span style={{color:"#1a1a1a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.question}</span>
-                      <span style={{color:"#1a6e2e",fontWeight:600,fontSize:"0.75rem",overflow:"hidden",textOverflow:"ellipsis"}}>{r.correct}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <button onClick={importCSVQuestions} disabled={csvImporting}
-                style={{background:"#1a6e2e",color:"#fff",border:"none",borderRadius:"4px",padding:"0.65rem 1.5rem",fontSize:"0.85rem",fontWeight:700,cursor:"pointer",opacity:csvImporting?0.7:1,width:"100%"}}>
-                {csvImporting ? "Importing…" : `✓ Add ${csvPreview.rows.length} Question${csvPreview.rows.length!==1?"s":""} to Bank`}
-              </button>
-            </div>
-          )}
-
-          {/* Success / duplicate warning */}
-          {csvResult && (
-            <div>
-              {csvResult.added > 0 && (
-                <div style={{background:"#f0faf2",border:"1px solid #b3dfc0",borderRadius:"4px",padding:"0.75rem 1rem",marginBottom:"0.75rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
-                  <span style={{fontSize:"1.3rem"}}>✅</span>
-                  <div>
-                    <div style={{fontWeight:700,color:"#1a6e2e",fontSize:"0.9rem"}}>{csvResult.added} question{csvResult.added!==1?"s":""} added to bank</div>
-                    <div style={{fontSize:"0.72rem",color:"#888"}}>Bank now has {csvResult.total} total questions</div>
-                  </div>
-                </div>
-              )}
-              {csvResult.pendingDuplicates && csvResult.duplicate_count > 0 && (
-                <div style={{background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"4px",padding:"0.85rem 1rem"}}>
-                  <div style={{fontWeight:700,color:"#7a4e00",marginBottom:"6px"}}>
-                    ⚠ {csvResult.duplicate_count} ID{csvResult.duplicate_count!==1?"s":""} already exist in the bank
-                  </div>
-                  <div style={{fontSize:"0.75rem",color:"#555",marginBottom:"8px"}}>
-                    <strong>Conflicting IDs:</strong> {csvResult.duplicates.join(", ")}
-                  </div>
-                  <div style={{fontSize:"0.75rem",color:"#555",marginBottom:"0.75rem"}}>
-                    These questions were skipped. What would you like to do?
-                  </div>
-                  <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap"}}>
-                    <button onClick={()=>importCSVQuestions(true)}
-                      style={{background:"#003865",color:"#fff",border:"none",borderRadius:"3px",padding:"6px 14px",cursor:"pointer",fontSize:"0.78rem",fontWeight:700}}>
-                      Auto-assign new IDs and import
-                    </button>
-                    <button onClick={()=>{ setCsvResult(null); setCsvPreview(null); setCsvPanel(false); }}
-                      style={{background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"6px 14px",cursor:"pointer",fontSize:"0.78rem",fontWeight:600}}>
-                      Skip them, I'll fix the CSV
-                    </button>
-                  </div>
-                </div>
-              )}
-              {!csvResult.pendingDuplicates && (
-                <button onClick={()=>{ setCsvPanel(false); setCsvResult(null); }}
-                  style={{width:"100%",marginTop:"0.5rem",background:"#1a6e2e",color:"#fff",border:"none",borderRadius:"3px",padding:"7px",cursor:"pointer",fontSize:"0.82rem",fontWeight:700}}>
-                  Done
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* DOK legend */}
-        <div style={{ background: "#fff", border: "1px solid #c8d3dd", borderRadius: "4px", padding: "0.75rem 1.1rem", marginBottom: "1rem", display: "flex", gap: "1.25rem", flexWrap: "wrap", alignItems: "center" }}>
-          <span style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.1em", color: "#555" }}>DOK:</span>
-          {DOK_OPTIONS.map(d => (
-            <span key={d.level} style={{ fontSize: "0.72rem", color: "#555" }}>
-              <strong style={{ color: "#003865" }}>{d.level} {d.label}</strong> — <span style={{ color: "#888" }}>{d.desc}</span>
-            </span>
           ))}
         </div>
-
-        {questions.map((q, i) => (
-          <QuestionEditor key={q.id} q={q} index={i}
-            onChange={u => updateQ(i,u)} onRemove={() => removeQ(i)}
-            onMoveUp={() => moveUp(i)} onMoveDown={() => moveDown(i)}
-            isFirst={i===0} isLast={i===questions.length-1} />
-        ))}
-
-        <button onClick={addQuestion}
-          style={{ width: "100%", background: "#fff", border: "2px dashed #003865", borderRadius: "4px", padding: "0.85rem", fontSize: "0.88rem", fontWeight: 700, color: "#003865", cursor: "pointer" }}
-          onMouseEnter={e=>e.currentTarget.style.background="#f0f4f8"}
-          onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
-          + Add Question
-        </button>
-
-        <div style={{ marginTop: "1rem", background: "#f0f4f8", border: "1px solid #dde3e9", borderRadius: "3px", padding: "0.75rem 1.1rem", fontSize: "0.78rem", color: "#666" }}>
-          <strong>Math syntax:</strong> Wrap any LaTeX in dollar signs — <code>$\frac{2}{3}$</code> renders as a fraction, <code>$10^{2}$</code> renders as 10². Use the toolbar buttons for common symbols. Press <strong>Enter</strong> in the question box for a new line.
+      </div>
+      {/* Standard mastery grid */}
+      <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"1.25rem 1.5rem"}}>
+        <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"0.75rem"}}>STANDARD MASTERY</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:"0.4rem"}}>
+          {Object.entries(mastery).sort(([a],[b])=>a.localeCompare(b)).map(([std,v])=>{
+            const p = Math.round((v.correct/v.total)*100);
+            return (
+              <div key={std} title={`${v.correct}/${v.total} correct`}
+                style={{background:p>=80?"#f0faf2":p>=60?"#fff8e1":"#fdf2f2",border:`1px solid ${p>=80?"#b3dfc0":p>=60?"#ffc107":"#f0b8b8"}`,borderRadius:"3px",padding:"0.35rem 0.65rem",textAlign:"center",minWidth:"80px"}}>
+                <div style={{fontSize:"0.6rem",fontWeight:700,color:"#555"}}>{std}</div>
+                <div style={{fontSize:"0.9rem",fontWeight:700,color:p>=80?"#1a6e2e":p>=60?"#7a4e00":"#8b1a1a"}}>{p}%</div>
+                <div style={{fontSize:"0.58rem",color:"#aaa"}}>{v.correct}/{v.total}</div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
   );
 }
 
-const lbl   = { display: "block", fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.12em", color: "#555", marginBottom: "5px" };
-const inp   = { width: "100%", padding: "0.6rem 0.85rem", border: "1px solid #c8d3dd", borderRadius: "3px", fontSize: "0.9rem", color: "#1a1a1a", background: "#fafbfc", boxSizing: "border-box" };
-const smBtn = { background: "#f0f4f8", border: "1px solid #c8d3dd", borderRadius: "3px", padding: "4px 7px", cursor: "pointer", fontSize: "0.7rem", color: "#333", fontWeight: 600 };
+// Simple SVG line chart
+function LineChart({ points, width=320, height=80, color="#003865" }) {
+  if (!points || points.length < 2) return (
+    <div style={{width,height,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.72rem",color:"#aaa"}}>
+      Not enough data yet
+    </div>
+  );
+  const xs = points.map((_,i) => (i / (points.length-1)) * width);
+  const min = Math.min(...points); const max = Math.max(...points);
+  const range = max - min || 1;
+  const ys = points.map(v => height - ((v - min) / range) * (height - 8) - 4);
+  const path = xs.map((x,i) => `${i===0?"M":"L"}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(" ");
+  return (
+    <svg width={width} height={height} style={{overflow:"visible"}}>
+      <path d={path} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round"/>
+      {xs.map((x,i)=>(
+        <circle key={i} cx={x} cy={ys[i]} r="4" fill={color} stroke="#fff" strokeWidth="1.5"/>
+      ))}
+    </svg>
+  );
+}
+
+// ── Test Controls ─────────────────────────────────────────
+function TestControls() {
+  const [ctrl,    setCtrl]    = useState({ paused: false, stopped: false });
+  const [loading, setLoading] = useState(true);
+  const [saving,  setSaving]  = useState(false);
+  const [msg,     setMsg]     = useState("");
+
+  useEffect(() => {
+    fetch(`${API}/test/control`).then(r=>r.json()).then(d=>{ setCtrl(d); setLoading(false); }).catch(()=>setLoading(false));
+  }, []);
+
+  async function send(patch) {
+    setSaving(true);
+    try {
+      const r = await fetch(`${API}/test/control`, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify(patch),
+      });
+      const d = await r.json();
+      setCtrl(d);
+      setMsg(patch.paused != null
+        ? (patch.paused ? "Test paused — students see a waiting screen." : "Test resumed.")
+        : (patch.stopped ? "Test stopped — students prompted to submit." : "Stop cleared."));
+      setTimeout(() => setMsg(""), 4000);
+    } catch { setMsg("Failed to update."); }
+    setSaving(false);
+  }
+
+  if (loading) return <div style={{padding:"2rem",color:"#aaa"}}>Loading…</div>;
+
+  return (
+    <div style={{padding:"1.25rem",maxWidth:"560px",fontFamily:"sans-serif"}}>
+      <div style={{fontSize:"1rem",fontWeight:700,color:"#003865",marginBottom:"4px"}}>Live Test Controls</div>
+      <div style={{fontSize:"0.75rem",color:"#888",marginBottom:"1.5rem"}}>
+        Controls apply to all students currently taking a test. Students poll every 5 seconds.
+      </div>
+
+      {msg && (
+        <div style={{background:"#f0faf2",border:"1px solid #b3dfc0",borderRadius:"4px",padding:"0.6rem 0.9rem",fontSize:"0.78rem",color:"#1a6e2e",fontWeight:700,marginBottom:"1rem"}}>
+          ✓ {msg}
+        </div>
+      )}
+
+      {/* Pause / Resume */}
+      <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"6px",padding:"1.1rem 1.25rem",marginBottom:"0.85rem",display:"flex",alignItems:"center",gap:"1rem"}}>
+        <div style={{flex:1}}>
+          <div style={{fontWeight:700,fontSize:"0.92rem",color:"#1a1a1a",marginBottom:"2px"}}>
+            {ctrl.paused ? "⏸ Test is PAUSED" : "▶ Test is Running"}
+          </div>
+          <div style={{fontSize:"0.72rem",color:"#888"}}>
+            {ctrl.paused
+              ? "Students see a pause screen and cannot answer questions."
+              : "Students are actively working. Click Pause to freeze the test."}
+          </div>
+        </div>
+        <button onClick={()=>send({paused:!ctrl.paused})} disabled={saving||ctrl.stopped}
+          style={{background:ctrl.paused?"#1a6e2e":"#b8860b",color:"#fff",border:"none",borderRadius:"4px",
+            padding:"0.65rem 1.25rem",fontWeight:700,fontSize:"0.85rem",cursor:"pointer",
+            opacity:(saving||ctrl.stopped)?0.5:1,whiteSpace:"nowrap"}}>
+          {ctrl.paused ? "▶ Resume" : "⏸ Pause"}
+        </button>
+      </div>
+
+      {/* Stop */}
+      <div style={{background:"#fff",border:"1px solid #f0b8b8",borderRadius:"6px",padding:"1.1rem 1.25rem",marginBottom:"0.85rem",display:"flex",alignItems:"center",gap:"1rem"}}>
+        <div style={{flex:1}}>
+          <div style={{fontWeight:700,fontSize:"0.92rem",color:ctrl.stopped?"#8b1a1a":"#1a1a1a",marginBottom:"2px"}}>
+            {ctrl.stopped ? "🛑 Test is STOPPED" : "🛑 Stop Test"}
+          </div>
+          <div style={{fontSize:"0.72rem",color:"#888"}}>
+            {ctrl.stopped
+              ? "Students are prompted to submit. Click Clear to reset for next test."
+              : "Immediately prompts all students to submit their answers."}
+          </div>
+        </div>
+        {ctrl.stopped
+          ? <button onClick={()=>send({stopped:false,paused:false})} disabled={saving}
+              style={{background:"#003865",color:"#fff",border:"none",borderRadius:"4px",
+                padding:"0.65rem 1.25rem",fontWeight:700,fontSize:"0.85rem",cursor:"pointer",opacity:saving?0.5:1}}>
+              Clear Stop
+            </button>
+          : <button onClick={()=>{ if(window.confirm("Stop the test for all students now?")) send({stopped:true,paused:false}); }}
+              disabled={saving}
+              style={{background:"#8b1a1a",color:"#fff",border:"none",borderRadius:"4px",
+                padding:"0.65rem 1.25rem",fontWeight:700,fontSize:"0.85rem",cursor:"pointer",opacity:saving?0.5:1}}>
+              🛑 Stop Now
+            </button>
+        }
+      </div>
+
+      <div style={{fontSize:"0.7rem",color:"#aaa",marginTop:"0.5rem"}}>
+        These controls affect all active tests school-wide. Pause/stop state resets when you click Clear Stop.
+      </div>
+    </div>
+  );
+}
+
+export default function Dashboard({ teacher }) {
+  const [tab,      setTab]      = useState("overview");
+  const [sessions, setSessions] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [loading,  setLoading]  = useState(true);
+  const [clearing, setClearing] = useState(false);
+  const [roster,   setRoster]   = useState([]);
+
+  // Growth filters
+  const [growthClass,   setGrowthClass]   = useState("all");
+  const [growthStudent, setGrowthStudent] = useState("all");
+
+  const [bankQ, setBankQ] = useState(QUESTIONS);
+
+  const refresh = useCallback(async () => {
+    try {
+      const [s, r, q] = await Promise.all([
+        fetch(`${API}/sessions${teacher && teacher.classIds !== null ? "?classIds="+teacher.classIds.join(",") : ""}`).then(r=>r.json()),
+        fetch(`${API}/roster${teacher && teacher.classIds !== null ? "?classIds="+teacher.classIds.join(",") : ""}`).then(r=>r.json()),
+        fetch(`${API}/questions`).then(r=>r.json()).catch(()=>[]),
+      ]);
+      setSessions(Array.isArray(s) ? s : []);
+      setRoster(Array.isArray(r) ? r : []);
+      if (Array.isArray(q) && q.length > 0) setBankQ(q);
+    } catch { setSessions([]); }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { refresh(); const t=setInterval(refresh,3000); return()=>clearInterval(t); }, [refresh]);
+
+  async function handleClear() {
+    setClearing(true);
+    await clearSessions();
+    setSessions([]); setSelected(null); setClearing(false);
+  }
+
+  // ── Overview stats ──
+  const sorted  = [...sessions].sort((a,b)=>b.pct - a.pct);
+  const sel     = sessions.find(s => s.name===selected || s.studentName===selected);
+  const avgP    = sessions.length ? Math.round(sessions.reduce((a,s)=>a+s.pct,0)/sessions.length) : 0;
+  const profC   = sessions.filter(s=>s.pct>=80).length;
+  const devC    = sessions.filter(s=>s.pct>=60&&s.pct<80).length;
+  const begC    = sessions.filter(s=>s.pct<60).length;
+
+  // ── Item analysis (use live question ids if available) ──
+  const allQIds = [...new Set(sessions.flatMap(s=>Object.keys(s.answers||{})))];
+  const itemData = bankQ.map(q => {
+    const correct = sessions.filter(s=>s.answers?.[q.id]===q.correct).length;
+    const attempted = sessions.filter(s=>q.id in (s.answers||{})).length;
+    return { ...q, correctCount:correct, attempted, pct: attempted ? Math.round((correct/attempted)*100) : 0 };
+  }).filter(q => q.attempted > 0);
+
+  // ── Growth: build per-student history ──
+  // Group sessions by studentId (fall back to studentName)
+  function studentKey(s) { return s.studentId || s.studentName || s.name || "Unknown"; }
+  function studentLabel(s) { return s.studentName || s.name || "Unknown"; }
+  function studentClass(s) { return s.className || ""; }
+
+  const studentMap = {};
+  sessions.forEach(s => {
+    const key = studentKey(s);
+    if (!studentMap[key]) studentMap[key] = { name: studentLabel(s), className: studentClass(s), sessions: [] };
+    studentMap[key].sessions.push(s);
+  });
+  // Sort each student's sessions by submitted date
+  Object.values(studentMap).forEach(st => {
+    st.sessions.sort((a,b) => new Date(a.submitted) - new Date(b.submitted));
+  });
+
+  // Standard mastery: per-student, per-standard accuracy across all sessions
+  function standardMastery(studentSessions) {
+    const map = {};
+    studentSessions.forEach(sess => {
+      Object.entries(sess.answers || {}).forEach(([qid, ans]) => {
+        const q = bankQ.find(x=>x.id===qid);
+        if (!q) return;
+        if (!map[q.standard]) map[q.standard] = { correct:0, total:0 };
+        map[q.standard].total++;
+        if (ans === q.correct) map[q.standard].correct++;
+      });
+    });
+    return map;
+  }
+
+  // Unique class names from sessions
+  const sessionClasses = [...new Set(sessions.map(s=>s.className||"").filter(Boolean))];
+  const filteredStudents = Object.entries(studentMap).filter(([,st]) => {
+    if (growthClass !== "all" && st.className !== growthClass) return false;
+    return true;
+  });
+
+  const focusStudent = growthStudent !== "all" ? studentMap[growthStudent] : null;
+
+  function renderTab() {
+    if (loading) return <div style={{textAlign:"center",color:"#aaa",paddingTop:"3rem"}}>Loading…</div>;
+
+    if (tab === "overview") {
+      if (sessions.length === 0) return (
+        <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"3rem",textAlign:"center",color:"#aaa",maxWidth:"600px"}}>
+          <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>⏳</div>
+          <div style={{fontSize:"1rem",fontWeight:600,color:"#555",marginBottom:"4px"}}>Waiting for students…</div>
+          <div style={{fontSize:"0.82rem"}}>Scores appear automatically as students submit.</div>
+        </div>
+      );
+      return (
+        <div style={{display:"flex",flexDirection:"column",gap:"1rem",maxWidth:"860px"}}>
+          <div style={{display:"flex",gap:"0.75rem",flexWrap:"wrap"}}>
+            {[
+              ["Class Average", `${avgP}%`, lvlC(avgP), lvlBg(avgP)],
+              ["Proficient (≥80%)", profC, "#1a6e2e", "#f0faf2"],
+              ["Developing (60–79%)", devC, "#7a4e00", "#fff8e1"],
+              ["Beginning (<60%)", begC, "#8b1a1a", "#fdf2f2"],
+              ["Submitted", sessions.length, "#003865", "#ddeaf7"],
+            ].map(([lbl,val,c,bg])=>(
+              <div key={lbl} style={{background:bg,border:`1px solid ${c}22`,borderRadius:"4px",padding:"0.9rem 1.25rem",minWidth:"120px",flex:1}}>
+                <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.12em",color:c,marginBottom:"4px"}}>{lbl.toUpperCase()}</div>
+                <div style={{fontSize:"1.6rem",fontWeight:700,color:c}}>{val}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden"}}>
+            <div style={{padding:"0.75rem 1rem",background:"#f0f4f8",borderBottom:"1px solid #dde3e9",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555"}}>
+              STUDENT SCORES — {sorted.length} submitted
+            </div>
+            {sorted.map((s,i)=>{
+              const name = s.studentName||s.name; const p=s.pct;
+              return (
+                <div key={i} onClick={()=>setSelected(name===selected?null:name)}
+                  style={{padding:"0.7rem 1rem",borderBottom:"1px solid #f0f4f8",cursor:"pointer",background:name===selected?"#f0f6ff":"#fff",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+                  <div style={{width:"28px",height:"28px",borderRadius:"50%",background:lvlBg(p),border:`2px solid ${lvlC(p)}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <span style={{fontSize:"0.65rem",fontWeight:700,color:lvlC(p)}}>{i+1}</span>
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:"0.88rem",fontWeight:700,color:"#1a1a1a"}}>{name}</div>
+                    {s.className&&<div style={{fontSize:"0.65rem",color:"#888"}}>{s.className}</div>}
+                  </div>
+                  {s.violations > 0 && (
+                    <div title={`${s.violations} testing violation${s.violations!==1?"s":""} detected`}
+                      style={{background:"#8b1a1a",color:"#fff",borderRadius:"3px",padding:"2px 7px",fontSize:"0.65rem",fontWeight:700,flexShrink:0}}>
+                      ⚠ {s.violations}
+                    </div>
+                  )}
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:"1rem",fontWeight:700,color:lvlC(p)}}>{p}%</div>
+                    <div style={{fontSize:"0.65rem",color:"#888"}}>{s.score}/{s.total} · {s.timeUsed}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {sel && (
+            <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"1rem 1.25rem"}}>
+              <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"0.75rem"}}>{(sel.studentName||sel.name).toUpperCase()} — ITEM DETAIL</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:"4px"}}>
+                {Object.entries(sel.answers||{}).map(([qid,ans])=>{
+                  const q = bankQ.find(x=>x.id===qid);
+                  const ok = q && ans===q.correct;
+                  return <div key={qid} title={q?.standard||qid}
+                    style={{width:"28px",height:"28px",borderRadius:"3px",background:ok?"#1a6e2e":"#8b1a1a",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    <span style={{color:"#fff",fontSize:"0.7rem",fontWeight:700}}>{ok?"✓":"✗"}</span>
+                  </div>;
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (tab === "items") {
+      if (itemData.length === 0) return (
+        <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"3rem",textAlign:"center",color:"#aaa",maxWidth:"600px"}}>
+          <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>📋</div>
+          <div style={{fontSize:"1rem",fontWeight:600,color:"#555"}}>No item data yet</div>
+          <div style={{fontSize:"0.82rem",marginTop:"4px"}}>Item analysis appears once students start submitting.</div>
+        </div>
+      );
+      return (
+        <div style={{maxWidth:"860px"}}>
+          <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden"}}>
+            <div style={{padding:"0.75rem 1rem",background:"#f0f4f8",borderBottom:"1px solid #dde3e9",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555"}}>
+              ITEM ANALYSIS — {itemData.length} questions attempted
+            </div>
+            {itemData.sort((a,b)=>a.pct-b.pct).map(q=>(
+              <div key={q.id} style={{padding:"0.65rem 1rem",borderBottom:"1px solid #f0f4f8",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+                <div style={{width:"36px",textAlign:"right",fontSize:"0.9rem",fontWeight:700,color:q.pct>=70?"#1a6e2e":q.pct>=50?"#7a4e00":"#8b1a1a",flexShrink:0}}>{q.pct}%</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",gap:"0.35rem",marginBottom:"2px",flexWrap:"wrap"}}>
+                    <span style={{fontSize:"0.6rem",fontWeight:700,color:"#003865",background:"#ddeaf7",padding:"1px 5px",borderRadius:"2px"}}>{q.standard}</span>
+                    {q.dok&&<span style={{fontSize:"0.6rem",fontWeight:700,color:"#7a4e00",background:"#fff3cd",padding:"1px 5px",borderRadius:"2px"}}>DOK {q.dok}</span>}
+                    <span style={{fontSize:"0.6rem",color:"#888"}}>{q.short}</span>
+                  </div>
+                  <div style={{height:"6px",background:"#e8edf2",borderRadius:"3px",overflow:"hidden"}}>
+                    <div style={{height:"100%",width:`${q.pct}%`,background:q.pct>=70?"#1a6e2e":q.pct>=50?"#f59e0b":"#8b1a1a",borderRadius:"3px",transition:"width .3s"}}/>
+                  </div>
+                </div>
+                <div style={{fontSize:"0.68rem",color:"#888",flexShrink:0}}>{q.correctCount}/{q.attempted}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (tab === "students") {
+      if (sessions.length === 0) return (
+        <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"3rem",textAlign:"center",color:"#aaa",maxWidth:"600px"}}>
+          <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>👤</div>
+          <div style={{fontSize:"1rem",fontWeight:600,color:"#555"}}>No submissions yet</div>
+        </div>
+      );
+      return (
+        <div style={{maxWidth:"860px",display:"flex",flexDirection:"column",gap:"0.75rem"}}>
+          {Object.entries(studentMap).map(([key, st])=>{
+            const latest = st.sessions[st.sessions.length-1];
+            const avg    = Math.round(st.sessions.reduce((a,s)=>a+s.pct,0)/st.sessions.length);
+            const mastery= standardMastery(st.sessions);
+            const weakStds = Object.entries(mastery).filter(([,v])=>v.total>=2&&v.correct/v.total<0.6).map(([std])=>std);
+            return (
+              <div key={key} style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden"}}>
+                <div style={{padding:"0.9rem 1.25rem",display:"flex",alignItems:"center",gap:"1rem",borderBottom:weakStds.length?"1px solid #f0f4f8":"none"}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:"0.9rem",fontWeight:700,color:"#1a1a1a"}}>{st.name}</div>
+                    {st.className&&<div style={{fontSize:"0.68rem",color:"#888"}}>{st.className}</div>}
+                  </div>
+                  <div style={{textAlign:"center"}}>
+                    <div style={{fontSize:"0.6rem",color:"#888",letterSpacing:"0.1em"}}>AVG</div>
+                    <div style={{fontSize:"1.2rem",fontWeight:700,color:lvlC(avg)}}>{avg}%</div>
+                  </div>
+                  <div style={{textAlign:"center"}}>
+                    <div style={{fontSize:"0.6rem",color:"#888",letterSpacing:"0.1em"}}>TESTS</div>
+                    <div style={{fontSize:"1.2rem",fontWeight:700,color:"#003865"}}>{st.sessions.length}</div>
+                  </div>
+                  <div style={{textAlign:"center"}}>
+                    <div style={{fontSize:"0.6rem",color:"#888",letterSpacing:"0.1em"}}>LATEST</div>
+                    <div style={{fontSize:"1.2rem",fontWeight:700,color:lvlC(latest.pct)}}>{latest.pct}%</div>
+                  </div>
+                </div>
+                {weakStds.length>0&&(
+                  <div style={{padding:"0.6rem 1.25rem",background:"#fdf2f2",display:"flex",alignItems:"center",gap:"0.5rem",flexWrap:"wrap"}}>
+                    <span style={{fontSize:"0.6rem",fontWeight:700,color:"#8b1a1a",letterSpacing:"0.1em"}}>NEEDS RETEACH:</span>
+                    {weakStds.map(std=>(
+                      <span key={std} style={{fontSize:"0.65rem",fontWeight:700,color:"#8b1a1a",background:"#fee2e2",padding:"1px 6px",borderRadius:"2px",border:"1px solid #fca5a5"}}>{std}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    if (tab === "controls") return <TestControls/>;
+    if (tab === "growth") {
+      if (Object.keys(studentMap).length === 0) return (
+        <div style={{maxWidth:"960px"}}>
+          <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"3rem",textAlign:"center",color:"#aaa"}}>
+            <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>📈</div>
+            <div style={{fontSize:"1rem",fontWeight:600,color:"#555"}}>No growth data yet</div>
+            <div style={{fontSize:"0.82rem",marginTop:"4px"}}>Students need to complete tests for growth to appear.</div>
+          </div>
+        </div>
+      );
+      return (
+        <div style={{maxWidth:"960px"}}>
+          <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"0.85rem 1.25rem",marginBottom:"1rem",display:"flex",gap:"0.75rem",flexWrap:"wrap",alignItems:"center"}}>
+            <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.12em",color:"#555"}}>FILTER</div>
+            <select style={{padding:"0.4rem 0.65rem",border:"1px solid #c8d3dd",borderRadius:"3px",fontSize:"0.8rem",background:"#fafbfc"}}
+              value={growthClass} onChange={e=>{setGrowthClass(e.target.value);setGrowthStudent("all");}}>
+              <option value="all">All Classes</option>
+              {sessionClasses.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+            <select style={{padding:"0.4rem 0.65rem",border:"1px solid #c8d3dd",borderRadius:"3px",fontSize:"0.8rem",background:"#fafbfc"}}
+              value={growthStudent} onChange={e=>setGrowthStudent(e.target.value)}>
+              <option value="all">All Students</option>
+              {filteredStudents.map(([key,st])=><option key={key} value={key}>{st.name}</option>)}
+            </select>
+            {growthStudent!=="all"&&<button onClick={()=>setGrowthStudent("all")} style={{fontSize:"0.72rem",background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"4px 10px",cursor:"pointer"}}>✕ Clear</button>}
+          </div>
+          {focusStudent ? (
+            <FocusStudentStats student={focusStudent} standardMasteryFn={standardMastery} bankQ={bankQ} lvlC={lvlC} lvlBg={lvlBg} lvlBd={lvlBd}/>
+          ) : (
+            <div style={{display:"flex",flexDirection:"column",gap:"0.5rem"}}>
+              <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden"}}>
+                <div style={{padding:"0.75rem 1rem",background:"#f0f4f8",borderBottom:"1px solid #dde3e9",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555"}}>
+                  STUDENT GROWTH OVERVIEW — {filteredStudents.length} students
+                </div>
+                {filteredStudents.map(([key, st])=>{
+                  const scores = st.sessions.map(s=>s.pct);
+                  const first  = scores[0]; const last = scores[scores.length-1];
+                  const delta  = scores.length>=2 ? last-first : null;
+                  const avg    = Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
+                  return (
+                    <div key={key} onClick={()=>setGrowthStudent(key)}
+                      style={{padding:"0.75rem 1rem 0.75rem 1.25rem",borderBottom:"1px solid #f0f4f8",display:"flex",alignItems:"center",gap:"1rem",cursor:"pointer",background:"#fff"}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:"0.88rem",fontWeight:700,color:"#1a1a1a"}}>{st.name}</div>
+                        {st.className&&<div style={{fontSize:"0.65rem",color:"#888"}}>{st.className}</div>}
+                      </div>
+                      <div style={{flexShrink:0}}>
+                        <LineChart points={scores} width={120} height={36} color={delta>0?"#1a6e2e":delta<0?"#8b1a1a":"#888"}/>
+                      </div>
+                      <div style={{display:"flex",gap:"0.75rem",flexShrink:0}}>
+                        <div style={{textAlign:"center",minWidth:"36px"}}>
+                          <div style={{fontSize:"0.55rem",color:"#aaa"}}>AVG</div>
+                          <div style={{fontSize:"0.9rem",fontWeight:700,color:lvlC(avg)}}>{avg}%</div>
+                        </div>
+                        {delta!==null&&(
+                          <div style={{textAlign:"center",minWidth:"40px"}}>
+                            <div style={{fontSize:"0.55rem",color:"#aaa"}}>ΔGROWTH</div>
+                            <div style={{fontSize:"0.9rem",fontWeight:700,color:delta>0?"#1a6e2e":delta<0?"#8b1a1a":"#888"}}>{delta>0?"+":""}{delta}%</div>
+                          </div>
+                        )}
+                        <div style={{textAlign:"center",minWidth:"28px"}}>
+                          <div style={{fontSize:"0.55rem",color:"#aaa"}}>TESTS</div>
+                          <div style={{fontSize:"0.9rem",fontWeight:700,color:"#003865"}}>{st.sessions.length}</div>
+                        </div>
+                      </div>
+                      <span style={{color:"#c8d3dd",fontSize:"0.8rem"}}>▶</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return null;
+  }
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",height:"100%",background:"#e8edf2",overflow:"hidden"}}>
+      {/* Tab bar */}
+      <div style={{background:"#004e94",display:"flex",alignItems:"flex-end",padding:"0 1.5rem",gap:"0.15rem",flexShrink:0}}>
+        {TABS.map(([key,lbl])=>(
+          <button key={key} onClick={()=>setTab(key)}
+            style={{background:tab===key?"#fff":"transparent",color:tab===key?"#003865":"#cce0f5",border:"none",padding:"0.6rem 1.1rem",fontSize:"0.78rem",fontWeight:700,cursor:"pointer",borderRadius:"4px 4px 0 0"}}>
+            {lbl}
+          </button>
+        ))}
+        <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:"0.5rem",paddingBottom:"4px"}}>
+          <div style={{fontSize:"0.68rem",color:"#cce0f5",opacity:.7}}>{sessions.length} total submissions · live</div>
+          <button
+            onClick={()=>generateClassReport(sessions, bankQ, growthClass).catch(e=>alert("Export failed: "+e.message))}
+            disabled={sessions.length===0}
+            style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.35)",color:"#fff",borderRadius:"3px",padding:"4px 10px",cursor:sessions.length===0?"not-allowed":"pointer",fontSize:"0.68rem",fontWeight:700,opacity:sessions.length===0?.4:1}}>
+            📄 Export PDF
+          </button>
+          <button onClick={handleClear} disabled={clearing||sessions.length===0}
+            style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.25)",color:"#fecaca",borderRadius:"3px",padding:"4px 10px",cursor:sessions.length===0?"not-allowed":"pointer",fontSize:"0.68rem",opacity:sessions.length===0?.4:1}}>
+            {clearing?"Clearing…":"🗑 Clear"}
+          </button>
+        </div>
+      </div>
+
+      <div style={{flex:1,padding:"1.25rem 1.5rem",overflowY:"auto"}}>
+        {renderTab()}
+      </div>
+    </div>
+  );
+}
