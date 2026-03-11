@@ -7,6 +7,7 @@ const TABS = [
   ["items",     "📋 Item Analysis"],
   ["students",  "👤 Students"],
   ["growth",    "📈 Growth"],
+  ["drills",    "🎯 Drills"],
   ["controls",  "🎛 Test Controls"],
 ];
 
@@ -228,19 +229,23 @@ export default function Dashboard({ teacher }) {
     setSessions([]); setSelected(null); setClearing(false);
   }
 
-  // ── Overview stats ──
-  const sorted  = [...sessions].sort((a,b)=>b.pct - a.pct);
-  const sel     = sessions.find(s => s.name===selected || s.studentName===selected);
-  const avgP    = sessions.length ? Math.round(sessions.reduce((a,s)=>a+s.pct,0)/sessions.length) : 0;
-  const profC   = sessions.filter(s=>s.pct>=80).length;
-  const devC    = sessions.filter(s=>s.pct>=60&&s.pct<80).length;
-  const begC    = sessions.filter(s=>s.pct<60).length;
+  // ── Split sessions by mode ──
+  const testSessions  = sessions.filter(s => s.mode !== "drill");
+  const drillSessions = sessions.filter(s => s.mode === "drill");
+
+  // ── Overview stats (tests only) ──
+  const sorted  = [...testSessions].sort((a,b)=>b.pct - a.pct);
+  const sel     = testSessions.find(s => s.name===selected || s.studentName===selected);
+  const avgP    = testSessions.length ? Math.round(testSessions.reduce((a,s)=>a+s.pct,0)/testSessions.length) : 0;
+  const profC   = testSessions.filter(s=>s.pct>=80).length;
+  const devC    = testSessions.filter(s=>s.pct>=60&&s.pct<80).length;
+  const begC    = testSessions.filter(s=>s.pct<60).length;
 
   // ── Item analysis (use live question ids if available) ──
-  const allQIds = [...new Set(sessions.flatMap(s=>Object.keys(s.answers||{})))];
+  const allQIds = [...new Set(testSessions.flatMap(s=>Object.keys(s.answers||{})))];
   const itemData = bankQ.map(q => {
-    const correct = sessions.filter(s=>s.answers?.[q.id]===q.correct).length;
-    const attempted = sessions.filter(s=>q.id in (s.answers||{})).length;
+    const correct = testSessions.filter(s=>s.answers?.[q.id]===q.correct).length;
+    const attempted = testSessions.filter(s=>q.id in (s.answers||{})).length;
     return { ...q, correctCount:correct, attempted, pct: attempted ? Math.round((correct/attempted)*100) : 0 };
   }).filter(q => q.attempted > 0);
 
@@ -251,7 +256,7 @@ export default function Dashboard({ teacher }) {
   function studentClass(s) { return s.className || ""; }
 
   const studentMap = {};
-  sessions.forEach(s => {
+  testSessions.forEach(s => {
     const key = studentKey(s);
     if (!studentMap[key]) studentMap[key] = { name: studentLabel(s), className: studentClass(s), sessions: [] };
     studentMap[key].sessions.push(s);
@@ -277,7 +282,7 @@ export default function Dashboard({ teacher }) {
   }
 
   // Unique class names from sessions
-  const sessionClasses = [...new Set(sessions.map(s=>s.className||"").filter(Boolean))];
+  const sessionClasses = [...new Set(testSessions.map(s=>s.className||"").filter(Boolean))];
   const filteredStudents = Object.entries(studentMap).filter(([,st]) => {
     if (growthClass !== "all" && st.className !== growthClass) return false;
     return true;
@@ -304,7 +309,7 @@ export default function Dashboard({ teacher }) {
               ["Proficient (≥80%)", profC, "#1a6e2e", "#f0faf2"],
               ["Developing (60–79%)", devC, "#7a4e00", "#fff8e1"],
               ["Beginning (<60%)", begC, "#8b1a1a", "#fdf2f2"],
-              ["Submitted", sessions.length, "#003865", "#ddeaf7"],
+              ["Submitted", testSessions.length, "#003865", "#ddeaf7"],
             ].map(([lbl,val,c,bg])=>(
               <div key={lbl} style={{background:bg,border:`1px solid ${c}22`,borderRadius:"4px",padding:"0.9rem 1.25rem",minWidth:"120px",flex:1}}>
                 <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.12em",color:c,marginBottom:"4px"}}>{lbl.toUpperCase()}</div>
@@ -314,7 +319,7 @@ export default function Dashboard({ teacher }) {
           </div>
           <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden"}}>
             <div style={{padding:"0.75rem 1rem",background:"#f0f4f8",borderBottom:"1px solid #dde3e9",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555"}}>
-              STUDENT SCORES — {sorted.length} submitted
+              TEST SCORES — {sorted.length} submitted
             </div>
             {sorted.map((s,i)=>{
               const name = s.studentName||s.name; const p=s.pct;
@@ -522,6 +527,104 @@ export default function Dashboard({ teacher }) {
       );
     }
 
+    if (tab === "drills") {
+      if (drillSessions.length === 0) return (
+        <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"3rem",textAlign:"center",color:"#aaa",maxWidth:"600px"}}>
+          <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>🎯</div>
+          <div style={{fontSize:"1rem",fontWeight:600,color:"#555",marginBottom:"4px"}}>No drill data yet</div>
+          <div style={{fontSize:"0.82rem"}}>Drill scores appear here separately from test scores.</div>
+        </div>
+      );
+
+      // Build per-standard accuracy from drill sessions
+      const stdMap = {};
+      drillSessions.forEach(sess => {
+        Object.entries(sess.answers || {}).forEach(([qid, ans]) => {
+          const q = bankQ.find(x => x.id === qid);
+          const std = q ? q.standard : (sess.testCode || "Unknown");
+          if (!stdMap[std]) stdMap[std] = { correct: 0, total: 0, students: new Set() };
+          stdMap[std].total++;
+          stdMap[std].students.add(sess.studentId || sess.studentName || sess.name);
+          // For drill sessions answers map qid -> chosen answer; grade against q.correct
+          if (q && ans === q.correct) stdMap[std].correct++;
+          // If no bankQ match, we can't grade — skip
+        });
+      });
+
+      // Per-student drill summary
+      const drillStudentMap = {};
+      drillSessions.forEach(s => {
+        const key = s.studentId || s.studentName || s.name || "Unknown";
+        const label = s.studentName || s.name || "Unknown";
+        if (!drillStudentMap[key]) drillStudentMap[key] = { name: label, className: s.className||"", sessions: [] };
+        drillStudentMap[key].sessions.push(s);
+      });
+
+      const stdRows = Object.entries(stdMap)
+        .map(([std, d]) => ({ std, ...d, pct: d.total ? Math.round((d.correct/d.total)*100) : 0, studentCount: d.students.size }))
+        .sort((a,b) => a.pct - b.pct); // weakest first
+
+      return (
+        <div style={{maxWidth:"960px",display:"flex",flexDirection:"column",gap:"1rem"}}>
+          {/* Summary cards */}
+          <div style={{display:"flex",gap:"0.75rem",flexWrap:"wrap"}}>
+            {[
+              ["Drill Sessions", drillSessions.length, "#7a4e00", "#fff8e1"],
+              ["Students Drilled", Object.keys(drillStudentMap).length, "#003865", "#ddeaf7"],
+              ["Standards Practiced", stdRows.length, "#1a6e2e", "#f0faf2"],
+              ["Avg Drill Score", drillSessions.length ? Math.round(drillSessions.reduce((a,s)=>a+s.pct,0)/drillSessions.length)+"%" : "—", "#555", "#f0f4f8"],
+            ].map(([lbl,val,c,bg])=>(
+              <div key={lbl} style={{background:bg,border:`1px solid ${c}22`,borderRadius:"4px",padding:"0.9rem 1.25rem",minWidth:"120px",flex:1}}>
+                <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.12em",color:c,marginBottom:"4px"}}>{lbl.toUpperCase()}</div>
+                <div style={{fontSize:"1.6rem",fontWeight:700,color:c}}>{val}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Per-standard accuracy */}
+          <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden"}}>
+            <div style={{padding:"0.75rem 1rem",background:"#f0f4f8",borderBottom:"1px solid #dde3e9",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555"}}>
+              STANDARD ACCURACY — weakest first
+            </div>
+            {stdRows.length === 0 ? (
+              <div style={{padding:"1.5rem",color:"#aaa",fontSize:"0.85rem",textAlign:"center"}}>No gradeable drill answers found. Make sure drill questions exist in your question bank.</div>
+            ) : stdRows.map(row => (
+              <div key={row.std} style={{padding:"0.65rem 1rem",borderBottom:"1px solid #f0f4f8",display:"flex",alignItems:"center",gap:"1rem"}}>
+                <div style={{width:"130px",flexShrink:0}}>
+                  <div style={{fontSize:"0.75rem",fontWeight:700,color:"#1a1a1a"}}>{row.std}</div>
+                  <div style={{fontSize:"0.62rem",color:"#888"}}>{row.studentCount} student{row.studentCount!==1?"s":""} · {row.total} attempts</div>
+                </div>
+                <div style={{flex:1,height:"10px",background:"#f0f4f8",borderRadius:"5px",overflow:"hidden"}}>
+                  <div style={{width:`${row.pct}%`,height:"100%",background:row.pct>=80?"#1a6e2e":row.pct>=60?"#f59e0b":"#dc2626",borderRadius:"5px",transition:"width .4s"}}/>
+                </div>
+                <div style={{width:"44px",textAlign:"right",fontWeight:700,fontSize:"0.88rem",color:row.pct>=80?"#1a6e2e":row.pct>=60?"#7a4e00":"#8b1a1a",flexShrink:0}}>{row.pct}%</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Per-student drill history */}
+          <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden"}}>
+            <div style={{padding:"0.75rem 1rem",background:"#f0f4f8",borderBottom:"1px solid #dde3e9",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555"}}>
+              STUDENT DRILL HISTORY
+            </div>
+            {Object.entries(drillStudentMap).map(([key, st]) => {
+              const avg = Math.round(st.sessions.reduce((a,s)=>a+s.pct,0)/st.sessions.length);
+              return (
+                <div key={key} style={{padding:"0.65rem 1rem",borderBottom:"1px solid #f0f4f8",display:"flex",alignItems:"center",gap:"1rem"}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:"0.85rem",fontWeight:700,color:"#1a1a1a"}}>{st.name}</div>
+                    {st.className && <div style={{fontSize:"0.62rem",color:"#888"}}>{st.className}</div>}
+                  </div>
+                  <div style={{fontSize:"0.72rem",color:"#888"}}>{st.sessions.length} drill{st.sessions.length!==1?"s":""}</div>
+                  <div style={{fontWeight:700,fontSize:"0.9rem",color:lvlC(avg),minWidth:"42px",textAlign:"right"}}>{avg}%</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
     return null;
   }
 
@@ -536,7 +639,7 @@ export default function Dashboard({ teacher }) {
           </button>
         ))}
         <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:"0.5rem",paddingBottom:"4px"}}>
-          <div style={{fontSize:"0.68rem",color:"#cce0f5",opacity:.7}}>{sessions.length} total submissions · live</div>
+          <div style={{fontSize:"0.68rem",color:"#cce0f5",opacity:.7}}>{testSessions.length} tests · {drillSessions.length} drills · live</div>
           <button
             onClick={()=>generateClassReport(sessions, bankQ, growthClass).catch(e=>alert("Export failed: "+e.message))}
             disabled={sessions.length===0}
