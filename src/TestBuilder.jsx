@@ -113,6 +113,16 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose }
   const [timeMins,       setTimeMins]       = useState(30);
   const [warnMins,       setWarnMins]       = useState(5);
   const [oneAttempt,     setOneAttempt]     = useState(false);
+  const [classes,        setClasses]        = useState([]);
+  const [assignedClassIds, setAssignedClassIds] = useState([]);
+
+  useEffect(() => {
+    fetch(`${API}/roster`).then(r=>r.json()).then(d=>setClasses(Array.isArray(d)?d:[])).catch(()=>{});
+  }, []);
+
+  function toggleClass(id) {
+    setAssignedClassIds(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev, id]);
+  }
 
   const duplicate = savedTests.find(t =>
     t.name?.trim().toLowerCase() === name.trim().toLowerCase()
@@ -133,6 +143,7 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose }
       timeLimitSecs: untimed ? 0 : Math.max(1, timeMins) * 60,
       warnSecs:      untimed ? 0 : Math.max(1, warnMins) * 60,
       oneAttempt,
+      classIds: assignedClassIds,
     };
     const err = await onSave(name.trim(), code, adaptive, timerCfg);
     if (err) { setCodeErr(err); setSaving(false); setOverwriteWarning(false); }
