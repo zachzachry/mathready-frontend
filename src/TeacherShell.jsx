@@ -51,7 +51,11 @@ function TeacherApp({ onBack, teacher }) {
 
   return (
     <div style={{display:"flex",flexDirection:"column",height:"100vh",fontFamily:"sans-serif",overflow:"hidden"}}>
-      <TopBar title={teacher?.teacherName ? `${teacher.teacherName} — Grade 5 Mathematics` : "Teacher Tools — Grade 5 Mathematics"} right={
+      <TopBar title={(() => {
+        const toolLabel = TOOLS.find(t => t.id === tool)?.label || "";
+        const name = teacher?.teacherName || "Teacher";
+        return toolLabel ? `${name} — ${toolLabel}` : `${name} — Grade 5 Mathematics`;
+      })()} right={
         <div style={{display:"flex",gap:"0.75rem",alignItems:"center"}}>
           <button onClick={()=>setSidebarOpen(o=>!o)} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"5px 10px",cursor:"pointer",fontSize:"0.72rem"}}>
             {sidebarOpen ? "◀ Hide" : "▶ Menu"}
@@ -84,10 +88,10 @@ function TeacherApp({ onBack, teacher }) {
           </div>
         )}
 
-        <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-          {tool==="dashboard"   && <Dashboard    teacher={teacher}/>}
-          {tool==="roster"      && <RosterManager teacher={teacher}/>}
-          {tool==="testbuilder" && <TestBuilder />}
+        <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column",minWidth:0}}>
+          {tool==="dashboard"   && <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}><Dashboard    teacher={teacher}/></div>}
+          {tool==="roster"      && <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}><RosterManager teacher={teacher}/></div>}
+          {tool==="testbuilder" && <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}><TestBuilder /></div>}
           {tool==="builder"     && <div style={{flex:1,overflowY:"auto"}}><QuestionBuilder /></div>}
           {tool==="importer"    && <div style={{flex:1,overflowY:"auto"}}><PDFImporter /></div>}
         </div>
