@@ -7,40 +7,20 @@ import PlotGrid from "./shared/PlotGrid";
 
 // ── Student Login ──────────────────────────────────────────
 function StudentLogin({ onStartTest, onStartPractice, onBack, prefill, codeOnly }) {
-  const [classes,    setClasses]    = useState([]);
-  const [classId,    setClassId]    = useState("");
-  const [studentId,  setStudentId]  = useState("");
-  const [code,       setCode]       = useState("");
-  const [err,        setErr]        = useState("");
-  const [step,       setStep]       = useState(codeOnly ? "code" : "form");   // form → mode → code → confirm
-  const [loading,    setLoading]    = useState(true);
-  const [checking,   setChecking]   = useState(false);
-  const [testInfo,   setTestInfo]   = useState(null);
+  // New flow: code → pick name → confirm
+  const [code,        setCode]       = useState("");
+  const [err,         setErr]        = useState("");
+  const [checking,    setChecking]   = useState(false);
+  const [testInfo,    setTestInfo]   = useState(null);
+  const [rosterCls,   setRosterCls]  = useState([]);  // classes from test's assigned classIds
+  const [studentId,   setStudentId]  = useState("");
+  const [classId,     setClassId]    = useState("");
+  const [step,        setStep]       = useState("code"); // code → name → mode → confirm
 
-  useEffect(() => {
-    fetch(`${API}/roster`)
-      .then(r => r.json())
-      .then(data => { setClasses(data); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, []);
-
-  const selectedClass   = prefill?.cls     || classes.find(c => c.id === classId);
+  const selectedClass   = prefill?.cls     || rosterCls.find(c => c.id === classId);
   const selectedStudent = prefill?.student || selectedClass?.students?.find(s => s.id === studentId);
 
-  // Step 1: class + name selected → go to mode picker
-  function handleContinueToMode() {
-    if (!classId)   { setErr("Please select your class."); return; }
-    if (!studentId) { setErr("Please select your name.");  return; }
-    setErr("");
-    setStep("mode");
-  }
-
-  // Step 2b: practice → straight in
-  function handlePractice() {
-    onStartPractice(selectedStudent, selectedClass);
-  }
-
-  // Step 2a: test → code entry
+  // Step 1 — validate test code and load roster
   async function checkCode() {
     const c = code.trim().toUpperCase();
     if (!c) { setErr("Please enter the test code."); return; }
@@ -52,27 +32,38 @@ function StudentLogin({ onStartTest, onStartPractice, onBack, prefill, codeOnly 
         setErr("Invalid test code. Check with your teacher.");
         setChecking(false); return;
       }
-      // One-attempt check
-      if (data.oneAttempt) {
-        try {
-          const sid  = selectedStudent?.id   ? `&studentId=${encodeURIComponent(selectedStudent.id)}`   : "";
-          const snam = selectedStudent?.name ? `&studentName=${encodeURIComponent(selectedStudent.name)}` : "";
-          if (sid || snam) {
-            const ar = await fetch(`${API}/test/attempt-check?code=${encodeURIComponent(c)}${sid}${snam}`);
-            const ad = await ar.json();
-            if (ad.attempted) {
-              setErr("You have already submitted this test. Only one attempt is allowed.");
-              setChecking(false); return;
-            }
-          }
-        } catch { /* allow through if check fails */ }
-      }
       setTestInfo(data);
-      setStep("confirm");
+      const cls = Array.isArray(data.roster) ? data.roster : [];
+      setRosterCls(cls);
+      // If only one class, auto-select it
+      if (cls.length === 1) setClassId(cls[0].id);
+      setStep("name");
     } catch {
       setErr("Could not connect to server. Try again.");
     }
     setChecking(false);
+  }
+
+  // Step 2 — student selected name, check one-attempt then proceed
+  async function handleNameConfirm() {
+    if (!studentId) { setErr("Please select your name."); return; }
+    setErr("");
+    if (testInfo?.oneAttempt) {
+      try {
+        const sid = `&studentId=${encodeURIComponent(studentId)}`;
+        const ar = await fetch(`${API}/test/attempt-check?code=${encodeURIComponent(code.trim().toUpperCase())}${sid}`);
+        const ad = await ar.json();
+        if (ad.attempted) {
+          setErr("You have already submitted this test. Only one attempt is allowed.");
+          return;
+        }
+      } catch {}
+    }
+    setStep(codeOnly ? "confirm" : "mode");
+  }
+
+  function handlePractice() {
+    onStartPractice(selectedStudent, selectedClass);
   }
 
   // ── Confirm screen ──
@@ -110,7 +101,7 @@ function StudentLogin({ onStartTest, onStartPractice, onBack, prefill, codeOnly 
             </div>
           )}
           <div style={{display:"flex",gap:"0.75rem"}}>
-            <button onClick={()=>setStep("code")} style={S.btnSec}>← Go Back</button>
+            <button onClick={()=>setStep(codeOnly?"name":"mode")} style={S.btnSec}>← Go Back</button>
             <button onClick={()=>onStartTest(selectedStudent, selectedClass, code.toUpperCase(), testInfo)} style={S.btnPri}>Begin Test →</button>
           </div>
         </div>
@@ -121,27 +112,27 @@ function StudentLogin({ onStartTest, onStartPractice, onBack, prefill, codeOnly 
   // ── Code entry screen ──
   if (step === "code") return (
     <div style={S.page}>
-      <div style={{background:"#003865",width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem"}}>
-        <button onClick={()=>setStep("mode")} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"4px 10px",cursor:"pointer",fontSize:"0.72rem"}}>← Back</button>
-        <div style={{color:"#fff",fontSize:"0.95rem",fontWeight:700}}>Enter Test Code</div>
+      <div style={{background:"#003865",width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
+        {onBack && <button onClick={onBack} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"4px 10px",cursor:"pointer",fontSize:"0.72rem"}}>← Back</button>}
+        <div style={{color:"#fff",fontSize:"0.95rem",fontWeight:700}}>Georgia Milestones Readiness Trainer</div>
       </div>
       <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem 1rem",width:"100%"}}>
         <div style={S.card}>
           <div style={S.hdr}>
-            <div style={S.hdrSub}>{selectedStudent?.name} · {selectedClass?.name}</div>
-            <div style={S.hdrTitle}>Enter Your Test Code</div>
+            <div style={S.hdrSub}>STUDENT SIGN IN</div>
+            <div style={S.hdrTitle}>Enter Test Code</div>
           </div>
           <div style={{padding:"1.75rem 2rem"}}>
             <div style={{marginBottom:"1.25rem"}}>
               <label style={S.lbl}>TEST CODE — given to you by your teacher</label>
-              <input style={{...S.inp,fontFamily:"monospace",fontSize:"1.3rem",letterSpacing:"0.25em",textTransform:"uppercase",fontWeight:700,textAlign:"center"}}
+              <input style={{...S.inp,fontFamily:"monospace",fontSize:"1.4rem",letterSpacing:"0.3em",textTransform:"uppercase",fontWeight:700,textAlign:"center"}}
                 value={code} onChange={e=>{setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,""));setErr("");}}
-                onKeyDown={e=>e.key==="Enter"&&checkCode()} placeholder="e.g. FRACTIONS" maxLength={8} autoFocus/>
+                onKeyDown={e=>e.key==="Enter"&&checkCode()} placeholder="ABCD1234" maxLength={8} autoFocus/>
             </div>
-            {err && <div style={S.errBox}>⚠ {err}</div>}
+            {err && <div style={{...S.errBox,marginBottom:"0.75rem"}}>⚠ {err}</div>}
             <button onClick={checkCode} disabled={checking}
-              style={{...S.btnPri,width:"100%",marginTop:"0.5rem",opacity:checking?0.7:1}}>
-              {checking ? "Checking code…" : "Continue →"}
+              style={{...S.btnPri,width:"100%",opacity:checking?0.7:1}}>
+              {checking ? "Checking…" : "Continue →"}
             </button>
           </div>
         </div>
@@ -149,11 +140,81 @@ function StudentLogin({ onStartTest, onStartPractice, onBack, prefill, codeOnly 
     </div>
   );
 
+  // ── Name picker screen ──
+  if (step === "name") {
+    const allStudents = rosterCls.flatMap(c => (c.students||[]).map(s=>({...s, className:c.name, classId:c.id})));
+    const noRoster = rosterCls.length === 0;
+    return (
+      <div style={S.page}>
+        <div style={{background:"#003865",width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
+          <button onClick={()=>{setStep("code");setErr("");}} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"4px 10px",cursor:"pointer",fontSize:"0.72rem"}}>← Back</button>
+          <div style={{color:"#fff",fontSize:"0.95rem",fontWeight:700}}>Code: <span style={{fontFamily:"monospace",letterSpacing:"0.18em"}}>{code}</span></div>
+        </div>
+        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem 1rem",width:"100%"}}>
+          <div style={S.card}>
+            <div style={S.hdr}>
+              <div style={S.hdrSub}>{testInfo?.title || "Grade 5 Mathematics"}</div>
+              <div style={S.hdrTitle}>Who are you?</div>
+            </div>
+            <div style={{padding:"1.75rem 2rem"}}>
+              {noRoster ? (
+                <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"4px",padding:"1.25rem",textAlign:"center"}}>
+                  <div style={{fontSize:"1.5rem",marginBottom:"0.5rem"}}>🚫</div>
+                  <div style={{fontWeight:700,color:"#8b1a1a",marginBottom:"4px"}}>No class assigned to this test</div>
+                  <div style={{fontSize:"0.82rem",color:"#555"}}>Ask your teacher to assign this test to your class.</div>
+                </div>
+              ) : (
+                <>
+                  {rosterCls.length > 1 && (
+                    <div style={{marginBottom:"1rem"}}>
+                      <label style={S.lbl}>YOUR CLASS</label>
+                      <select style={{...S.inp}} value={classId} onChange={e=>{setClassId(e.target.value);setStudentId("");setErr("");}}>
+                        <option value="">— Select your class —</option>
+                        {rosterCls.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  <div style={{marginBottom:"1rem"}}>
+                    <label style={S.lbl}>YOUR NAME</label>
+                    {(() => {
+                      const students = classId
+                        ? (rosterCls.find(c=>c.id===classId)?.students||[])
+                        : allStudents;
+                      if (!classId && rosterCls.length > 1) return (
+                        <div style={{color:"#aaa",fontSize:"0.82rem",padding:"0.65rem",border:"1px solid #e0e7ee",borderRadius:"3px"}}>Select your class first</div>
+                      );
+                      return (
+                        <select style={{...S.inp,fontSize:"1rem"}} value={studentId} onChange={e=>{setStudentId(e.target.value);setErr("");}}>
+                          <option value="">— Select your name —</option>
+                          {students.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
+                      );
+                    })()}
+                  </div>
+                  {!studentId && (
+                    <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"3px",padding:"0.65rem 0.9rem",fontSize:"0.8rem",color:"#8b1a1a",marginBottom:"0.75rem"}}>
+                      🚫 If your name is not listed, see your teacher to be added to the class roster.
+                    </div>
+                  )}
+                  {err && <div style={{...S.errBox,marginBottom:"0.75rem"}}>⚠ {err}</div>}
+                  <button onClick={handleNameConfirm} disabled={!studentId}
+                    style={{...S.btnPri,width:"100%",opacity:studentId?1:0.4,cursor:studentId?"pointer":"not-allowed"}}>
+                    Continue →
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ── Mode picker screen ──
   if (step === "mode") return (
     <div style={S.page}>
       <div style={{background:"#003865",width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem"}}>
-        <button onClick={()=>setStep("form")} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"4px 10px",cursor:"pointer",fontSize:"0.72rem"}}>← Back</button>
+        <button onClick={()=>setStep("name")} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"4px 10px",cursor:"pointer",fontSize:"0.72rem"}}>← Back</button>
         <div style={{color:"#fff",fontSize:"0.95rem",fontWeight:700}}>Georgia Milestones Readiness Trainer</div>
       </div>
       <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem 1rem",width:"100%"}}>
@@ -188,54 +249,8 @@ function StudentLogin({ onStartTest, onStartPractice, onBack, prefill, codeOnly 
     </div>
   );
 
-  // ── Form screen (class + name) ──
-  return (
-    <div style={S.page}>
-      <div style={{background:"#003865",width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem"}}>
-        <button onClick={onBack} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"4px 10px",cursor:"pointer",fontSize:"0.72rem"}}>← Back</button>
-        <div style={{color:"#fff",fontSize:"0.95rem",fontWeight:700}}>Georgia Milestones Readiness Trainer</div>
-      </div>
-      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem 1rem",width:"100%"}}>
-        <div style={S.card}>
-          <div style={S.hdr}>
-            <div style={S.hdrSub}>STUDENT SIGN IN</div>
-            <div style={S.hdrTitle}>Grade 5 Mathematics</div>
-          </div>
-          <div style={{padding:"1.75rem 2rem"}}>
-            {loading ? (
-              <div style={{textAlign:"center",color:"#aaa",padding:"2rem"}}>Loading class roster…</div>
-            ) : classes.length === 0 ? (
-              <div style={{background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"3px",padding:"1rem",marginBottom:"1rem",fontSize:"0.82rem",color:"#7a4e00"}}>
-                ⚠ No class roster found. Ask your teacher to set up the roster first.
-              </div>
-            ) : (
-              <>
-                <div style={{marginBottom:"1rem"}}>
-                  <label style={S.lbl}>CLASS / PERIOD</label>
-                  <select style={S.inp} value={classId} onChange={e=>{setClassId(e.target.value);setStudentId("");setErr("");}}>
-                    <option value="">— Select your class —</option>
-                    {classes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                </div>
-                <div style={{marginBottom:"1.25rem"}}>
-                  <label style={S.lbl}>YOUR NAME</label>
-                  <select style={S.inp} value={studentId} onChange={e=>{setStudentId(e.target.value);setErr("");}} disabled={!classId}>
-                    <option value="">— Select your name —</option>
-                    {(selectedClass?.students || []).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
-              </>
-            )}
-            {err && <div style={S.errBox}>⚠ {err}</div>}
-            <button onClick={handleContinueToMode} disabled={loading||classes.length===0}
-              style={{...S.btnPri,width:"100%",marginTop:"0.5rem"}}>
-              Continue →
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  // Fallback — should not reach here
+  return null;
 }
 
 // ── Practice Mode ──────────────────────────────────────────
