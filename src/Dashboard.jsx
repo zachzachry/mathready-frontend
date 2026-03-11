@@ -231,7 +231,7 @@ export default function Dashboard({ teacher }) {
 
   // ── Split sessions by mode ──
   const testSessions  = sessions.filter(s => s.mode !== "drill");
-  const drillSessions = sessions.filter(s => s.mode === "drill");
+  const drillSessions = sessions.filter(s => s.mode === "drill" || s.mode === "practice");
 
   // ── Overview stats (tests only) ──
   const sorted  = [...testSessions].sort((a,b)=>b.pct - a.pct);
