@@ -8,6 +8,7 @@ const TABS = [
   ["students",  "👤 Students"],
   ["growth",    "📈 Growth"],
   ["drills",    "🎯 Drills"],
+  ["profile",   "📋 Class Profile"],
   ["controls",  "🎛 Test Controls"],
 ];
 
@@ -286,6 +287,26 @@ export default function Dashboard({ teacher }) {
       });
     });
     return map;
+  }
+
+  // ── Georgia domains ──
+  const DOMAINS = [
+    { key:"NR",  label:"Number & Operations",        color:"#003865", bg:"#ddeaf7", standards: s => s.startsWith("5.NR") },
+    { key:"PAR", label:"Patterns, Algebra & Relations", color:"#7a4e00", bg:"#fff8e1", standards: s => s.startsWith("5.PAR") },
+    { key:"MDR", label:"Measurement, Data & Results", color:"#1a6e2e", bg:"#f0faf2", standards: s => s.startsWith("5.MDR") },
+    { key:"GSR", label:"Geometry & Spatial Reasoning", color:"#5b21b6", bg:"#f3f0ff", standards: s => s.startsWith("5.GSR") },
+  ];
+
+  function domainMastery(studentSessions) {
+    const stdMap = standardMastery(studentSessions);
+    const result = {};
+    DOMAINS.forEach(d => {
+      const stds = Object.entries(stdMap).filter(([std]) => d.standards(std));
+      const correct = stds.reduce((a,[,v]) => a + v.correct, 0);
+      const total   = stds.reduce((a,[,v]) => a + v.total,   0);
+      result[d.key] = total ? Math.round((correct/total)*100) : null;
+    });
+    return result;
   }
 
   // Unique class names from sessions
@@ -627,6 +648,173 @@ export default function Dashboard({ teacher }) {
                 </div>
               );
             })}
+          </div>
+        </div>
+      );
+    }
+
+    if (tab === "profile") {
+      const profileStudents = Object.entries(studentMap);
+      if (profileStudents.length === 0) return (
+        <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"3rem",textAlign:"center",color:"#aaa",maxWidth:"600px"}}>
+          <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>📋</div>
+          <div style={{fontSize:"1rem",fontWeight:600,color:"#555",marginBottom:"4px"}}>No test data yet</div>
+          <div style={{fontSize:"0.82rem"}}>Class Profile populates once students submit tests.</div>
+        </div>
+      );
+
+      // Class-level domain averages
+      const classDomainAvg = {};
+      DOMAINS.forEach(d => {
+        const vals = profileStudents.map(([,st]) => domainMastery(st.sessions)[d.key]).filter(v => v !== null);
+        classDomainAvg[d.key] = vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : null;
+      });
+
+      // Per-student domain scores
+      const studentDomains = profileStudents.map(([key, st]) => ({
+        key, name: st.name, className: st.className,
+        overall: Math.round(st.sessions.reduce((a,s)=>a+s.pct,0)/st.sessions.length),
+        sessions: st.sessions.length,
+        domains: domainMastery(st.sessions),
+      })).sort((a,b) => b.overall - a.overall);
+
+      // Standard-level detail — which standards are weakest class-wide
+      const allStdMap = {};
+      testSessions.forEach(sess => {
+        Object.entries(sess.answers || {}).forEach(([qid, ans]) => {
+          const q = bankQ.find(x=>x.id===qid);
+          if (!q) return;
+          if (!allStdMap[q.standard]) allStdMap[q.standard] = { std: q.standard, short: q.short||q.standard, correct:0, total:0 };
+          allStdMap[q.standard].total++;
+          if (ans === q.correct) allStdMap[q.standard].correct++;
+        });
+      });
+      const stdRows = Object.values(allStdMap)
+        .map(r => ({...r, pct: Math.round((r.correct/r.total)*100)}))
+        .sort((a,b) => a.pct - b.pct);
+      const weakest = stdRows.slice(0, 5);
+      const strongest = [...stdRows].sort((a,b)=>b.pct-a.pct).slice(0,5);
+
+      const DomainBar = ({pct: p, color, bg}) => (
+        <div style={{display:"flex",alignItems:"center",gap:"0.5rem",width:"100%"}}>
+          <div style={{flex:1,height:"12px",background:"#f0f4f8",borderRadius:"6px",overflow:"hidden"}}>
+            <div style={{width:`${p||0}%`,height:"100%",background:color,borderRadius:"6px",transition:"width .5s"}}/>
+          </div>
+          <div style={{width:"36px",textAlign:"right",fontSize:"0.78rem",fontWeight:700,color:p===null?"#aaa":lvlC(p),flexShrink:0}}>
+            {p===null?"—":`${p}%`}
+          </div>
+        </div>
+      );
+
+      return (
+        <div style={{maxWidth:"1060px",display:"flex",flexDirection:"column",gap:"1.25rem"}}>
+
+          {/* Class domain summary */}
+          <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden"}}>
+            <div style={{padding:"0.75rem 1.25rem",background:"#003865",color:"#fff",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em"}}>
+              CLASS PROFILE — DOMAIN AVERAGES · {profileStudents.length} students · {testSessions.length} test sessions
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"1px",background:"#e8edf2"}}>
+              {DOMAINS.map(d => {
+                const p = classDomainAvg[d.key];
+                return (
+                  <div key={d.key} style={{background:"#fff",padding:"1rem 1.25rem"}}>
+                    <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.12em",color:d.color,marginBottom:"6px"}}>{d.label.toUpperCase()}</div>
+                    <div style={{fontSize:"2rem",fontWeight:700,color:p===null?"#aaa":lvlC(p),marginBottom:"6px"}}>{p===null?"—":`${p}%`}</div>
+                    <DomainBar pct={p} color={d.color} bg={d.bg}/>
+                    {p!==null && <div style={{fontSize:"0.65rem",color:"#888",marginTop:"4px"}}>{lvl(p)}</div>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Strength / Opportunity */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem"}}>
+            {[
+              ["🏆 Strength Areas", strongest, "#1a6e2e","#f0faf2","#b3dfc0"],
+              ["⚠️ Opportunity Areas", weakest,  "#8b1a1a","#fdf2f2","#f0b8b8"],
+            ].map(([title, rows, color, bg, bd]) => (
+              <div key={title} style={{background:"#fff",border:`1px solid ${bd}`,borderRadius:"4px",overflow:"hidden"}}>
+                <div style={{padding:"0.65rem 1rem",background:bg,borderBottom:`1px solid ${bd}`,fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color}}>{title.toUpperCase()}</div>
+                {rows.map(r => (
+                  <div key={r.std} style={{padding:"0.55rem 1rem",borderBottom:"1px solid #f5f5f5",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:"0.72rem",fontWeight:700,color:"#1a1a1a"}}>{r.std}</div>
+                      <div style={{fontSize:"0.62rem",color:"#888"}}>{r.short} · {r.total} attempts</div>
+                    </div>
+                    <div style={{fontWeight:700,fontSize:"0.9rem",color:lvlC(r.pct),minWidth:"38px",textAlign:"right"}}>{r.pct}%</div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+
+          {/* Student × Domain grid */}
+          <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden"}}>
+            <div style={{padding:"0.75rem 1.25rem",background:"#f0f4f8",borderBottom:"1px solid #dde3e9",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555"}}>
+              STUDENT DOMAIN BREAKDOWN
+            </div>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:"0.8rem"}}>
+                <thead>
+                  <tr style={{background:"#f8fafc",borderBottom:"2px solid #dde3e9"}}>
+                    <th style={{padding:"0.6rem 1rem",textAlign:"left",fontWeight:700,color:"#555",fontSize:"0.68rem",letterSpacing:"0.08em",minWidth:"140px"}}>STUDENT</th>
+                    <th style={{padding:"0.6rem 0.75rem",textAlign:"center",fontWeight:700,color:"#555",fontSize:"0.68rem",minWidth:"70px"}}>OVERALL</th>
+                    {DOMAINS.map(d => (
+                      <th key={d.key} style={{padding:"0.6rem 0.75rem",textAlign:"center",fontWeight:700,color:d.color,fontSize:"0.65rem",minWidth:"80px"}}>{d.key}</th>
+                    ))}
+                    <th style={{padding:"0.6rem 0.75rem",textAlign:"center",fontWeight:700,color:"#555",fontSize:"0.65rem",minWidth:"60px"}}>TESTS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {studentDomains.map((st, i) => (
+                    <tr key={st.key} style={{borderBottom:"1px solid #f0f4f8",background:i%2===0?"#fff":"#fafbfc"}}>
+                      <td style={{padding:"0.6rem 1rem",fontWeight:600,color:"#1a1a1a"}}>
+                        {st.name}
+                        {st.className && <div style={{fontSize:"0.62rem",color:"#888",fontWeight:400}}>{st.className}</div>}
+                      </td>
+                      <td style={{padding:"0.6rem 0.75rem",textAlign:"center"}}>
+                        <span style={{display:"inline-block",padding:"2px 8px",borderRadius:"10px",background:lvlBg(st.overall),color:lvlC(st.overall),fontWeight:700,fontSize:"0.82rem"}}>
+                          {st.overall}%
+                        </span>
+                      </td>
+                      {DOMAINS.map(d => {
+                        const p = st.domains[d.key];
+                        return (
+                          <td key={d.key} style={{padding:"0.6rem 0.75rem",textAlign:"center"}}>
+                            {p===null ? (
+                              <span style={{color:"#ccc",fontSize:"0.75rem"}}>—</span>
+                            ) : (
+                              <span style={{display:"inline-block",padding:"2px 8px",borderRadius:"10px",background:lvlBg(p),color:lvlC(p),fontWeight:700,fontSize:"0.8rem"}}>{p}%</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td style={{padding:"0.6rem 0.75rem",textAlign:"center",color:"#888",fontSize:"0.8rem"}}>{st.sessions}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                {/* Class averages footer */}
+                <tfoot>
+                  <tr style={{borderTop:"2px solid #dde3e9",background:"#f0f4f8"}}>
+                    <td style={{padding:"0.6rem 1rem",fontWeight:700,fontSize:"0.72rem",color:"#555",letterSpacing:"0.08em"}}>CLASS AVG</td>
+                    <td style={{padding:"0.6rem 0.75rem",textAlign:"center"}}>
+                      <span style={{fontWeight:700,fontSize:"0.82rem",color:lvlC(Math.round(testSessions.reduce((a,s)=>a+s.pct,0)/(testSessions.length||1)))}}>{Math.round(testSessions.reduce((a,s)=>a+s.pct,0)/(testSessions.length||1))}%</span>
+                    </td>
+                    {DOMAINS.map(d => {
+                      const p = classDomainAvg[d.key];
+                      return (
+                        <td key={d.key} style={{padding:"0.6rem 0.75rem",textAlign:"center"}}>
+                          {p===null ? <span style={{color:"#ccc"}}>—</span> : <span style={{fontWeight:700,color:lvlC(p),fontSize:"0.82rem"}}>{p}%</span>}
+                        </td>
+                      );
+                    })}
+                    <td style={{padding:"0.6rem 0.75rem",textAlign:"center",color:"#888",fontSize:"0.8rem"}}>{testSessions.length}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </div>
         </div>
       );
