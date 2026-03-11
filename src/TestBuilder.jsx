@@ -112,6 +112,7 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose }
   const [untimed,        setUntimed]        = useState(false);
   const [timeMins,       setTimeMins]       = useState(30);
   const [warnMins,       setWarnMins]       = useState(5);
+  const [oneAttempt,     setOneAttempt]     = useState(false);
 
   const duplicate = savedTests.find(t =>
     t.name?.trim().toLowerCase() === name.trim().toLowerCase()
@@ -131,6 +132,7 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose }
       untimed,
       timeLimitSecs: untimed ? 0 : Math.max(1, timeMins) * 60,
       warnSecs:      untimed ? 0 : Math.max(1, warnMins) * 60,
+      oneAttempt,
     };
     const err = await onSave(name.trim(), code, adaptive, timerCfg);
     if (err) { setCodeErr(err); setSaving(false); setOverwriteWarning(false); }
@@ -202,6 +204,25 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose }
               </div>
             </div>
           )}
+        </div>
+        {/* One Attempt toggle */}
+        <div>
+          <label style={{display:"flex",alignItems:"center",gap:"0.75rem",cursor:"pointer",padding:"0.65rem 0.85rem",
+            background:oneAttempt?"#fdf2f2":"#fafbfc",
+            border:`1px solid ${oneAttempt?"#f0b8b8":"#dde3e9"}`,borderRadius:"3px"}}
+            onClick={()=>setOneAttempt(a=>!a)}>
+            <div style={{width:"36px",height:"20px",borderRadius:"10px",background:oneAttempt?"#8b1a1a":"#c8d3dd",position:"relative",flexShrink:0,transition:"background .2s"}}>
+              <div style={{position:"absolute",top:"2px",left:oneAttempt?"18px":"2px",width:"16px",height:"16px",borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+            </div>
+            <div>
+              <div style={{fontSize:"0.82rem",fontWeight:700,color:oneAttempt?"#8b1a1a":"#333"}}>
+                One Attempt Only {oneAttempt?"ON":"OFF"}
+              </div>
+              <div style={{fontSize:"0.7rem",color:"#888",marginTop:"1px"}}>
+                Students can only submit this test once. They cannot retake it.
+              </div>
+            </div>
+          </label>
         </div>
         </div>
         {overwriteWarning && (
