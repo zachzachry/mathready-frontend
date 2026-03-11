@@ -508,8 +508,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
           )}
 
           {/* Feedback banner */}
-          {revealed && (
-            {(() => {
+          {revealed && (() => {
               let isOk;
               if (q.type === "multiselect") {
                 try { isOk = JSON.stringify([...JSON.parse(selected)].sort()) === correct; } catch { isOk = false; }
@@ -534,7 +533,6 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
               )}
             </div>
               ); })()}
-          )}
 
           {/* Next button */}
           {(revealed || (q.type==="plotpoint" && selected)) && (
