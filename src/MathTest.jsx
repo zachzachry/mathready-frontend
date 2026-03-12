@@ -59,7 +59,7 @@ function StudentLogin({ onStartTest, onStartPractice, onBack, prefill, codeOnly 
         }
       } catch {}
     }
-    setStep(codeOnly ? "confirm" : "mode");
+    setStep("confirm");
   }
 
   function handlePractice() {
@@ -101,7 +101,7 @@ function StudentLogin({ onStartTest, onStartPractice, onBack, prefill, codeOnly 
             </div>
           )}
           <div style={{display:"flex",gap:"0.75rem"}}>
-            <button onClick={()=>setStep(codeOnly?"name":"mode")} style={S.btnSec}>← Go Back</button>
+            <button onClick={()=>setStep("name")} style={S.btnSec}>← Go Back</button>
             <button onClick={()=>onStartTest(selectedStudent, selectedClass, code.toUpperCase(), testInfo)} style={S.btnPri}>Begin Test →</button>
           </div>
         </div>
@@ -235,12 +235,12 @@ function StudentLogin({ onStartTest, onStartPractice, onBack, prefill, codeOnly 
               </div>
             </button>
             {/* Test card */}
-            <button onClick={()=>setStep("code")}
+            <button onClick={()=>testInfo ? setStep("confirm") : setStep("code")}
               style={{background:"#fff",border:"2px solid #003865",borderRadius:"8px",padding:"1.75rem 2rem",textAlign:"left",cursor:"pointer",display:"flex",alignItems:"center",gap:"1.25rem",boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
               <div style={{width:"52px",height:"52px",borderRadius:"50%",background:"#ddeaf7",border:"2px solid #9dbfe0",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:"1.6rem"}}>📝</div>
               <div>
                 <div style={{fontSize:"1.05rem",fontWeight:700,color:"#003865",marginBottom:"4px"}}>Take a Test</div>
-                <div style={{fontSize:"0.82rem",color:"#555",lineHeight:1.5}}>Enter a test code from your teacher. Timed, no feedback until the end.</div>
+                <div style={{fontSize:"0.82rem",color:"#555",lineHeight:1.5}}>{testInfo ? `Continue to: ${testInfo.title||"Grade 5 Mathematics"}` : "Enter a test code from your teacher."}</div>
               </div>
             </button>
           </div>
