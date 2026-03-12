@@ -987,19 +987,27 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
             <div style={{padding:"0.5rem",display:"flex",flexWrap:"wrap",gap:"4px"}}>
               {questions.map((item,i)=>{
                 const isAns=!!ans[item.id]; const isCur=i===cur; const isFg=!!flg[item.id];
+                let bg="#fafbfc", border="#bcc8d4", color="#445";
+                if (isCur)       { bg="#003865"; border="#003865"; color="#fff"; }
+                else if (isFg)   { bg="#fff8e1"; border="#ffc107"; color="#7a4e00"; }
+                else if (isAns)  { bg="#d4edda"; border="#1a6e2e"; color="#1a5c28"; }
                 return <button key={item.id} onClick={()=>setCur(i)}
-                  style={{width:"35px",height:"35px",borderRadius:"3px",border:`2px solid ${isCur?"#003865":isAns?"#1a6e2e":"#bcc8d4"}`,background:isCur?"#003865":isAns?"#d4edda":"#fafbfc",color:isCur?"#fff":isAns?"#1a5c28":"#445",fontSize:"0.75rem",fontWeight:700,cursor:"pointer",position:"relative"}}>
-                  {i+1}{isFg&&<span style={{position:"absolute",top:"-5px",right:"-4px",fontSize:"0.5rem"}}>🚩</span>}
+                  style={{width:"36px",height:"36px",borderRadius:"3px",border:`2px solid ${border}`,background:bg,color,fontSize:"0.75rem",fontWeight:700,cursor:"pointer",position:"relative",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  {isFg && !isCur ? <span style={{position:"absolute",top:"-4px",right:"-4px",fontSize:"0.55rem",lineHeight:1}}>🚩</span> : null}
+                  {i+1}
                 </button>;
               })}
             </div>
             <div style={{padding:"0.65rem 0.9rem",borderTop:"1px solid #dde3e9",marginTop:"auto"}}>
-              {[["#d4edda","#1a6e2e","Answered"],["#fafbfc","#bcc8d4","Unanswered"]].map(([bg,bd,lbl])=>(
-                <div key={lbl} style={{display:"flex",alignItems:"center",gap:"6px",marginBottom:"4px",fontSize:"0.65rem",color:"#555"}}>
-                  <div style={{width:"13px",height:"13px",background:bg,border:`2px solid ${bd}`,borderRadius:"2px"}}/>{lbl}
+              {[
+                ["#d4edda","#1a6e2e","Answered"],
+                ["#fff8e1","#ffc107","Flagged for Review"],
+                ["#fafbfc","#bcc8d4","Not Answered"],
+              ].map(([bg,bd,lbl])=>(
+                <div key={lbl} style={{display:"flex",alignItems:"center",gap:"6px",marginBottom:"4px",fontSize:"0.62rem",color:"#555"}}>
+                  <div style={{width:"13px",height:"13px",background:bg,border:`2px solid ${bd}`,borderRadius:"2px",flexShrink:0}}/>{lbl}
                 </div>
               ))}
-              <div style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"0.65rem",color:"#555"}}><span>🚩</span>Flagged</div>
             </div>
           </div>
         )}
@@ -1103,9 +1111,10 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
       <div style={{background:"#fff",borderTop:"2px solid #c8d3dd",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0.65rem 1.5rem",flexShrink:0}}>
         <button onClick={()=>setCur(c=>Math.max(0,c-1))} disabled={cur===0}
           style={{background:cur===0?"#e8edf2":"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"7px 20px",fontSize:"0.83rem",cursor:cur===0?"not-allowed":"pointer",color:cur===0?"#aaa":"#333",fontWeight:600}}>◀ Back</button>
-        <div style={{display:"flex",gap:"4px"}}>
-          {questions.map((_,i)=><div key={i} onClick={()=>setCur(i)}
-            style={{width:"9px",height:"9px",borderRadius:"50%",background:i===cur?"#003865":ans[questions[i].id]?"#1a6e2e":"#c8d3dd",cursor:"pointer"}}/>)}
+        <div style={{display:"flex",gap:"0.75rem",alignItems:"center",fontSize:"0.75rem"}}>
+          <span style={{color:"#1a6e2e",fontWeight:700}}>✓ {ansCount} answered</span>
+          {flgCount>0&&<span style={{color:"#7a4e00",fontWeight:700}}>🚩 {flgCount} flagged</span>}
+          {TOTAL-ansCount>0&&<span style={{color:"#888"}}>{TOTAL-ansCount} left</span>}
         </div>
         {cur<TOTAL-1
           ?<button onClick={()=>setCur(c=>c+1)} style={{background:"#003865",border:"none",borderRadius:"3px",padding:"7px 20px",fontSize:"0.83rem",cursor:"pointer",color:"#fff",fontWeight:600}}>Next ▶</button>
@@ -1121,13 +1130,35 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
               <div style={{fontSize:"1rem",fontWeight:700}}>Submit Test?</div>
             </div>
             <div style={{padding:"1.25rem"}}>
-              <p style={{fontSize:"0.88rem",color:"#444",margin:"0 0 0.75rem"}}>You have answered <strong>{ansCount}</strong> of <strong>{TOTAL}</strong> questions.</p>
-              {ansCount<TOTAL&&<div style={{fontSize:"0.82rem",color:"#8b1a1a",background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"3px",padding:"0.55rem 0.85rem",marginBottom:"0.75rem"}}>⚠ {TOTAL-ansCount} question{TOTAL-ansCount>1?"s are":" is"} unanswered.</div>}
-              <p style={{fontSize:"0.82rem",color:"#666",margin:0}}>Once submitted you cannot return to change answers.</p>
+              <div style={{display:"flex",gap:"1rem",marginBottom:"0.85rem",flexWrap:"wrap"}}>
+                <div style={{flex:1,background:"#f0faf2",border:"1px solid #b3dfc0",borderRadius:"4px",padding:"0.65rem 0.85rem",textAlign:"center"}}>
+                  <div style={{fontSize:"1.4rem",fontWeight:700,color:"#1a6e2e"}}>{ansCount}</div>
+                  <div style={{fontSize:"0.65rem",color:"#555"}}>Answered</div>
+                </div>
+                <div style={{flex:1,background:flgCount?"#fff8e1":"#f8fafc",border:`1px solid ${flgCount?"#ffc107":"#dde3e9"}`,borderRadius:"4px",padding:"0.65rem 0.85rem",textAlign:"center"}}>
+                  <div style={{fontSize:"1.4rem",fontWeight:700,color:flgCount?"#7a4e00":"#aaa"}}>{flgCount}</div>
+                  <div style={{fontSize:"0.65rem",color:"#555"}}>Flagged</div>
+                </div>
+                <div style={{flex:1,background:TOTAL-ansCount?"#fdf2f2":"#f8fafc",border:`1px solid ${TOTAL-ansCount?"#f0b8b8":"#dde3e9"}`,borderRadius:"4px",padding:"0.65rem 0.85rem",textAlign:"center"}}>
+                  <div style={{fontSize:"1.4rem",fontWeight:700,color:TOTAL-ansCount?"#8b1a1a":"#aaa"}}>{TOTAL-ansCount}</div>
+                  <div style={{fontSize:"0.65rem",color:"#555"}}>Unanswered</div>
+                </div>
+              </div>
+              {flgCount>0&&(
+                <div style={{background:"#fff8e1",border:"1px solid #ffc107",borderRadius:"3px",padding:"0.6rem 0.85rem",marginBottom:"0.65rem",fontSize:"0.82rem",color:"#7a4e00",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"0.5rem"}}>
+                  <span>🚩 You have <strong>{flgCount}</strong> question{flgCount>1?"s":""}  flagged for review.</span>
+                  <button onClick={()=>{ setModal(false); const firstFlagged=questions.findIndex((_,i)=>flg[questions[i].id]); if(firstFlagged>=0)setCur(firstFlagged); }}
+                    style={{background:"#ffc107",border:"none",borderRadius:"3px",padding:"4px 10px",fontSize:"0.75rem",fontWeight:700,cursor:"pointer",color:"#7a4e00",whiteSpace:"nowrap"}}>
+                    Review →
+                  </button>
+                </div>
+              )}
+              {TOTAL-ansCount>0&&<div style={{fontSize:"0.82rem",color:"#8b1a1a",background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"3px",padding:"0.55rem 0.85rem",marginBottom:"0.65rem"}}>⚠ {TOTAL-ansCount} question{TOTAL-ansCount>1?"s are":" is"} unanswered — these will be marked incorrect.</div>}
+              <p style={{fontSize:"0.78rem",color:"#888",margin:0}}>Once submitted you cannot return to change your answers.</p>
             </div>
             <div style={{display:"flex",gap:"0.65rem",padding:"0.9rem 1.25rem",borderTop:"1px solid #dde3e9"}}>
-              <button onClick={()=>setModal(false)} style={{flex:1,background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600,color:"#333"}}>Go Back</button>
-              <button onClick={doSubmit} style={{flex:1,background:"#1a6e2e",border:"none",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",color:"#fff",fontWeight:700}}>Submit</button>
+              <button onClick={()=>setModal(false)} style={{flex:1,background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600,color:"#333"}}>← Keep Working</button>
+              <button onClick={doSubmit} style={{flex:1,background:"#1a6e2e",border:"none",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",color:"#fff",fontWeight:700}}>Submit Final ✓</button>
             </div>
           </div>
         </div>
