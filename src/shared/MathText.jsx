@@ -59,7 +59,7 @@ function StudentLogin({ onStartTest, onStartPractice, onBack, prefill, codeOnly 
         }
       } catch {}
     }
-    setStep(codeOnly ? "confirm" : "mode");
+    setStep("confirm");
   }
 
   function handlePractice() {
@@ -101,7 +101,7 @@ function StudentLogin({ onStartTest, onStartPractice, onBack, prefill, codeOnly 
             </div>
           )}
           <div style={{display:"flex",gap:"0.75rem"}}>
-            <button onClick={()=>setStep(codeOnly?"name":"mode")} style={S.btnSec}>← Go Back</button>
+            <button onClick={()=>setStep("name")} style={S.btnSec}>← Go Back</button>
             <button onClick={()=>onStartTest(selectedStudent, selectedClass, code.toUpperCase(), testInfo)} style={S.btnPri}>Begin Test →</button>
           </div>
         </div>
