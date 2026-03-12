@@ -258,6 +258,74 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose }
   );
 }
 
+
+// ── Assign Classes Modal ───────────────────────────────────
+function AssignClassesModal({ test, onSave, onClose }) {
+  const [classes,  setClasses]  = useState([]);
+  const [selected, setSelected] = useState(test.classIds || []);
+  const [saving,   setSaving]   = useState(false);
+
+  useEffect(() => {
+    fetch(`${API}/roster`).then(r=>r.json()).then(d=>setClasses(Array.isArray(d)?d:[])).catch(()=>{});
+  }, []);
+
+  function toggle(id) {
+    setSelected(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev, id]);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    await onSave(selected);
+    setSaving(false);
+  }
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
+      <div style={{background:"#fff",borderRadius:"6px",width:"100%",maxWidth:"380px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.25)"}}>
+        <div style={{background:"#003865",color:"#fff",padding:"0.9rem 1.25rem"}}>
+          <div style={{fontSize:"0.6rem",opacity:.65,letterSpacing:"0.14em"}}>ASSIGN TO CLASSES</div>
+          <div style={{fontSize:"1rem",fontWeight:700}}>{test.name}</div>
+        </div>
+        <div style={{padding:"1.25rem"}}>
+          <div style={{fontSize:"0.75rem",color:"#555",marginBottom:"0.75rem"}}>
+            Students entering code <strong style={{fontFamily:"monospace",letterSpacing:"0.15em"}}>{test.code}</strong> will see names from these classes:
+          </div>
+          {classes.length === 0 ? (
+            <div style={{color:"#aaa",fontSize:"0.82rem",padding:"1rem",textAlign:"center"}}>No classes found.</div>
+          ) : (
+            <div style={{display:"flex",flexDirection:"column",gap:"4px",maxHeight:"200px",overflowY:"auto",marginBottom:"0.75rem"}}>
+              {classes.map(cls => {
+                const on = selected.includes(cls.id);
+                return (
+                  <label key={cls.id} onClick={()=>toggle(cls.id)}
+                    style={{display:"flex",alignItems:"center",gap:"0.6rem",padding:"0.5rem 0.75rem",
+                      border:`1px solid ${on?"#003865":"#dde3e9"}`,borderRadius:"4px",
+                      background:on?"#ddeaf7":"#fafbfc",cursor:"pointer"}}>
+                    <div style={{width:"16px",height:"16px",borderRadius:"3px",border:`2px solid ${on?"#003865":"#c8d3dd"}`,
+                      background:on?"#003865":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      {on&&<span style={{color:"#fff",fontSize:"0.65rem",fontWeight:900}}>✓</span>}
+                    </div>
+                    <span style={{fontWeight:on?700:400,color:on?"#003865":"#333",fontSize:"0.85rem"}}>{cls.name}</span>
+                    <span style={{marginLeft:"auto",fontSize:"0.68rem",color:"#888"}}>{cls.students?.length||0} students</span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+          {selected.length===0&&<div style={{fontSize:"0.72rem",color:"#e67e00",marginBottom:"0.75rem"}}>⚠ No class selected — students won't be able to find their name.</div>}
+          <div style={{display:"flex",gap:"0.65rem"}}>
+            <button onClick={onClose} style={{flex:1,background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600}}>Cancel</button>
+            <button onClick={handleSave} disabled={saving}
+              style={{flex:1,background:"#003865",border:"none",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",color:"#fff",fontWeight:700,opacity:saving?0.7:1}}>
+              {saving?"Saving…":"Save →"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main TestBuilder ───────────────────────────────────────
 export default function TestBuilder() {
   const [bank, setBank]               = useState([]);
@@ -269,6 +337,7 @@ export default function TestBuilder() {
   const [confirmDelete,     setConfirmDelete]     = useState(null);
   const [confirmDeleteTest, setConfirmDeleteTest] = useState(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [assignClassesTest, setAssignClassesTest] = useState(null); // test object to assign classes to
   const [savedTests, setSavedTests]   = useState([]);
   const [allClasses,  setAllClasses]  = useState([]);
   const [assigningTest, setAssigningTest] = useState(null); // test id being assigned
@@ -656,8 +725,9 @@ export default function TestBuilder() {
                             : `${t.count} question${t.count!==1?"s":""} · Saved ${t.saved_at}`}
                         </div>
                       </div>
-                      <div style={{display:"flex",gap:"0.4rem",flexShrink:0}}>
+                      <div style={{display:"flex",gap:"0.4rem",flexShrink:0,flexWrap:"wrap"}}>
                         <button onClick={()=>loadSavedTest(t.id)} style={{...S.smBtn,background:"#003865",color:"#fff",borderColor:"#003865",padding:"5px 12px"}}>Load</button>
+                        <button onClick={()=>setAssignClassesTest(t)} style={{...S.smBtn,padding:"5px 10px",background:"#e8f0fa",borderColor:"#b3cde8",color:"#003865"}}>🏫 Classes</button>
                         <button onClick={()=>setConfirmDeleteTest(t)} style={{...S.smBtn,color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",padding:"5px 10px"}}>🗑</button>
                       </div>
                     </div>
@@ -670,6 +740,13 @@ export default function TestBuilder() {
                           style={{...S.smBtn,marginLeft:"auto",padding:"2px 8px",fontSize:"0.68rem"}}>Copy</button>
                       </div>
                     )}
+                    {/* Class assignment badge */}
+                    <div onClick={()=>setAssignClassesTest(t)} style={{marginTop:"4px",display:"flex",alignItems:"center",gap:"0.4rem",cursor:"pointer"}}>
+                      {t.classIds?.length > 0
+                        ? <span style={{fontSize:"0.68rem",color:"#1a6e2e",background:"#f0faf2",border:"1px solid #b3dfc0",borderRadius:"10px",padding:"1px 8px"}}>🏫 {t.classIds.length} class{t.classIds.length!==1?"es":""} assigned</span>
+                        : <span style={{fontSize:"0.68rem",color:"#e67e00",background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"10px",padding:"1px 8px"}}>⚠ No class assigned — click to fix</span>
+                      }
+                    </div>
                     {/* Class assignment */}
                     {t.type !== "drill" && (
                       assigningTest === t.id ? (
@@ -677,7 +754,8 @@ export default function TestBuilder() {
                           <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"6px"}}>ASSIGN TO CLASSES</div>
                           <div style={{display:"flex",flexDirection:"column",gap:"3px",maxHeight:"110px",overflowY:"auto",marginBottom:"6px"}}>
                             {allClasses.map(cls => {
-                              const checked = (t.classIds||[]).includes(cls.id);
+                              const liveTest = savedTests.find(x=>x.id===t.id);
+                              const checked = (liveTest?.classIds||[]).includes(cls.id);
                               return (
                                 <label key={cls.id} onClick={()=>{
                                   const cur = savedTests.find(x=>x.id===t.id);
@@ -695,9 +773,19 @@ export default function TestBuilder() {
                             {allClasses.length===0 && <div style={{color:"#aaa",fontSize:"0.75rem"}}>No classes found.</div>}
                           </div>
                           <div style={{display:"flex",gap:"0.4rem"}}>
-                            <button onClick={()=>assignClasses(t.id, savedTests.find(x=>x.id===t.id)?.classIds||[])}
-                              style={{...S.smBtn,background:"#003865",color:"#fff",borderColor:"#003865",flex:1,padding:"4px"}}>Save</button>
-                            <button onClick={()=>setAssigningTest(null)}
+                            <button onClick={async ()=>{
+                              const cur = savedTests.find(x=>x.id===t.id);
+                              if (!cur) return;
+                              const fullTest = savedTests.find(x=>x.id===t.id);
+                              await fetch(`${API}/tests/saved/${t.id}`,{
+                                method:"PUT", headers:{"Content-Type":"application/json"},
+                                body: JSON.stringify({...fullTest, classIds: fullTest.classIds||[]})
+                              });
+                              await loadSavedTests();
+                              setAssigningTest(null);
+                            }}
+                              style={{...S.smBtn,background:"#003865",color:"#fff",borderColor:"#003865",flex:1,padding:"4px"}}>💾 Save</button>
+                            <button onClick={()=>{ loadSavedTests(); setAssigningTest(null); }}
                               style={{...S.smBtn,padding:"4px 8px"}}>Cancel</button>
                           </div>
                         </div>
@@ -726,6 +814,13 @@ export default function TestBuilder() {
       {/* Modals */}
       {editingQ&&<EditModal question={editingQ} onSave={handleSaveEdit} onClose={()=>setEditingQ(null)}/>}
       {showSaveModal&&<SaveTestModal count={selected.length} currentTitle={testTitle} savedTests={savedTests} onSave={saveTest} onClose={()=>setShowSaveModal(false)}/>}
+      {assignClassesTest&&<AssignClassesModal test={assignClassesTest} onSave={async(classIds)=>{
+        try {
+          await fetch(`${API}/tests/saved/${assignClassesTest.id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...assignClassesTest,classIds})});
+          await loadSavedTests();
+          setAssignClassesTest(null);
+        } catch {}
+      }} onClose={()=>setAssignClassesTest(null)}/>}
 
       {confirmDelete&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
