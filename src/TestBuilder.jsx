@@ -270,6 +270,8 @@ export default function TestBuilder() {
   const [confirmDeleteTest, setConfirmDeleteTest] = useState(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [savedTests, setSavedTests]   = useState([]);
+  const [allClasses,  setAllClasses]  = useState([]);
+  const [assigningTest, setAssigningTest] = useState(null); // test id being assigned
   const [savedMsg, setSavedMsg]       = useState("");
   const [rightTab, setRightTab]       = useState("current");
 
@@ -306,7 +308,10 @@ export default function TestBuilder() {
     catch { setSavedTests([]); }
   }, []);
 
-  useEffect(()=>{ loadBank(); loadActive(); loadSavedTests(); },[loadBank,loadActive,loadSavedTests]);
+  useEffect(()=>{
+    loadBank(); loadActive(); loadSavedTests();
+    fetch(`${API}/roster`).then(r=>r.json()).then(d=>setAllClasses(Array.isArray(d)?d:[])).catch(()=>{});
+  },[loadBank,loadActive,loadSavedTests]);
 
   const filtered = bank.filter(q => {
     if (filterStd  && !q.standard?.startsWith(filterStd)) return false;
@@ -343,6 +348,19 @@ export default function TestBuilder() {
   }
 
   function handleSaveEdit(updated) { setBank(b=>b.map(q=>q.id===updated.id?updated:q)); setEditingQ(null); }
+
+  async function assignClasses(testId, classIds) {
+    const t = savedTests.find(x => x.id === testId);
+    if (!t) return;
+    try {
+      await fetch(`${API}/tests/saved/${testId}`, {
+        method:"PUT", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({...t, classIds})
+      });
+      await loadSavedTests();
+    } catch {}
+    setAssigningTest(null);
+  }
 
   async function saveTest(name, code, adaptive=false, timerCfg={}) {
     try {
@@ -651,6 +669,51 @@ export default function TestBuilder() {
                         <button onClick={()=>navigator.clipboard.writeText(t.code)}
                           style={{...S.smBtn,marginLeft:"auto",padding:"2px 8px",fontSize:"0.68rem"}}>Copy</button>
                       </div>
+                    )}
+                    {/* Class assignment */}
+                    {t.type !== "drill" && (
+                      assigningTest === t.id ? (
+                        <div style={{marginTop:"0.5rem",background:"#f8fafc",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.6rem"}}>
+                          <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"6px"}}>ASSIGN TO CLASSES</div>
+                          <div style={{display:"flex",flexDirection:"column",gap:"3px",maxHeight:"110px",overflowY:"auto",marginBottom:"6px"}}>
+                            {allClasses.map(cls => {
+                              const checked = (t.classIds||[]).includes(cls.id);
+                              return (
+                                <label key={cls.id} onClick={()=>{
+                                  const cur = savedTests.find(x=>x.id===t.id);
+                                  if (!cur) return;
+                                  const ids = checked ? (cur.classIds||[]).filter(x=>x!==cls.id) : [...(cur.classIds||[]), cls.id];
+                                  setSavedTests(prev => prev.map(x => x.id===t.id ? {...x, classIds: ids} : x));
+                                }} style={{display:"flex",alignItems:"center",gap:"0.5rem",cursor:"pointer",padding:"3px 5px",borderRadius:"3px",background:checked?"#ddeaf7":"transparent",fontSize:"0.8rem"}}>
+                                  <div style={{width:"14px",height:"14px",borderRadius:"2px",border:`2px solid ${checked?"#003865":"#c8d3dd"}`,background:checked?"#003865":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                                    {checked && <span style={{color:"#fff",fontSize:"0.55rem",fontWeight:900}}>✓</span>}
+                                  </div>
+                                  <span style={{fontWeight:checked?700:400,color:checked?"#003865":"#333"}}>{cls.name}</span>
+                                </label>
+                              );
+                            })}
+                            {allClasses.length===0 && <div style={{color:"#aaa",fontSize:"0.75rem"}}>No classes found.</div>}
+                          </div>
+                          <div style={{display:"flex",gap:"0.4rem"}}>
+                            <button onClick={()=>assignClasses(t.id, savedTests.find(x=>x.id===t.id)?.classIds||[])}
+                              style={{...S.smBtn,background:"#003865",color:"#fff",borderColor:"#003865",flex:1,padding:"4px"}}>Save</button>
+                            <button onClick={()=>setAssigningTest(null)}
+                              style={{...S.smBtn,padding:"4px 8px"}}>Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{marginTop:"0.5rem",display:"flex",alignItems:"center",gap:"0.5rem"}}>
+                          <span style={{fontSize:"0.68rem",color:(t.classIds||[]).length?"#555":"#e67e00"}}>
+                            {(t.classIds||[]).length
+                              ? `🏫 ${(t.classIds||[]).map(id=>allClasses.find(c=>c.id===id)?.name||id).join(", ")}`
+                              : "⚠ No class assigned"}
+                          </span>
+                          <button onClick={()=>setAssigningTest(t.id)}
+                            style={{...S.smBtn,padding:"2px 8px",fontSize:"0.65rem",marginLeft:"auto",whiteSpace:"nowrap"}}>
+                            Assign Classes
+                          </button>
+                        </div>
+                      )
                     )}
                   </div>
                 ))
