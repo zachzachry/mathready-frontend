@@ -4,70 +4,49 @@ import TeacherShell from "./TeacherShell";
 import AdminShell from "./AdminShell";
 import { API } from "./shared/constants";
 
-function PinPad({ onConfirm, loading, err }) {
-  const [digits, setDigits] = useState([]);
-  const MAX = 5;
+function HexInput({ onConfirm, loading, err }) {
+  const [code, setCode] = useState("");
+  const HEX = /^[0-9A-Fa-f]*$/;
 
-  function press(d) {
-    if (loading) return;
-    setDigits(prev => {
-      if (prev.length >= MAX) return prev;
-      const next = [...prev, d];
-      if (next.length === MAX) setTimeout(() => onConfirm(next.join("")), 80);
-      return next;
-    });
+  useEffect(() => { if (err) setCode(""); }, [err]);
+
+  function handleChange(e) {
+    const v = e.target.value.toUpperCase().replace(/[^0-9A-F]/g, "").slice(0, 8);
+    setCode(v);
   }
-  function del() { if (!loading) setDigits(d => d.slice(0, -1)); }
-
-  useEffect(() => {
-    function handle(e) {
-      if (e.key >= "0" && e.key <= "9") press(Number(e.key));
-      if (e.key === "Backspace") del();
-    }
-    window.addEventListener("keydown", handle);
-    return () => window.removeEventListener("keydown", handle);
-  });
-
-  useEffect(() => { if (err) setDigits([]); }, [err]);
-
-  const KEYS = [[1,2,3],[4,5,6],[7,8,9],[null,0,"⌫"]];
+  function handleKey(e) {
+    if (e.key === "Enter" && code.length >= 4) onConfirm(code);
+  }
 
   return (
-    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"1.5rem"}}>
-      <div style={{display:"flex",gap:"0.85rem"}}>
-        {Array.from({length:MAX}).map((_,i)=>(
-          <div key={i} style={{width:"18px",height:"18px",borderRadius:"50%",
-            background:i<digits.length?"#003865":"#d0dae4",
-            border:"2px solid "+(i<digits.length?"#003865":"#b0bec8"),
-            transition:"background 0.15s"}}/>
-        ))}
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"1rem",width:"100%"}}>
+      <input
+        value={code}
+        onChange={handleChange}
+        onKeyDown={handleKey}
+        autoFocus
+        placeholder="e.g. A3F9B2"
+        maxLength={8}
+        style={{
+          width:"100%", padding:"0.85rem 1rem", border:"2px solid #b3cde8",
+          borderRadius:"6px", fontSize:"1.6rem", fontFamily:"monospace",
+          letterSpacing:"0.3em", textAlign:"center", textTransform:"uppercase",
+          fontWeight:700, color:"#003865", background:"#f8faff", boxSizing:"border-box",
+          outline:"none"
+        }}
+      />
+      <div style={{fontSize:"0.7rem",color:"#aaa",letterSpacing:"0.08em"}}>
+        CHARACTERS: 0–9 and A–F · 4 to 8 characters
       </div>
       {err && <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"4px",
-        padding:"0.55rem 1.25rem",fontSize:"0.82rem",color:"#8b1a1a",fontWeight:600,textAlign:"center"}}>
+        padding:"0.55rem 1.25rem",fontSize:"0.82rem",color:"#8b1a1a",fontWeight:600,textAlign:"center",width:"100%",boxSizing:"border-box"}}>
         ⚠ {err}</div>}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3, 72px)",gap:"0.6rem"}}>
-        {KEYS.flat().map((k,i)=>{
-          if(k===null) return <div key={i}/>;
-          const isDel = k==="⌫";
-          return (
-            <button key={i} onClick={()=>isDel?del():press(k)}
-              disabled={loading||(!isDel&&digits.length>=MAX)}
-              style={{width:"72px",height:"72px",borderRadius:"50%",
-                border:"2px solid "+(isDel?"#c8d3dd":"#b3cde8"),
-                background:isDel?"#f0f4f8":"#fff",
-                fontSize:isDel?"1.3rem":"1.5rem",fontWeight:700,
-                color:isDel?"#888":"#003865",cursor:loading?"not-allowed":"pointer",
-                boxShadow:"0 2px 6px rgba(0,0,0,.08)",transition:"transform 0.08s",
-                opacity:loading?0.6:1}}
-              onMouseDown={e=>e.currentTarget.style.transform="scale(0.93)"}
-              onMouseUp={e=>e.currentTarget.style.transform="scale(1)"}
-              onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
-              {k}
-            </button>
-          );
-        })}
-      </div>
-      {loading && <div style={{fontSize:"0.8rem",color:"#888"}}>Checking PIN…</div>}
+      <button onClick={()=>onConfirm(code)} disabled={loading||code.length<4}
+        style={{width:"100%",padding:"0.75rem",background:code.length>=4?"#003865":"#c8d3dd",
+          border:"none",borderRadius:"6px",fontSize:"1rem",fontWeight:700,color:"#fff",
+          cursor:code.length>=4?"pointer":"not-allowed",opacity:loading?0.7:1}}>
+        {loading ? "Checking…" : "Sign In →"}
+      </button>
     </div>
   );
 }
@@ -96,7 +75,7 @@ export default function App() {
         });
         setScreen("teacher");
       } else {
-        setErr("PIN not recognized. Check with your teacher.");
+        setErr("Code not recognized. Check with your admin.");
       }
     } catch {
       setErr("Could not connect. Try again.");
@@ -119,12 +98,12 @@ export default function App() {
         <div style={{fontSize:"1.6rem",fontWeight:700,color:"#003865",fontFamily:"Georgia,serif"}}>
           Staff Sign In
         </div>
-        <div style={{fontSize:"0.85rem",color:"#888",marginTop:"4px"}}>Enter your staff PIN</div>
+        <div style={{fontSize:"0.85rem",color:"#888",marginTop:"4px"}}>Enter your staff login code</div>
       </div>
       <div style={{background:"#fff",borderRadius:"8px",boxShadow:"0 4px 24px rgba(0,0,0,.1)",
         padding:"2rem 2.5rem",display:"flex",flexDirection:"column",alignItems:"center",gap:"1.25rem",
         width:"100%",maxWidth:"340px"}}>
-        <PinPad onConfirm={handlePin} loading={loading} err={err}/>
+        <HexInput onConfirm={handlePin} loading={loading} err={err}/>
       </div>
       <button onClick={reset} style={{fontSize:"0.72rem",color:"#888",background:"none",border:"none",cursor:"pointer",textDecoration:"underline"}}>
         ← Back
@@ -173,7 +152,7 @@ export default function App() {
           </div>
           <div>
             <div style={{fontSize:"1.1rem",fontWeight:700,color:"#003865",marginBottom:"3px"}}>I'm a Teacher / Admin</div>
-            <div style={{fontSize:"0.8rem",color:"#888"}}>Sign in with your staff PIN</div>
+            <div style={{fontSize:"0.8rem",color:"#888"}}>Sign in with your staff code</div>
           </div>
         </button>
       </div>
