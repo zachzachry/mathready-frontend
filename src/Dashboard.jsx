@@ -99,13 +99,29 @@ function LineChart({ points, width=320, height=80, color="#003865" }) {
 
 // ── Test Controls ─────────────────────────────────────────
 function TestControls() {
-  const [ctrl,    setCtrl]    = useState({ paused: false, stopped: false });
-  const [loading, setLoading] = useState(true);
-  const [saving,  setSaving]  = useState(false);
-  const [msg,     setMsg]     = useState("");
+  const [ctrl,       setCtrl]       = useState({ paused: false, stopped: false, extensions: {} });
+  const [active,     setActive]     = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [saving,     setSaving]     = useState(false);
+  const [msg,        setMsg]        = useState("");
+  const [extMsgs,    setExtMsgs]    = useState({});  // per-student flash messages
 
+  // Poll control state + active students every 5s
   useEffect(() => {
-    fetch(`${API}/test/control`).then(r=>r.json()).then(d=>{ setCtrl(d); setLoading(false); }).catch(()=>setLoading(false));
+    async function poll() {
+      try {
+        const [c, a] = await Promise.all([
+          fetch(`${API}/test/control`).then(r=>r.json()),
+          fetch(`${API}/active`).then(r=>r.json()).catch(()=>[]),
+        ]);
+        setCtrl(c);
+        setActive(Array.isArray(a) ? a : []);
+      } catch {}
+      setLoading(false);
+    }
+    poll();
+    const t = setInterval(poll, 5000);
+    return () => clearInterval(t);
   }, []);
 
   async function send(patch) {
@@ -119,16 +135,33 @@ function TestControls() {
       setCtrl(d);
       setMsg(patch.paused != null
         ? (patch.paused ? "Test paused — students see a waiting screen." : "Test resumed.")
-        : (patch.stopped ? "Test stopped — students prompted to submit." : "Stop cleared."));
+        : (patch.stopped ? "Test stopped — students prompted to submit." : "Stop cleared. Extensions reset."));
       setTimeout(() => setMsg(""), 4000);
     } catch { setMsg("Failed to update."); }
     setSaving(false);
   }
 
+  async function grantExtension(studentName, extraSecs) {
+    try {
+      await fetch(`${API}/test/control/extend`, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ studentName, extraSecs }),
+      });
+      const mins = extraSecs / 60;
+      setExtMsgs(prev => ({ ...prev, [studentName]: `+${mins} min granted` }));
+      setTimeout(() => setExtMsgs(prev => { const n={...prev}; delete n[studentName]; return n; }), 3000);
+      // Refresh ctrl to show updated extensions
+      const d = await fetch(`${API}/test/control`).then(r=>r.json());
+      setCtrl(d);
+    } catch {}
+  }
+
   if (loading) return <div style={{padding:"2rem",color:"#aaa"}}>Loading…</div>;
 
+  const extensions = ctrl.extensions || {};
+
   return (
-    <div style={{padding:"1.25rem",maxWidth:"560px",fontFamily:"sans-serif"}}>
+    <div style={{padding:"1.25rem",maxWidth:"620px",fontFamily:"sans-serif"}}>
       <div style={{fontSize:"1rem",fontWeight:700,color:"#003865",marginBottom:"4px"}}>Live Test Controls</div>
       <div style={{fontSize:"0.75rem",color:"#888",marginBottom:"1.5rem"}}>
         Controls apply to all students currently taking a test. Students poll every 5 seconds.
@@ -161,7 +194,7 @@ function TestControls() {
       </div>
 
       {/* Stop */}
-      <div style={{background:"#fff",border:"1px solid #f0b8b8",borderRadius:"6px",padding:"1.1rem 1.25rem",marginBottom:"0.85rem",display:"flex",alignItems:"center",gap:"1rem"}}>
+      <div style={{background:"#fff",border:"1px solid #f0b8b8",borderRadius:"6px",padding:"1.1rem 1.25rem",marginBottom:"1.25rem",display:"flex",alignItems:"center",gap:"1rem"}}>
         <div style={{flex:1}}>
           <div style={{fontWeight:700,fontSize:"0.92rem",color:ctrl.stopped?"#8b1a1a":"#1a1a1a",marginBottom:"2px"}}>
             {ctrl.stopped ? "🛑 Test is STOPPED" : "🛑 Stop Test"}
@@ -187,8 +220,54 @@ function TestControls() {
         }
       </div>
 
-      <div style={{fontSize:"0.7rem",color:"#aaa",marginTop:"0.5rem"}}>
-        These controls affect all active tests school-wide. Pause/stop state resets when you click Clear Stop.
+      {/* IEP Time Extensions */}
+      <div style={{marginBottom:"1.25rem"}}>
+        <div style={{fontSize:"0.85rem",fontWeight:700,color:"#003865",marginBottom:"4px"}}>⏱ Time Extensions (IEP / 504)</div>
+        <div style={{fontSize:"0.72rem",color:"#888",marginBottom:"0.85rem"}}>
+          Grant extra time to individual students currently taking the test. Their timer adds the extra minutes immediately.
+        </div>
+
+        {active.length === 0 ? (
+          <div style={{background:"#f8fafc",border:"1px solid #dde3e9",borderRadius:"6px",padding:"1rem 1.25rem",fontSize:"0.8rem",color:"#aaa",textAlign:"center"}}>
+            No students are currently active. Extensions can only be granted during a live test.
+          </div>
+        ) : (
+          <div style={{display:"flex",flexDirection:"column",gap:"0.5rem"}}>
+            {active.map(s => {
+              const totalExtra = extensions[s.name] || 0;
+              const flashMsg   = extMsgs[s.name];
+              return (
+                <div key={s.name} style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"6px",padding:"0.75rem 1rem",display:"flex",alignItems:"center",gap:"0.75rem",flexWrap:"wrap"}}>
+                  <div style={{flex:1,minWidth:"120px"}}>
+                    <div style={{fontWeight:700,fontSize:"0.88rem",color:"#1a1a1a"}}>{s.name}</div>
+                    <div style={{fontSize:"0.68rem",color:"#888"}}>
+                      Q{s.current_question+1} · {s.status === "active" ? <span style={{color:"#1a6e2e"}}>● Active</span> : <span style={{color:"#b8860b"}}>● Slow</span>}
+                      {totalExtra > 0 && <span style={{color:"#003865",marginLeft:"0.5rem",fontWeight:700}}>+{totalExtra/60} min granted</span>}
+                    </div>
+                  </div>
+                  {flashMsg ? (
+                    <div style={{background:"#f0faf2",border:"1px solid #b3dfc0",borderRadius:"4px",padding:"4px 12px",fontSize:"0.75rem",color:"#1a6e2e",fontWeight:700}}>
+                      ✓ {flashMsg}
+                    </div>
+                  ) : (
+                    <div style={{display:"flex",gap:"4px"}}>
+                      {[5,10,15,30].map(mins => (
+                        <button key={mins} onClick={()=>grantExtension(s.name, mins*60)}
+                          style={{background:"#ddeaf7",border:"1px solid #b3cde8",borderRadius:"4px",padding:"5px 10px",fontSize:"0.75rem",fontWeight:700,cursor:"pointer",color:"#003865",whiteSpace:"nowrap"}}>
+                          +{mins}m
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div style={{fontSize:"0.7rem",color:"#aaa"}}>
+        Pause/stop controls affect all students school-wide. Extensions are per-student and reset when stop is cleared.
       </div>
     </div>
   );
@@ -402,8 +481,64 @@ export default function Dashboard({ teacher }) {
           <div style={{fontSize:"0.82rem",marginTop:"4px"}}>Item analysis appears once students start submitting.</div>
         </div>
       );
+      // ── DOK breakdown ──
+      const dokLevels = [1, 2, 3];
+      const dokData = dokLevels.map(dok => {
+        const qs = itemData.filter(q => q.dok === dok);
+        const correct  = qs.reduce((a, q) => a + q.correctCount, 0);
+        const attempts = qs.reduce((a, q) => a + q.attempted, 0);
+        const pct = attempts ? Math.round((correct / attempts) * 100) : null;
+        return { dok, qs: qs.length, correct, attempts, pct };
+      }).filter(d => d.attempts > 0);
+
+      const DOK_LABELS = { 1: "Recall & Reproduction", 2: "Skills & Concepts", 3: "Strategic Thinking" };
+      const DOK_COLORS = { 1: "#003865", 2: "#7a4e00", 3: "#5b21b6" };
+      const DOK_BG     = { 1: "#ddeaf7", 2: "#fff8e1", 3: "#f3f0ff" };
+
       return (
-        <div style={{maxWidth:"860px"}}>
+        <div style={{maxWidth:"860px",display:"flex",flexDirection:"column",gap:"0.85rem"}}>
+
+          {/* DOK Summary Cards */}
+          {dokData.length > 0 && (
+            <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden"}}>
+              <div style={{padding:"0.75rem 1rem",background:"#f0f4f8",borderBottom:"1px solid #dde3e9",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555"}}>
+                DOK PERFORMANCE BREAKDOWN
+              </div>
+              <div style={{display:"flex",gap:0,flexWrap:"wrap"}}>
+                {dokData.map((d, i) => (
+                  <div key={d.dok} style={{flex:1,minWidth:"160px",padding:"1rem 1.25rem",borderRight:i<dokData.length-1?"1px solid #dde3e9":"none"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:"0.5rem",marginBottom:"0.5rem"}}>
+                      <span style={{background:DOK_BG[d.dok],border:`1px solid ${DOK_COLORS[d.dok]}44`,borderRadius:"3px",padding:"2px 8px",fontSize:"0.65rem",fontWeight:700,color:DOK_COLORS[d.dok]}}>
+                        DOK {d.dok}
+                      </span>
+                      <span style={{fontSize:"0.72rem",color:"#888"}}>{DOK_LABELS[d.dok]}</span>
+                    </div>
+                    <div style={{fontSize:"2rem",fontWeight:700,color:d.pct>=70?"#1a6e2e":d.pct>=50?"#b8860b":"#8b1a1a",lineHeight:1}}>
+                      {d.pct}%
+                    </div>
+                    <div style={{height:"6px",background:"#e8edf2",borderRadius:"3px",margin:"0.4rem 0",overflow:"hidden"}}>
+                      <div style={{height:"100%",width:`${d.pct}%`,background:d.pct>=70?"#1a6e2e":d.pct>=50?"#f59e0b":"#8b1a1a",borderRadius:"3px",transition:"width .4s"}}/>
+                    </div>
+                    <div style={{fontSize:"0.68rem",color:"#888"}}>{d.correct}/{d.attempts} correct · {d.qs} question{d.qs!==1?"s":""}</div>
+                  </div>
+                ))}
+              </div>
+              {dokData.length >= 2 && (() => {
+                const sorted = [...dokData].sort((a,b) => a.pct - b.pct);
+                const weakest = sorted[0];
+                const strongest = sorted[sorted.length-1];
+                return (
+                  <div style={{padding:"0.6rem 1.25rem",borderTop:"1px solid #dde3e9",background:"#fafbfc",display:"flex",gap:"1.5rem",flexWrap:"wrap"}}>
+                    <span style={{fontSize:"0.72rem",color:"#555"}}>
+                      💡 <strong>Insight:</strong> Students perform best on DOK {strongest.dok} ({strongest.pct}%) and struggle most on DOK {weakest.dok} ({weakest.pct}%).
+                      {weakest.dok > 1 ? " Consider more scaffolding for higher-order thinking." : " Focus on foundational recall and fluency."}
+                    </span>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
           <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden"}}>
             <div style={{padding:"0.75rem 1rem",background:"#f0f4f8",borderBottom:"1px solid #dde3e9",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555"}}>
               ITEM ANALYSIS — {itemData.length} questions attempted
