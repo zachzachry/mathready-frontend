@@ -94,7 +94,7 @@ function TeacherApp({ onBack, teacher }) {
             switch(activeTool) {
               case "dashboard":   return <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column",height:"100%"}}><Dashboard    teacher={effectiveTeacher} readOnly={readOnly}/></div>;
               case "roster":      return <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column",height:"100%"}}><RosterManager teacher={effectiveTeacher} readOnly={readOnly}/></div>;
-              case "testbuilder": return <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column",height:"100%"}}><TestBuilder   readOnly={readOnly}/></div>;
+              case "testbuilder": return <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column",height:"100%"}}><TestBuilder   teacher={effectiveTeacher} readOnly={readOnly}/></div>;
               case "builder":     return <div style={{flex:1,overflowY:"auto",height:"100%"}}><QuestionBuilder readOnly={readOnly}/></div>;
               case "importer":    return <div style={{flex:1,overflowY:"auto",height:"100%"}}><PDFImporter     readOnly={readOnly}/></div>;
               default:            return <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column",height:"100%"}}><Dashboard    teacher={effectiveTeacher} readOnly={readOnly}/></div>;
