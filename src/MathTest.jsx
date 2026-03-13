@@ -6,9 +6,9 @@ import { buildWeightMap, updateSessionWeights, pickAdaptiveQuestion, ALL_STANDAR
 import PlotGrid from "./shared/PlotGrid";
 
 // ── Student Login ──────────────────────────────────────────
-function StudentLogin({ onStartTest, onStartPractice, onBack, prefill, codeOnly }) {
+function StudentLogin({ onStartTest, onStartPractice, onBack, prefill, codeOnly, prefillCode }) {
   // New flow: code → pick name → confirm
-  const [code,        setCode]       = useState("");
+  const [code,        setCode]       = useState(prefillCode || "");
   const [err,         setErr]        = useState("");
   const [checking,    setChecking]   = useState(false);
   const [testInfo,    setTestInfo]   = useState(null);
@@ -20,9 +20,14 @@ function StudentLogin({ onStartTest, onStartPractice, onBack, prefill, codeOnly 
   const selectedClass   = prefill?.cls     || rosterCls.find(c => c.id === classId);
   const selectedStudent = prefill?.student || selectedClass?.students?.find(s => s.id === studentId);
 
+  // Auto-submit if code came from URL param
+  useEffect(() => {
+    if (prefillCode) checkCode(prefillCode);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Step 1 — validate test code and load roster
-  async function checkCode() {
-    const c = code.trim().toUpperCase();
+  async function checkCode(overrideCode) {
+    const c = (overrideCode || code).trim().toUpperCase();
     if (!c) { setErr("Please enter the test code."); return; }
     setChecking(true); setErr("");
     try {
@@ -1261,10 +1266,91 @@ function StudentResults({ session, questions, onReset }) {
   );
 }
 
+// ── PracticeLogin: loads class roster by ID, student picks name, enters practice ──
+function PracticeLogin({ classId, onStart, onBack }) {
+  const [cls,       setCls]       = useState(null);
+  const [loading,   setLoading]   = useState(true);
+  const [err,       setErr]       = useState("");
+  const [studentId, setStudentId] = useState("");
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const r = await fetch(`${API}/roster/class/${encodeURIComponent(classId)}`);
+        const d = await r.json();
+        if (d.id) { setCls(d); }
+        else { setErr("Practice link not recognized. Check with your teacher."); }
+      } catch { setErr("Could not connect. Try again."); }
+      setLoading(false);
+    }
+    load();
+  }, [classId]);
+
+  const selected = cls?.students?.find(s => s.id === studentId);
+
+  if (loading) return (
+    <div style={{minHeight:"100vh",background:"#e8edf2",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"sans-serif"}}>
+      <div style={{color:"#888"}}>Loading…</div>
+    </div>
+  );
+
+  if (err) return (
+    <div style={{minHeight:"100vh",background:"#e8edf2",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontFamily:"sans-serif",gap:"1rem"}}>
+      <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"6px",padding:"1rem 1.5rem",color:"#8b1a1a",fontWeight:600}}>{err}</div>
+      <button onClick={onBack} style={{fontSize:"0.78rem",color:"#888",background:"none",border:"none",cursor:"pointer",textDecoration:"underline"}}>← Back</button>
+    </div>
+  );
+
+  return (
+    <div style={{minHeight:"100vh",background:"#e8edf2",display:"flex",flexDirection:"column",
+      alignItems:"center",justifyContent:"center",fontFamily:"sans-serif",padding:"2rem 1rem",gap:"2rem"}}>
+      <div style={{textAlign:"center"}}>
+        <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.18em",color:"#888",marginBottom:"6px"}}>
+          GEORGIA MILESTONES READINESS TRAINER
+        </div>
+        <div style={{fontSize:"1.6rem",fontWeight:700,color:"#1a6e2e",fontFamily:"Georgia,serif"}}>
+          🎯 Practice Mode
+        </div>
+        <div style={{fontSize:"0.85rem",color:"#888",marginTop:"4px"}}>{cls?.name}</div>
+      </div>
+      <div style={{background:"#fff",borderRadius:"8px",boxShadow:"0 4px 24px rgba(0,0,0,.1)",
+        padding:"2rem 2.5rem",display:"flex",flexDirection:"column",gap:"1.25rem",
+        width:"100%",maxWidth:"340px"}}>
+        <label style={{fontSize:"0.78rem",fontWeight:700,color:"#555",letterSpacing:"0.06em"}}>SELECT YOUR NAME</label>
+        <select value={studentId} onChange={e=>setStudentId(e.target.value)}
+          style={{padding:"0.7rem 0.9rem",border:"2px solid #b3dfc0",borderRadius:"6px",
+            fontSize:"1rem",color:studentId?"#1a6e2e":"#aaa",fontWeight:600,
+            background:"#f6fdf8",outline:"none",width:"100%",boxSizing:"border-box"}}>
+          <option value="">— choose your name —</option>
+          {(cls?.students||[]).map(s => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
+        <button onClick={()=>{ if(selected) onStart(selected, cls); }}
+          disabled={!selected}
+          style={{background:selected?"#1a6e2e":"#c8d3dd",border:"none",borderRadius:"6px",
+            padding:"0.75rem",fontSize:"1rem",fontWeight:700,color:"#fff",
+            cursor:selected?"pointer":"not-allowed"}}>
+          Start Practice →
+        </button>
+      </div>
+      <button onClick={onBack} style={{fontSize:"0.72rem",color:"#888",background:"none",border:"none",cursor:"pointer",textDecoration:"underline"}}>
+        ← Back
+      </button>
+    </div>
+  );
+}
+
 // ── Main shell ─────────────────────────────────────────────
-export default function MathTest({ onBack, identity }) {
-  // identity is pre-filled from PIN login: { studentId, studentName, classId, className }
-  const [screen,          setScreen]          = useState(identity ? "mode" : "login");
+export default function MathTest({ onBack, identity, prefillCode, directPracticeClassId }) {
+  // identity     = pre-filled from PIN login
+  // prefillCode  = test code from ?code= URL param (skip code entry)
+  // directPracticeClassId = class ID from ?practice= URL param (skip to practice name picker)
+  const initScreen = directPracticeClassId ? "practice-login"
+                   : prefillCode           ? "login"
+                   : identity              ? "mode"
+                                           : "login";
+  const [screen,          setScreen]          = useState(initScreen);
   const [student,         setStudent]         = useState(
     identity ? { id: identity.studentId, name: identity.studentName } : null
   );
@@ -1282,9 +1368,9 @@ export default function MathTest({ onBack, identity }) {
   const [warnSecs,        setWarnSecs]        = useState(300);
 
   function reset() {
+    if (prefillCode || directPracticeClassId) { onBack(); return; }
     setFinalSession(null); setPracticeHistory([]);
     setTestCode("");
-    // If came via PIN, go back to mode picker not login
     setScreen(identity ? "mode" : "login");
   }
 
@@ -1409,7 +1495,11 @@ export default function MathTest({ onBack, identity }) {
   }
 
   if (screen === "login")
-    return <StudentLogin onStartTest={handleStartTest} onStartPractice={handleStartPractice} onBack={onBack}/>;
+    return <StudentLogin onStartTest={handleStartTest} onStartPractice={handleStartPractice} onBack={onBack} prefillCode={prefillCode}/>;
+
+  // ── Practice link flow: load class roster, pick name, go to practice ──
+  if (screen === "practice-login")
+    return <PracticeLogin classId={directPracticeClassId} onStart={handleStartPractice} onBack={onBack}/>;
 
   if (screen === "practice")
     return <PracticeMode student={student} cls={cls} onFinish={handleFinishPractice} onQuit={reset}/>;
