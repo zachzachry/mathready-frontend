@@ -1266,40 +1266,49 @@ function StudentResults({ session, questions, onReset }) {
   );
 }
 
-// ── PracticeLogin: loads class roster by ID, student picks name, enters practice ──
-function PracticeLogin({ classId, onStart, onBack }) {
-  const [cls,       setCls]       = useState(null);
-  const [loading,   setLoading]   = useState(true);
-  const [err,       setErr]       = useState("");
-  const [studentId, setStudentId] = useState("");
+// ── GoogleSignIn: used for ?code= and ?practice= link flows ──────────────────
+function GoogleSignIn({ mode, codeOrClassId, onSuccess, onBack }) {
+  // mode = "test" | "practice"
+  const [err,     setErr]     = useState("");
+  const [loading, setLoading] = useState(false);
+  const btnRef = useRef(null);
+  const CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
 
   useEffect(() => {
-    async function load() {
-      try {
-        const r = await fetch(`${API}/roster/class/${encodeURIComponent(classId)}`);
-        const d = await r.json();
-        if (d.id) { setCls(d); }
-        else { setErr("Practice link not recognized. Check with your teacher."); }
-      } catch { setErr("Could not connect. Try again."); }
-      setLoading(false);
+    if (!CLIENT_ID || !window.google) return;
+    window.google.accounts.id.initialize({
+      client_id: CLIENT_ID,
+      callback: handleCredential,
+      ux_mode: "popup",
+    });
+    window.google.accounts.id.renderButton(btnRef.current, {
+      theme: "outline",
+      size: "large",
+      text: "signin_with",
+      shape: "rectangular",
+      width: 280,
+    });
+  // eslint-disable-line
+  }, [CLIENT_ID]);
+
+  async function handleCredential(response) {
+    setLoading(true); setErr("");
+    try {
+      const body = { token: response.credential };
+      if (mode === "test")     body.code    = codeOrClassId;
+      if (mode === "practice") body.classId = codeOrClassId;
+      const r = await fetch(`${API}/auth/google/verify`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await r.json();
+      if (!r.ok) { setErr(data.detail || "Sign-in failed. Check with your teacher."); setLoading(false); return; }
+      onSuccess(data.student, data.cls);
+    } catch {
+      setErr("Could not connect. Try again.");
     }
-    load();
-  }, [classId]);
-
-  const selected = cls?.students?.find(s => s.id === studentId);
-
-  if (loading) return (
-    <div style={{minHeight:"100vh",background:"#e8edf2",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"sans-serif"}}>
-      <div style={{color:"#888"}}>Loading…</div>
-    </div>
-  );
-
-  if (err) return (
-    <div style={{minHeight:"100vh",background:"#e8edf2",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontFamily:"sans-serif",gap:"1rem"}}>
-      <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"6px",padding:"1rem 1.5rem",color:"#8b1a1a",fontWeight:600}}>{err}</div>
-      <button onClick={onBack} style={{fontSize:"0.78rem",color:"#888",background:"none",border:"none",cursor:"pointer",textDecoration:"underline"}}>← Back</button>
-    </div>
-  );
+    setLoading(false);
+  }
 
   return (
     <div style={{minHeight:"100vh",background:"#e8edf2",display:"flex",flexDirection:"column",
@@ -1308,32 +1317,41 @@ function PracticeLogin({ classId, onStart, onBack }) {
         <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.18em",color:"#888",marginBottom:"6px"}}>
           GEORGIA MILESTONES READINESS TRAINER
         </div>
-        <div style={{fontSize:"1.6rem",fontWeight:700,color:"#1a6e2e",fontFamily:"Georgia,serif"}}>
-          🎯 Practice Mode
+        <div style={{fontSize:"1.6rem",fontWeight:700,color:mode==="practice"?"#1a6e2e":"#003865",fontFamily:"Georgia,serif"}}>
+          {mode === "practice" ? "🎯 Practice Mode" : "📝 Take a Test"}
         </div>
-        <div style={{fontSize:"0.85rem",color:"#888",marginTop:"4px"}}>{cls?.name}</div>
+        <div style={{fontSize:"0.85rem",color:"#888",marginTop:"4px"}}>
+          Sign in with your school Google account to continue
+        </div>
       </div>
+
       <div style={{background:"#fff",borderRadius:"8px",boxShadow:"0 4px 24px rgba(0,0,0,.1)",
-        padding:"2rem 2.5rem",display:"flex",flexDirection:"column",gap:"1.25rem",
-        width:"100%",maxWidth:"340px"}}>
-        <label style={{fontSize:"0.78rem",fontWeight:700,color:"#555",letterSpacing:"0.06em"}}>SELECT YOUR NAME</label>
-        <select value={studentId} onChange={e=>setStudentId(e.target.value)}
-          style={{padding:"0.7rem 0.9rem",border:"2px solid #b3dfc0",borderRadius:"6px",
-            fontSize:"1rem",color:studentId?"#1a6e2e":"#aaa",fontWeight:600,
-            background:"#f6fdf8",outline:"none",width:"100%",boxSizing:"border-box"}}>
-          <option value="">— choose your name —</option>
-          {(cls?.students||[]).map(s => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
-        <button onClick={()=>{ if(selected) onStart(selected, cls); }}
-          disabled={!selected}
-          style={{background:selected?"#1a6e2e":"#c8d3dd",border:"none",borderRadius:"6px",
-            padding:"0.75rem",fontSize:"1rem",fontWeight:700,color:"#fff",
-            cursor:selected?"pointer":"not-allowed"}}>
-          Start Practice →
-        </button>
+        padding:"2rem 2.5rem",display:"flex",flexDirection:"column",alignItems:"center",gap:"1.5rem",
+        width:"100%",maxWidth:"360px"}}>
+        {loading ? (
+          <div style={{color:"#888",fontSize:"0.9rem"}}>Verifying…</div>
+        ) : (
+          <>
+            <div style={{fontSize:"0.82rem",color:"#555",textAlign:"center",lineHeight:1.6}}>
+              Use the Google account you use for Google Classroom.
+            </div>
+            <div ref={btnRef}></div>
+            {!CLIENT_ID && (
+              <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"4px",
+                padding:"0.5rem 1rem",fontSize:"0.78rem",color:"#8b1a1a",textAlign:"center"}}>
+                Google auth not configured. Contact your administrator.
+              </div>
+            )}
+          </>
+        )}
+        {err && (
+          <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"4px",
+            padding:"0.55rem 1.25rem",fontSize:"0.82rem",color:"#8b1a1a",fontWeight:600,textAlign:"center",width:"100%",boxSizing:"border-box"}}>
+            ⚠ {err}
+          </div>
+        )}
       </div>
+
       <button onClick={onBack} style={{fontSize:"0.72rem",color:"#888",background:"none",border:"none",cursor:"pointer",textDecoration:"underline"}}>
         ← Back
       </button>
@@ -1346,8 +1364,8 @@ export default function MathTest({ onBack, identity, prefillCode, directPractice
   // identity     = pre-filled from PIN login
   // prefillCode  = test code from ?code= URL param (skip code entry)
   // directPracticeClassId = class ID from ?practice= URL param (skip to practice name picker)
-  const initScreen = directPracticeClassId ? "practice-login"
-                   : prefillCode           ? "login"
+  const initScreen = directPracticeClassId ? "google-practice"
+                   : prefillCode           ? "google-test"
                    : identity              ? "mode"
                                            : "login";
   const [screen,          setScreen]          = useState(initScreen);
@@ -1497,9 +1515,21 @@ export default function MathTest({ onBack, identity, prefillCode, directPractice
   if (screen === "login")
     return <StudentLogin onStartTest={handleStartTest} onStartPractice={handleStartPractice} onBack={onBack} prefillCode={prefillCode}/>;
 
-  // ── Practice link flow: load class roster, pick name, go to practice ──
-  if (screen === "practice-login")
-    return <PracticeLogin classId={directPracticeClassId} onStart={handleStartPractice} onBack={onBack}/>;
+  // ── Google Sign-In flows (from Google Classroom links) ──
+  if (screen === "google-test")
+    return <GoogleSignIn mode="test" codeOrClassId={prefillCode} onBack={onBack}
+      onSuccess={async (studentObj, classObj) => {
+        // Fetch testInfo so handleStartTest gets full config
+        try {
+          const r = await fetch(`${API}/test/code/${encodeURIComponent(prefillCode)}`);
+          const testInfo = await r.json();
+          handleStartTest(studentObj, classObj, prefillCode, testInfo);
+        } catch { handleStartTest(studentObj, classObj, prefillCode, null); }
+      }} />;
+
+  if (screen === "google-practice")
+    return <GoogleSignIn mode="practice" codeOrClassId={directPracticeClassId} onBack={onBack}
+      onSuccess={(studentObj, classObj) => handleStartPractice(studentObj, classObj)} />;
 
   if (screen === "practice")
     return <PracticeMode student={student} cls={cls} onFinish={handleFinishPractice} onQuit={reset}/>;
