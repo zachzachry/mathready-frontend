@@ -364,7 +364,7 @@ function EmailModal({ student, onSave, onClose }) {
   );
 }
 
-export default function RosterManager({ teacher }) {
+export default function RosterManager({ teacher, readOnly }) {
   const [classes,    setClasses]    = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [activeClass,setActiveClass]= useState(null);
@@ -588,6 +588,7 @@ export default function RosterManager({ teacher }) {
           <div style={{fontSize:"0.72rem",opacity:.7,marginTop:"2px"}}>{classes.length} class{classes.length!==1?"es":""} · {totalStudents} students</div>
         </div>
 
+        {!readOnly && (
         <div style={{padding:"0.85rem 1rem",borderBottom:"1px solid #dde3e9",flexShrink:0}}>
           <label style={S.lbl}>NEW CLASS / PERIOD</label>
           <div style={{display:"flex",gap:"0.4rem"}}>
@@ -606,6 +607,7 @@ export default function RosterManager({ teacher }) {
           </button>
           {msg && <div style={{fontSize:"0.72rem",color:"#1a6e2e",fontWeight:700,marginTop:"5px"}}>✓ {msg}</div>}
         </div>
+        )}
 
         <div style={{flex:1,overflowY:"auto",padding:"0.5rem"}}>
           {classes.length===0 ? (
@@ -625,9 +627,11 @@ export default function RosterManager({ teacher }) {
                     style={{...S.btn,padding:"2px 7px",fontSize:"0.65rem",color:"#1a6e2e",borderColor:"#b3dfc0",background:"#f0faf2"}}>
                     📋 Practice Link
                   </button>
+                  {!readOnly && (
                   <button onClick={e=>{e.stopPropagation();deleteClass(cls.id);}}
                     title="Delete entire class"
                     style={{...S.btn,padding:"2px 7px",color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",fontSize:"0.68rem"}}>🗑 Delete</button>
+                  )}
                 </div>
               </div>
             );
@@ -673,6 +677,7 @@ export default function RosterManager({ teacher }) {
             </div>
 
             {/* Add students */}
+            {!readOnly && (
             <div style={{background:"#fff",borderBottom:"2px solid #dde3e9",padding:"1rem 1.25rem",flexShrink:0}}>
               <div style={{display:"flex",gap:"0.4rem",marginBottom:"0.75rem",flexWrap:"wrap"}}>
                 {[["one","Add One"],["paste","Paste List"],["csv","📄 Upload CSV"]].map(([key,lbl])=>(
@@ -747,6 +752,7 @@ export default function RosterManager({ teacher }) {
                 </div>
               ) : null}
             </div>
+            )}
 
             {/* Student list */}
             <div style={{flex:1,overflowY:"auto",padding:"0.75rem 1.25rem"}}>
@@ -774,6 +780,7 @@ export default function RosterManager({ teacher }) {
                           )}
                         </span>
                       </div>
+                      {!readOnly && (<>
                       <PinEditor
                         pin={s.pin}
                         onSave={pin=>setPin(activeClassData.id, s.id, pin)}
@@ -788,6 +795,7 @@ export default function RosterManager({ teacher }) {
                       </button>
                       <button onClick={()=>removeStudent(activeClassData.id, s.id, s.name)}
                         style={{...S.btn,padding:"2px 8px",color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",fontSize:"0.7rem"}}>✕</button>
+                      </>)}
                     </div>
                   ))}
                 </div>
