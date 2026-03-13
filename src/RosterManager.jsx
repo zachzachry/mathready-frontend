@@ -99,6 +99,75 @@ function printPinSheet(cls) {
 }
 
 // ── Main ───────────────────────────────────────────────────
+// ── Accommodations Modal ──────────────────────────────────
+function AccomModal({ student, onSave, onClose }) {
+  const [extTime,  setExtTime]  = useState(student.extendedTime  || "none");
+  const [reduce,   setReduce]   = useState(!!student.reduceChoices);
+  const [saving,   setSaving]   = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+    await onSave(extTime, reduce);
+    setSaving(false);
+  }
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}}>
+      <div style={{background:"#fff",borderRadius:"6px",width:"100%",maxWidth:"380px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.22)"}}>
+        <div style={{background:"#003865",color:"#fff",padding:"0.9rem 1.25rem"}}>
+          <div style={{fontSize:"0.62rem",letterSpacing:"0.12em",opacity:.7,marginBottom:"2px"}}>ACCOMMODATIONS</div>
+          <div style={{fontSize:"1rem",fontWeight:700}}>{student.name}</div>
+        </div>
+        <div style={{padding:"1.25rem",display:"flex",flexDirection:"column",gap:"1rem"}}>
+
+          {/* Extended Time */}
+          <div>
+            <label style={{display:"block",fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"8px"}}>⏱ EXTENDED TIME (IEP / 504)</label>
+            <div style={{display:"flex",gap:"0.5rem"}}>
+              {[["none","Standard"],["1.5x","1.5×"],["2x","2×"]].map(([val,lbl])=>(
+                <button key={val} onClick={()=>setExtTime(val)}
+                  style={{flex:1,padding:"0.55rem",border:`2px solid ${extTime===val?"#003865":"#c8d3dd"}`,borderRadius:"4px",background:extTime===val?"#003865":"#fafbfc",color:extTime===val?"#fff":"#555",fontWeight:700,fontSize:"0.82rem",cursor:"pointer"}}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+            {extTime !== "none" && (
+              <div style={{marginTop:"6px",fontSize:"0.72rem",color:"#555",background:"#f0f4f8",padding:"6px 10px",borderRadius:"3px"}}>
+                A 30-min test becomes {extTime==="1.5x"?"45":"60"} minutes for this student.
+              </div>
+            )}
+          </div>
+
+          {/* Reduce Answer Choices */}
+          <div>
+            <label style={{display:"block",fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"8px"}}>✂ REDUCE ANSWER CHOICES</label>
+            <div style={{display:"flex",gap:"0.5rem"}}>
+              {[[false,"Standard (4 choices)"],[true,"Reduced (3 choices)"]].map(([val,lbl])=>(
+                <button key={String(val)} onClick={()=>setReduce(val)}
+                  style={{flex:1,padding:"0.55rem",border:`2px solid ${reduce===val?"#003865":"#c8d3dd"}`,borderRadius:"4px",background:reduce===val?"#003865":"#fafbfc",color:reduce===val?"#fff":"#555",fontWeight:600,fontSize:"0.78rem",cursor:"pointer"}}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+            {reduce && (
+              <div style={{marginTop:"6px",fontSize:"0.72rem",color:"#555",background:"#f0f4f8",padding:"6px 10px",borderRadius:"3px"}}>
+                One incorrect choice is hidden on all multiple-choice questions.
+              </div>
+            )}
+          </div>
+        </div>
+        <div style={{display:"flex",gap:"0.65rem",padding:"0.9rem 1.25rem",borderTop:"1px solid #dde3e9"}}>
+          <button onClick={onClose} style={{flex:1,background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600,color:"#333"}}>Cancel</button>
+          <button onClick={handleSave} disabled={saving} style={{flex:1,background:"#1a6e2e",border:"none",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",color:"#fff",fontWeight:700,opacity:saving?.6:1}}>
+            {saving?"Saving…":"Save Accommodations"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 export default function RosterManager({ teacher }) {
   const [classes,    setClasses]    = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -235,6 +304,22 @@ export default function RosterManager({ teacher }) {
       setCsvPreview(null);
     } catch { flash("Import failed."); }
     setCsvImporting(false);
+  }
+
+  async function saveAccommodations(cid, sid, extendedTime, reduceChoices) {
+    const cls  = roster.find(c => c.id === cid);
+    if (!cls) return;
+    const updated = cls.students.map(s =>
+      s.id === sid ? { ...s, extendedTime, reduceChoices } : s
+    );
+    try {
+      await fetch(`${API}/roster/class/${cid}`, {
+        method:"PUT", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ name: cls.name, students: updated }),
+      });
+      await loadRoster();
+      setAccomModal(null);
+    } catch {}
   }
 
   async function removeStudent(cid, sid, name) {
@@ -433,12 +518,28 @@ export default function RosterManager({ teacher }) {
                       <div style={{width:"26px",height:"26px",borderRadius:"50%",background:"#003865",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                         <span style={{color:"#fff",fontSize:"0.65rem",fontWeight:700}}>{i+1}</span>
                       </div>
-                      <div style={{flex:1,fontSize:"0.88rem",fontWeight:600,color:"#1a1a1a",minWidth:"120px"}}>{s.name}</div>
+                      <div style={{flex:1,fontSize:"0.88rem",fontWeight:600,color:"#1a1a1a",minWidth:"120px"}}>
+                        {s.name}
+                        <span style={{display:"inline-flex",gap:"4px",marginLeft:"8px",verticalAlign:"middle"}}>
+                          {s.extendedTime && s.extendedTime !== "none" && (
+                            <span style={{background:"#ddeaf7",border:"1px solid #b3cde8",borderRadius:"3px",padding:"1px 6px",fontSize:"0.6rem",fontWeight:700,color:"#003865"}}>
+                              ⏱ {s.extendedTime === "1.5x" ? "1.5×" : "2×"} TIME
+                            </span>
+                          )}
+                          {s.reduceChoices && (
+                            <span style={{background:"#fff8e1",border:"1px solid #ffc107",borderRadius:"3px",padding:"1px 6px",fontSize:"0.6rem",fontWeight:700,color:"#7a4e00"}}>
+                              ✂ 3-CHOICE
+                            </span>
+                          )}
+                        </span>
+                      </div>
                       <PinEditor
                         pin={s.pin}
                         onSave={pin=>setPin(activeClassData.id, s.id, pin)}
                         onRegen={()=>regenPin(activeClassData.id, s.id)}
                       />
+                      <button onClick={()=>setAccomModal({cid:activeClassData.id, student:s})}
+                        style={{...S.btn,padding:"2px 8px",fontSize:"0.7rem",color:"#003865",borderColor:"#b3cde8",background:"#ddeaf7"}}>IEP</button>
                       <button onClick={()=>removeStudent(activeClassData.id, s.id, s.name)}
                         style={{...S.btn,padding:"2px 8px",color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",fontSize:"0.7rem"}}>✕</button>
                     </div>
@@ -449,6 +550,14 @@ export default function RosterManager({ teacher }) {
           </>
         )}
       </div>
+    {/* ── IEP / Accommodations Modal ── */}
+    {accomModal && (
+      <AccomModal
+        student={accomModal.student}
+        onSave={(ext, red) => saveAccommodations(accomModal.cid, accomModal.student.id, ext, red)}
+        onClose={() => setAccomModal(null)}
+      />
+    )}
     </div>
   );
 }
