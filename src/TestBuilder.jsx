@@ -1,165 +1,256 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
+import MathText from "./shared/MathText";
 import { API } from "./shared/constants";
+
+const STANDARDS = [
+  "5.NR.1.1","5.NR.1.2","5.NR.2.1","5.NR.2.2",
+  "5.NR.3.1","5.NR.3.2","5.NR.3.3","5.NR.3.4","5.NR.3.5","5.NR.3.6",
+  "5.NR.4.1","5.NR.4.2","5.NR.4.3","5.NR.4.4","5.NR.5.1",
+  "5.PAR.6.1","5.PAR.6.2",
+  "5.MDR.7.1","5.MDR.7.2","5.MDR.7.3","5.MDR.7.4",
+  "5.GSR.8.1","5.GSR.8.2","5.GSR.8.3","5.GSR.8.4",
+];
+const DOK_LABELS = { 1:"Recall", 2:"Skill/Concept", 3:"Strategic", 4:"Extended" };
 
 const S = {
   inp:   { width:"100%", padding:"0.5rem 0.75rem", border:"1px solid #c8d3dd", borderRadius:"3px", fontSize:"0.85rem", background:"#fafbfc", boxSizing:"border-box" },
   lbl:   { display:"block", fontSize:"0.62rem", fontWeight:700, letterSpacing:"0.12em", color:"#555", marginBottom:"4px" },
-  btn:   { border:"1px solid #c8d3dd", borderRadius:"3px", padding:"6px 14px", cursor:"pointer", fontSize:"0.78rem", fontWeight:600, background:"#f0f4f8", color:"#333" },
-  ta:    { width:"100%", padding:"0.5rem 0.75rem", border:"1px solid #c8d3dd", borderRadius:"3px", fontSize:"0.82rem", background:"#fafbfc", boxSizing:"border-box", resize:"vertical", fontFamily:"sans-serif", minHeight:"120px" },
+  smBtn: { border:"1px solid #c8d3dd", borderRadius:"3px", padding:"4px 10px", cursor:"pointer", fontSize:"0.75rem", fontWeight:600, background:"#f0f4f8", color:"#333" },
+  ta:    { width:"100%", padding:"0.5rem 0.75rem", border:"1px solid #c8d3dd", borderRadius:"3px", fontSize:"0.85rem", background:"#fafbfc", boxSizing:"border-box", resize:"vertical", minHeight:"80px", fontFamily:"sans-serif" },
+  code:  { fontFamily:"monospace", fontSize:"1.1rem", letterSpacing:"0.18em", textTransform:"uppercase", fontWeight:700, color:"#003865" },
 };
 
-// ── Inline PIN editor ──────────────────────────────────────
-function PinEditor({ pin, onSave, onRegen }) {
-  const [editing, setEditing] = useState(false);
-  const [val,     setVal]     = useState(pin || "");
-  const [err,     setErr]     = useState("");
-  const inputRef = useRef();
+function genCode() {
+  return Math.random().toString(36).substring(2,8).toUpperCase();
+}
 
-  function startEdit() { setVal(pin || ""); setErr(""); setEditing(true); setTimeout(()=>inputRef.current?.focus(),50); }
-  function cancel()    { setEditing(false); setErr(""); }
+// ── Edit Question Modal ────────────────────────────────────
+function EditModal({ question, onSave, onClose }) {
+  const [q, setQ] = useState({ ...question });
+  const [saving, setSaving] = useState(false);
 
-  async function save() {
-    const clean = val.trim();
-    if (clean.length !== 5 || !/^[0-9]{5}$/.test(clean)) { setErr("Must be exactly 5 digits"); return; }
-    const ok = await onSave(clean);
-    if (ok === true) { setEditing(false); setErr(""); }
-    else             { setErr(ok || "Already in use"); }
+  function updateChoice(i, val) {
+    const choices = [...q.choices]; choices[i] = val;
+    setQ(p => ({ ...p, choices }));
   }
 
-  if (editing) return (
-    <div style={{display:"flex",alignItems:"center",gap:"0.35rem"}}>
-      <input ref={inputRef} value={val}
-        onChange={e=>{ setVal(e.target.value.replace(/\D/g,"").slice(0,5)); setErr(""); }}
-        onKeyDown={e=>{ if(e.key==="Enter") save(); if(e.key==="Escape") cancel(); }}
-        style={{width:"80px",padding:"4px 8px",border:`1px solid ${err?"#f0b8b8":"#003865"}`,borderRadius:"3px",fontFamily:"monospace",fontSize:"0.95rem",fontWeight:700,letterSpacing:"0.18em",textAlign:"center",background:"#fff"}}
-        placeholder="12345" maxLength={5}/>
-      <button onClick={save}   style={{...S.btn,padding:"2px 8px",background:"#1a6e2e",color:"#fff",border:"none",fontSize:"0.72rem"}}>✓</button>
-      <button onClick={cancel} style={{...S.btn,padding:"2px 8px",fontSize:"0.72rem"}}>✕</button>
-      {err && <span style={{fontSize:"0.68rem",color:"#8b1a1a"}}>{err}</span>}
-    </div>
-  );
-
-  return (
-    <div style={{display:"flex",alignItems:"center",gap:"0.4rem",background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"3px 8px"}}>
-      <span style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.08em",color:"#555"}}>PIN</span>
-      <span style={{fontFamily:"monospace",fontSize:"0.95rem",fontWeight:700,letterSpacing:"0.18em",color:pin?"#003865":"#bbb",minWidth:"52px"}}>
-        {pin || "—"}
-      </span>
-      <button onClick={startEdit} title="Set a specific PIN"
-        style={{...S.btn,padding:"1px 6px",fontSize:"0.65rem"}}>✏️</button>
-      <button onClick={()=>navigator.clipboard.writeText(pin||"")} title="Copy PIN" disabled={!pin}
-        style={{...S.btn,padding:"1px 6px",fontSize:"0.65rem",opacity:pin?1:0.4}}>📋</button>
-      <button onClick={onRegen} title="Generate random PIN"
-        style={{...S.btn,padding:"1px 6px",fontSize:"0.65rem"}}>🔀</button>
-    </div>
-  );
-}
-
-// ── Print PIN cards ────────────────────────────────────────
-function printPinSheet(cls) {
-  const rows = cls.students.map(s => `
-    <div class="card">
-      <div class="class-name">${cls.name}</div>
-      <div class="student-name">${s.name}</div>
-      <div class="pin-label">PIN</div>
-      <div class="pin">${s.pin || "—"}</div>
-      <div class="hint">mathready-frontend.vercel.app</div>
-    </div>
-  `).join("");
-
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <title>PINs — ${cls.name}</title>
-  <style>
-    body { font-family: sans-serif; margin: 0; padding: 0; }
-    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; }
-    .card { border: 1px solid #ccc; padding: 1rem 1.25rem; page-break-inside: avoid; box-sizing: border-box; }
-    .class-name { font-size: 0.55rem; letter-spacing: 0.1em; color: #888; text-transform: uppercase; margin-bottom: 2px; }
-    .student-name { font-size: 1rem; font-weight: 700; color: #1a1a1a; margin-bottom: 0.5rem; }
-    .pin-label { font-size: 0.55rem; letter-spacing: 0.12em; color: #888; text-transform: uppercase; }
-    .pin { font-size: 1.8rem; font-weight: 700; font-family: monospace; letter-spacing: 0.25em; color: #003865; margin: 2px 0; }
-    .hint { font-size: 0.55rem; color: #aaa; margin-top: 4px; }
-    @media print { @page { margin: 0.5in; } }
-  </style>
-  </head><body>
-  <div style="padding:0.5rem 0.75rem 0.25rem;border-bottom:2px solid #003865;margin-bottom:0.5rem;display:flex;align-items:center;justify-content:space-between;">
-    <div>
-      <div style="font-size:0.6rem;color:#888;letter-spacing:0.1em;text-transform:uppercase;">Georgia Milestones Readiness Trainer</div>
-      <div style="font-size:1rem;font-weight:700;color:#003865;">${cls.name} — Student PINs</div>
-    </div>
-    <div style="font-size:0.7rem;color:#888;">${new Date().toLocaleDateString()}</div>
-  </div>
-  <div class="grid">${rows}</div>
-  </body></html>`;
-
-  const w = window.open("", "_blank");
-  w.document.write(html);
-  w.document.close();
-  w.focus();
-  setTimeout(() => w.print(), 400);
-}
-
-// ── Main ───────────────────────────────────────────────────
-// ── Accommodations Modal ──────────────────────────────────
-function AccomModal({ student, onSave, onClose }) {
-  const [extTime,  setExtTime]  = useState(student.extendedTime  || "none");
-  const [reduce,   setReduce]   = useState(!!student.reduceChoices);
-  const [saving,   setSaving]   = useState(false);
-
   async function handleSave() {
+    if (!q.question.trim() || q.choices.filter(c=>c.trim()).length < 4 || !q.correct.trim()) return;
     setSaving(true);
-    await onSave(extTime, reduce);
+    try {
+      await fetch(`${API}/questions`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(q) });
+      onSave(q);
+    } catch {}
     setSaving(false);
   }
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}}>
-      <div style={{background:"#fff",borderRadius:"6px",width:"100%",maxWidth:"380px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.22)"}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"1rem"}}>
+      <div style={{background:"#fff",borderRadius:"6px",width:"100%",maxWidth:"600px",maxHeight:"90vh",overflow:"hidden",display:"flex",flexDirection:"column",boxShadow:"0 8px 32px rgba(0,0,0,.25)"}}>
+        <div style={{background:"#003865",color:"#fff",padding:"0.9rem 1.25rem",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+          <div><div style={{fontSize:"0.6rem",opacity:.65,letterSpacing:"0.14em"}}>QUESTION BANK</div><div style={{fontSize:"1rem",fontWeight:700}}>Edit Question</div></div>
+          <button onClick={onClose} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"5px 12px",cursor:"pointer",fontSize:"0.8rem"}}>✕ Cancel</button>
+        </div>
+        <div style={{overflowY:"auto",padding:"1.25rem",display:"flex",flexDirection:"column",gap:"0.85rem"}}>
+          <div style={{display:"flex",gap:"0.75rem"}}>
+            <div style={{flex:2}}><label style={S.lbl}>STANDARD</label>
+              <select style={S.inp} value={q.standard} onChange={e=>setQ(p=>({...p,standard:e.target.value}))}>
+                {STANDARDS.map(s=><option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div style={{flex:1}}><label style={S.lbl}>DOK</label>
+              <select style={S.inp} value={q.dok||""} onChange={e=>setQ(p=>({...p,dok:Number(e.target.value)}))}>
+                <option value="">—</option>
+                {[1,2,3,4].map(d=><option key={d} value={d}>{d} — {DOK_LABELS[d]}</option>)}
+              </select>
+            </div>
+          </div>
+          <div><label style={S.lbl}>SKILL LABEL</label>
+            <input style={S.inp} value={q.short} onChange={e=>setQ(p=>({...p,short:e.target.value}))} placeholder="e.g. Add Fractions"/>
+          </div>
+          <div><label style={S.lbl}>QUESTION TEXT (use $...$ for math)</label>
+            <textarea style={S.ta} value={q.question} onChange={e=>setQ(p=>({...p,question:e.target.value}))} rows={3}/>
+            {q.question&&<div style={{marginTop:"4px",padding:"0.5rem 0.75rem",background:"#f8fafc",border:"1px solid #dde3e9",borderRadius:"3px",fontSize:"0.85rem",fontFamily:"Georgia,serif"}}><MathText text={q.question}/></div>}
+          </div>
+          <div><label style={S.lbl}>ANSWER CHOICES — click letter to mark correct</label>
+            <div style={{display:"flex",flexDirection:"column",gap:"0.4rem"}}>
+              {["A","B","C","D"].map((letter,i)=>{
+                const isCorrect=q.correct===q.choices[i];
+                return (
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
+                    <div onClick={()=>setQ(p=>({...p,correct:p.choices[i]}))}
+                      style={{width:"24px",height:"24px",borderRadius:"50%",background:isCorrect?"#1a6e2e":"#e8edf2",border:`2px solid ${isCorrect?"#1a6e2e":"#bcc8d4"}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,cursor:"pointer"}}>
+                      <span style={{fontSize:"0.65rem",fontWeight:700,color:isCorrect?"#fff":"#667"}}>{letter}</span>
+                    </div>
+                    <input style={{...S.inp,flex:1,border:`1px solid ${isCorrect?"#1a6e2e":"#c8d3dd"}`,background:isCorrect?"#f0faf2":"#fafbfc"}}
+                      value={q.choices[i]} onChange={e=>updateChoice(i,e.target.value)} placeholder={`Choice ${letter}`}/>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+        <div style={{padding:"0.9rem 1.25rem",borderTop:"1px solid #dde3e9",display:"flex",gap:"0.65rem",justifyContent:"flex-end",flexShrink:0}}>
+          <button onClick={onClose} style={{...S.smBtn,padding:"0.6rem 1.25rem"}}>Cancel</button>
+          <button onClick={handleSave} disabled={saving} style={{background:"#003865",border:"none",borderRadius:"3px",padding:"0.6rem 1.5rem",fontSize:"0.85rem",fontWeight:700,color:"#fff",cursor:"pointer"}}>
+            {saving?"Saving…":"💾 Save Changes"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Save Test Modal ────────────────────────────────────────
+function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose }) {
+  const [name,      setName]      = useState(currentTitle || "");
+  const [code,      setCode]      = useState(genCode());
+  const [saving,    setSaving]    = useState(false);
+  const [codeErr,   setCodeErr]   = useState("");
+  const [adaptive,  setAdaptive]  = useState(false);
+  const [overwriteWarning, setOverwriteWarning] = useState(false);
+  const [untimed,        setUntimed]        = useState(false);
+  const [timeMins,       setTimeMins]       = useState(30);
+  const [warnMins,       setWarnMins]       = useState(5);
+  const [oneAttempt,     setOneAttempt]     = useState(false);
+  const [classes,        setClasses]        = useState([]);
+  const [assignedClassIds, setAssignedClassIds] = useState([]);
+
+  useEffect(() => {
+    fetch(`${API}/roster`).then(r=>r.json()).then(d=>setClasses(Array.isArray(d)?d:[])).catch(()=>{});
+  }, []);
+
+  function toggleClass(id) {
+    setAssignedClassIds(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev, id]);
+  }
+
+  const duplicate = savedTests.find(t =>
+    t.name?.trim().toLowerCase() === name.trim().toLowerCase()
+  );
+
+  function handleCodeChange(val) {
+    const clean = val.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,8);
+    setCode(clean);
+    setCodeErr(clean.length < 4 ? "Code must be at least 4 characters" : "");
+  }
+
+  async function handleSave() {
+    if (!name.trim() || code.length < 4) return;
+    if (duplicate && !overwriteWarning) { setOverwriteWarning(true); return; }
+    setSaving(true);
+    const timerCfg = {
+      untimed,
+      timeLimitSecs: untimed ? 0 : Math.max(1, timeMins) * 60,
+      warnSecs:      untimed ? 0 : Math.max(1, warnMins) * 60,
+      oneAttempt,
+      classIds: assignedClassIds,
+    };
+    const err = await onSave(name.trim(), code, adaptive, timerCfg);
+    if (err) { setCodeErr(err); setSaving(false); setOverwriteWarning(false); }
+  }
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
+      <div style={{background:"#fff",borderRadius:"6px",width:"100%",maxWidth:"420px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.25)"}}>
         <div style={{background:"#003865",color:"#fff",padding:"0.9rem 1.25rem"}}>
-          <div style={{fontSize:"0.62rem",letterSpacing:"0.12em",opacity:.7,marginBottom:"2px"}}>ACCOMMODATIONS</div>
-          <div style={{fontSize:"1rem",fontWeight:700}}>{student.name}</div>
+          <div style={{fontSize:"0.6rem",opacity:.65,letterSpacing:"0.14em"}}>TEST LIBRARY</div>
+          <div style={{fontSize:"1rem",fontWeight:700}}>Save Test</div>
         </div>
-        <div style={{padding:"1.25rem",display:"flex",flexDirection:"column",gap:"1rem"}}>
-
-          {/* Extended Time */}
-          <div>
-            <label style={{display:"block",fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"8px"}}>⏱ EXTENDED TIME (IEP / 504)</label>
-            <div style={{display:"flex",gap:"0.5rem"}}>
-              {[["none","Standard"],["1.5x","1.5×"],["2x","2×"]].map(([val,lbl])=>(
-                <button key={val} onClick={()=>setExtTime(val)}
-                  style={{flex:1,padding:"0.55rem",border:`2px solid ${extTime===val?"#003865":"#c8d3dd"}`,borderRadius:"4px",background:extTime===val?"#003865":"#fafbfc",color:extTime===val?"#fff":"#555",fontWeight:700,fontSize:"0.82rem",cursor:"pointer"}}>
-                  {lbl}
-                </button>
-              ))}
-            </div>
-            {extTime !== "none" && (
-              <div style={{marginTop:"6px",fontSize:"0.72rem",color:"#555",background:"#f0f4f8",padding:"6px 10px",borderRadius:"3px"}}>
-                A 30-min test becomes {extTime==="1.5x"?"45":"60"} minutes for this student.
-              </div>
-            )}
+        <div style={{padding:"1.25rem",display:"flex",flexDirection:"column",gap:"0.85rem"}}>
+          <div><label style={S.lbl}>TEST NAME</label>
+            <input style={S.inp} value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Chapter 3 Fractions Quiz" autoFocus/>
           </div>
-
-          {/* Reduce Answer Choices */}
           <div>
-            <label style={{display:"block",fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"8px"}}>✂ REDUCE ANSWER CHOICES</label>
-            <div style={{display:"flex",gap:"0.5rem"}}>
-              {[[false,"Standard (4 choices)"],[true,"Reduced (3 choices)"]].map(([val,lbl])=>(
-                <button key={String(val)} onClick={()=>setReduce(val)}
-                  style={{flex:1,padding:"0.55rem",border:`2px solid ${reduce===val?"#003865":"#c8d3dd"}`,borderRadius:"4px",background:reduce===val?"#003865":"#fafbfc",color:reduce===val?"#fff":"#555",fontWeight:600,fontSize:"0.78rem",cursor:"pointer"}}>
-                  {lbl}
-                </button>
-              ))}
+            <label style={S.lbl}>STUDENT CODE — students enter this to access the test</label>
+            <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
+              <input style={{...S.inp,...S.code,flex:1}} value={code} onChange={e=>handleCodeChange(e.target.value)} maxLength={8} placeholder="e.g. FRACTIONS"/>
+              <button onClick={()=>setCode(genCode())} style={{...S.smBtn,flexShrink:0,padding:"0.5rem 0.75rem"}}>🔀 New</button>
             </div>
-            {reduce && (
-              <div style={{marginTop:"6px",fontSize:"0.72rem",color:"#555",background:"#f0f4f8",padding:"6px 10px",borderRadius:"3px"}}>
-                One incorrect choice is hidden on all multiple-choice questions.
-              </div>
-            )}
+            {codeErr
+              ? <div style={{fontSize:"0.7rem",color:"#8b1a1a",marginTop:"4px"}}>⚠ {codeErr}</div>
+              : <div style={{fontSize:"0.7rem",color:"#888",marginTop:"4px"}}>4–8 characters, letters and numbers only</div>
+            }
           </div>
+          <div style={{background:"#f0f4f8",borderRadius:"3px",padding:"0.65rem 0.85rem",fontSize:"0.78rem",color:"#555"}}>
+            Students log in and enter <strong style={S.code}>{code||"—"}</strong> to take this {count}-question test.
+          </div>
+          <div>
+            <label style={{display:"flex",alignItems:"center",gap:"0.75rem",cursor:"pointer",padding:"0.65rem 0.85rem",background:adaptive?"#f0faf2":"#fafbfc",border:`1px solid ${adaptive?"#b3dfc0":"#dde3e9"}`,borderRadius:"3px"}}>
+              <div onClick={()=>setAdaptive(a=>!a)}
+                style={{width:"36px",height:"20px",borderRadius:"10px",background:adaptive?"#1a6e2e":"#c8d3dd",position:"relative",flexShrink:0,transition:"background .2s"}}>
+                <div style={{position:"absolute",top:"2px",left:adaptive?"18px":"2px",width:"16px",height:"16px",borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+              </div>
+              <div>
+                <div style={{fontSize:"0.82rem",fontWeight:700,color:adaptive?"#1a6e2e":"#333"}}>Adaptive Mode {adaptive?"ON":"OFF"}</div>
+                <div style={{fontSize:"0.7rem",color:"#888",marginTop:"1px"}}>Questions adjust to each student's weak areas during the test</div>
+              </div>
+            </label>
+          </div>
+        <div style={{borderTop:"1px solid #eef1f4",paddingTop:"0.85rem"}}>
+          <label style={{display:"flex",alignItems:"center",gap:"0.75rem",cursor:"pointer",marginBottom:"0.75rem",
+            padding:"0.65rem 0.85rem",background:untimed?"#fff3cd":"#fafbfc",
+            border:`1px solid ${untimed?"#ffc107":"#dde3e9"}`,borderRadius:"3px"}}
+            onClick={()=>setUntimed(u=>!u)}>
+            <div style={{width:"36px",height:"20px",borderRadius:"10px",background:untimed?"#b8860b":"#c8d3dd",position:"relative",flexShrink:0,transition:"background .2s"}}>
+              <div style={{position:"absolute",top:"2px",left:untimed?"18px":"2px",width:"16px",height:"16px",borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+            </div>
+            <div>
+              <div style={{fontSize:"0.82rem",fontWeight:700,color:untimed?"#7a4e00":"#333"}}>Untimed {untimed?"ON":"OFF"}</div>
+              <div style={{fontSize:"0.7rem",color:"#888",marginTop:"1px"}}>No countdown — students work at their own pace</div>
+            </div>
+          </label>
+          {!untimed && (
+            <div style={{display:"flex",gap:"0.75rem"}}>
+              <div style={{flex:1}}>
+                <label style={{display:"block",fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"4px"}}>TIME LIMIT (minutes)</label>
+                <input type="number" min="1" max="180" value={timeMins}
+                  onChange={e=>setTimeMins(Math.max(1,Math.min(180,Number(e.target.value))))}
+                  style={{...S.inp,fontFamily:"monospace",fontWeight:700,fontSize:"1rem"}}/>
+              </div>
+              <div style={{flex:1}}>
+                <label style={{display:"block",fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"4px"}}>WARN AT (minutes left)</label>
+                <input type="number" min="1" max={timeMins-1} value={warnMins}
+                  onChange={e=>setWarnMins(Math.max(1,Math.min(timeMins-1,Number(e.target.value))))}
+                  style={{...S.inp,fontFamily:"monospace",fontWeight:700,fontSize:"1rem"}}/>
+              </div>
+            </div>
+          )}
         </div>
+        {/* One Attempt toggle */}
+        <div>
+          <label style={{display:"flex",alignItems:"center",gap:"0.75rem",cursor:"pointer",padding:"0.65rem 0.85rem",
+            background:oneAttempt?"#fdf2f2":"#fafbfc",
+            border:`1px solid ${oneAttempt?"#f0b8b8":"#dde3e9"}`,borderRadius:"3px"}}
+            onClick={()=>setOneAttempt(a=>!a)}>
+            <div style={{width:"36px",height:"20px",borderRadius:"10px",background:oneAttempt?"#8b1a1a":"#c8d3dd",position:"relative",flexShrink:0,transition:"background .2s"}}>
+              <div style={{position:"absolute",top:"2px",left:oneAttempt?"18px":"2px",width:"16px",height:"16px",borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+            </div>
+            <div>
+              <div style={{fontSize:"0.82rem",fontWeight:700,color:oneAttempt?"#8b1a1a":"#333"}}>
+                One Attempt Only {oneAttempt?"ON":"OFF"}
+              </div>
+              <div style={{fontSize:"0.7rem",color:"#888",marginTop:"1px"}}>
+                Students can only submit this test once. They cannot retake it.
+              </div>
+            </div>
+          </label>
+        </div>
+        </div>
+        {overwriteWarning && (
+          <div style={{padding:"0.75rem 1.25rem",background:"#fff8e1",borderTop:"1px solid #ffd166"}}>
+            <div style={{fontSize:"0.82rem",color:"#7a4e00",fontWeight:700,marginBottom:"4px"}}>
+              ⚠ A test named "{name.trim()}" already exists.
+            </div>
+            <div style={{fontSize:"0.75rem",color:"#7a4e00"}}>
+              This will save as a second copy with a different code. Click Save again to confirm.
+            </div>
+          </div>
+        )}
         <div style={{display:"flex",gap:"0.65rem",padding:"0.9rem 1.25rem",borderTop:"1px solid #dde3e9"}}>
-          <button onClick={onClose} style={{flex:1,background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600,color:"#333"}}>Cancel</button>
-          <button onClick={handleSave} disabled={saving} style={{flex:1,background:"#1a6e2e",border:"none",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",color:"#fff",fontWeight:700,opacity:saving?.6:1}}>
-            {saving?"Saving…":"Save Accommodations"}
+          <button onClick={()=>{ setOverwriteWarning(false); onClose(); }} style={{flex:1,background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600,color:"#333"}}>Cancel</button>
+          <button onClick={handleSave} disabled={saving||!name.trim()||code.length<4}
+            style={{flex:1,background:(!name.trim()||code.length<4)?"#c8d3dd":overwriteWarning?"#b8860b":"#003865",border:"none",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:(!name.trim()||code.length<4)?"not-allowed":"pointer",color:"#fff",fontWeight:700}}>
+            {saving?"Saving…":overwriteWarning?"Save Anyway →":"💾 Save"}
           </button>
         </div>
       </div>
@@ -168,404 +259,589 @@ function AccomModal({ student, onSave, onClose }) {
 }
 
 
-export default function RosterManager({ teacher }) {
-  const [classes,    setClasses]    = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [activeClass,setActiveClass]= useState(null);
-  const [newClassName,setNewClassName]=useState("");
-  const [addMode,    setAddMode]    = useState("one");
-  const [oneInput,   setOneInput]   = useState("");
-  const [pasteInput, setPasteInput] = useState("");
-  const [adding,     setAdding]     = useState(false);
-  const [msg,        setMsg]        = useState("");
-  const [accomModal, setAccomModal] = useState(null);
+// ── Assign Classes Modal ───────────────────────────────────
+function AssignClassesModal({ test, onSave, onClose }) {
+  const [classes,  setClasses]  = useState([]);
+  const [selected, setSelected] = useState(test.classIds || []);
+  const [saving,   setSaving]   = useState(false);
 
-  const load = useCallback(async () => {
-    try { const url = `${API}/roster${teacher && teacher.classIds !== null ? '?classIds='+teacher.classIds.join(',') : ''}`; const r = await fetch(url); setClasses(await r.json()); }
-    catch { setClasses([]); }
+  useEffect(() => {
+    fetch(`${API}/roster`).then(r=>r.json()).then(d=>setClasses(Array.isArray(d)?d:[])).catch(()=>{});
+  }, []);
+
+  function toggle(id) {
+    setSelected(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev, id]);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    await onSave(selected);
+    setSaving(false);
+  }
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
+      <div style={{background:"#fff",borderRadius:"6px",width:"100%",maxWidth:"380px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.25)"}}>
+        <div style={{background:"#003865",color:"#fff",padding:"0.9rem 1.25rem"}}>
+          <div style={{fontSize:"0.6rem",opacity:.65,letterSpacing:"0.14em"}}>ASSIGN TO CLASSES</div>
+          <div style={{fontSize:"1rem",fontWeight:700}}>{test.name}</div>
+        </div>
+        <div style={{padding:"1.25rem"}}>
+          <div style={{fontSize:"0.75rem",color:"#555",marginBottom:"0.75rem"}}>
+            Students entering code <strong style={{fontFamily:"monospace",letterSpacing:"0.15em"}}>{test.code}</strong> will see names from these classes:
+          </div>
+          {classes.length === 0 ? (
+            <div style={{color:"#aaa",fontSize:"0.82rem",padding:"1rem",textAlign:"center"}}>No classes found.</div>
+          ) : (
+            <div style={{display:"flex",flexDirection:"column",gap:"4px",maxHeight:"200px",overflowY:"auto",marginBottom:"0.75rem"}}>
+              {classes.map(cls => {
+                const on = selected.includes(cls.id);
+                return (
+                  <label key={cls.id} onClick={()=>toggle(cls.id)}
+                    style={{display:"flex",alignItems:"center",gap:"0.6rem",padding:"0.5rem 0.75rem",
+                      border:`1px solid ${on?"#003865":"#dde3e9"}`,borderRadius:"4px",
+                      background:on?"#ddeaf7":"#fafbfc",cursor:"pointer"}}>
+                    <div style={{width:"16px",height:"16px",borderRadius:"3px",border:`2px solid ${on?"#003865":"#c8d3dd"}`,
+                      background:on?"#003865":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      {on&&<span style={{color:"#fff",fontSize:"0.65rem",fontWeight:900}}>✓</span>}
+                    </div>
+                    <span style={{fontWeight:on?700:400,color:on?"#003865":"#333",fontSize:"0.85rem"}}>{cls.name}</span>
+                    <span style={{marginLeft:"auto",fontSize:"0.68rem",color:"#888"}}>{cls.students?.length||0} students</span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+          {selected.length===0&&<div style={{fontSize:"0.72rem",color:"#e67e00",marginBottom:"0.75rem"}}>⚠ No class selected — students won't be able to find their name.</div>}
+          <div style={{display:"flex",gap:"0.65rem"}}>
+            <button onClick={onClose} style={{flex:1,background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600}}>Cancel</button>
+            <button onClick={handleSave} disabled={saving}
+              style={{flex:1,background:"#003865",border:"none",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",color:"#fff",fontWeight:700,opacity:saving?0.7:1}}>
+              {saving?"Saving…":"Save →"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main TestBuilder ───────────────────────────────────────
+export default function TestBuilder({ teacher, readOnly }) {
+  const [bank, setBank]               = useState([]);
+  const [selected, setSelected]       = useState([]);
+  const [loading, setLoading]         = useState(true);
+
+  const [testTitle, setTestTitle]     = useState("Grade 5 Math — Practice");
+  const [editingQ, setEditingQ]       = useState(null);
+  const [confirmDelete,     setConfirmDelete]     = useState(null);
+  const [confirmDeleteTest, setConfirmDeleteTest] = useState(null);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [assignClassesTest, setAssignClassesTest] = useState(null); // test object to assign classes to
+  const [savedTests, setSavedTests]   = useState([]);
+  const [allClasses,  setAllClasses]  = useState([]);
+  const [assigningTest, setAssigningTest] = useState(null); // test id being assigned
+  const [savedMsg, setSavedMsg]       = useState("");
+  const [rightTab, setRightTab]       = useState("current");
+
+  const [filterStd,  setFilterStd]  = useState("");
+  const [filterDok,  setFilterDok]  = useState("");
+  const [filterText, setFilterText] = useState("");
+  const [autoCount,  setAutoCount]  = useState(10);
+
+  // Fluency Drill state
+  const [drillName,     setDrillName]     = useState("Fluency Drill");
+  const [drillStds,     setDrillStds]     = useState([]);
+  const [drillCount,    setDrillCount]    = useState(10);
+  const [drillCode,     setDrillCode]     = useState(genCode());
+  const [drillSaving,   setDrillSaving]   = useState(false);
+  const [drillMsg,      setDrillMsg]      = useState("");
+  const [drillCodeErr,  setDrillCodeErr]  = useState("");
+
+  const loadBank = useCallback(async () => {
+    try { const r=await fetch(`${API}/questions`); setBank(await r.json()); }
+    catch { setBank([]); }
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
-
-  function flash(text) { setMsg(text); setTimeout(() => setMsg(""), 3500); }
-
-  async function generateMissingPins() {
+  const loadActive = useCallback(async () => {
     try {
-      const r    = await fetch(`${API}/roster/pins/generate-missing`, { method:"POST" });
-      const data = await r.json();
-      await load();
-      flash(`Generated ${data.generated} new PIN${data.generated!==1?"s":""}.`);
-    } catch { flash("Failed to generate PINs."); }
-  }
-
-  async function addClass() {
-    if (!newClassName.trim()) return;
-    try {
-      await fetch(`${API}/roster/class`, { method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ name: newClassName.trim() }) });
-      setNewClassName(""); await load(); flash("Class added!");
+      const r=await fetch(`${API}/test/active`); const t=await r.json();
+      setSelected((t.questions||[]).map(q=>q.id));
+      setTestTitle(t.title||"Grade 5 Math — Practice");
     } catch {}
+  }, []);
+
+  const loadSavedTests = useCallback(async () => {
+    try { const r=await fetch(`${API}/tests/saved`); setSavedTests(await r.json()); }
+    catch { setSavedTests([]); }
+  }, []);
+
+  useEffect(()=>{
+    loadBank(); loadActive(); loadSavedTests();
+    const classFilter = teacher?.classIds !== null && teacher?.classIds?.length
+      ? `?classIds=${teacher.classIds.join(",")}`
+      : "";
+    fetch(`${API}/roster${classFilter}`).then(r=>r.json()).then(d=>setAllClasses(Array.isArray(d)?d:[])).catch(()=>{});
+  },[loadBank,loadActive,loadSavedTests]);
+
+  const filtered = bank.filter(q => {
+    if (filterStd  && !q.standard?.startsWith(filterStd)) return false;
+    if (filterDok  && q.dok !== Number(filterDok))         return false;
+    if (filterText) {
+      const t = filterText.toLowerCase();
+      const matchesId = q.id?.toLowerCase().includes(t);
+      const matchesQ  = q.question?.toLowerCase().includes(t);
+      const matchesS  = q.short?.toLowerCase().includes(t);
+      if (!matchesId && !matchesQ && !matchesS) return false;
+    }
+    return true;
+  });
+
+  const selectedQuestions = selected.map(id=>bank.find(q=>q.id===id)).filter(Boolean);
+  const isSelected = id => selected.includes(id);
+
+  function toggleSelect(q) { setSelected(s=>s.includes(q.id)?s.filter(x=>x!==q.id):[...s,q.id]); }
+  function moveUp(i)       { setSelected(s=>{const a=[...s];[a[i-1],a[i]]=[a[i],a[i-1]];return a;}); }
+  function moveDown(i)     { setSelected(s=>{const a=[...s];[a[i],a[i+1]]=[a[i+1],a[i]];return a;}); }
+  function removeFromTest(id) { setSelected(s=>s.filter(x=>x!==id)); }
+
+  function autoFill() {
+    const needed=autoCount-selected.length; if(needed<=0)return;
+    const candidates=filtered.filter(q=>!selected.includes(q.id));
+    const shuffled=[...candidates].sort(()=>Math.random()-.5);
+    setSelected(s=>[...s,...shuffled.slice(0,needed).map(q=>q.id)]);
   }
 
-  async function deleteClass(cid) {
-    if (!window.confirm("Delete this class and all its students?")) return;
-    try { await fetch(`${API}/roster/class/${cid}`, { method:"DELETE" }); await load(); }
+  async function deleteQuestion(id) {
+    try { await fetch(`${API}/questions/${id}`,{method:"DELETE"}); setBank(b=>b.filter(q=>q.id!==id)); setSelected(s=>s.filter(x=>x!==id)); }
     catch {}
+    setConfirmDelete(null);
   }
 
-  async function addStudents() {
-    const cls = classes.find(c => c.id === activeClass);
-    if (!cls) return;
-    const names = addMode==="one"
-      ? [oneInput.trim()].filter(Boolean)
-      : pasteInput.split("\n").map(n=>n.trim()).filter(Boolean);
-    if (!names.length) return;
-    setAdding(true);
+  function handleSaveEdit(updated) { setBank(b=>b.map(q=>q.id===updated.id?updated:q)); setEditingQ(null); }
+
+  async function assignClasses(testId, classIds) {
+    const t = savedTests.find(x => x.id === testId);
+    if (!t) return;
     try {
-      const r    = await fetch(`${API}/roster/class/${activeClass}/students`, {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ students: names })
-      });
-      const data = await r.json();
-      setOneInput(""); setPasteInput(""); await load();
-      flash(`Added ${data.added} student${data.added!==1?"s":""}!`);
-    } catch {}
-    setAdding(false);
-  }
-
-  // ── CSV upload ──────────────────────────────────────────
-  const csvRef = useRef();
-  const [csvPreview, setCsvPreview] = useState(null);  // [{name, pin}]
-  const [csvErr,     setCsvErr]     = useState("");
-  const [csvImporting, setCsvImporting] = useState(false);
-
-  function parseCSV(text) {
-    const lines = text.trim().replace(/\r/g, "").split("\n").filter(l => l.trim());
-    if (!lines.length) return { err:"Empty file", rows:[] };
-    // Detect header row
-    const first = lines[0].toLowerCase();
-    const hasHeader = first.includes("name") || first.includes("pin") || first.includes("student");
-    const dataLines = hasHeader ? lines.slice(1) : lines;
-    const rows = [];
-    const errs = [];
-    dataLines.forEach((line, i) => {
-      // Support comma or tab separated
-      const parts = line.includes("	") ? line.split("	") : line.split(",");
-      const name = parts[0]?.trim().replace(/^"|"$/g,"");
-      const pin  = parts[1]?.trim().replace(/^"|"$/g,"");
-      if (!name) { errs.push(`Row ${i+2}: missing name`); return; }
-      if (pin && (pin.length !== 5 || !/^[0-9]{5}$/.test(pin))) {
-        errs.push(`Row ${i+2}: PIN must be 5 digits (got "${pin}")`);
-        return;
-      }
-      rows.push({ name, pin: pin || null });
-    });
-    return { rows, errs };
-  }
-
-  function handleCSVFile(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const { rows, errs } = parseCSV(ev.target.result);
-      if (errs.length) { setCsvErr(errs.join(" · ")); setCsvPreview(null); return; }
-      if (!rows.length) { setCsvErr("No valid rows found."); setCsvPreview(null); return; }
-      setCsvErr(""); setCsvPreview(rows);
-    };
-    reader.readAsText(file);
-    e.target.value = "";
-  }
-
-  async function importCSV() {
-    if (!csvPreview?.length || !activeClass) return;
-    setCsvImporting(true);
-    // Add students first (names only)
-    const names = csvPreview.map(r => r.name);
-    try {
-      const r = await fetch(`${API}/roster/class/${activeClass}/students`, {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ students: names })
-      });
-      const data = await r.json();
-      await load();
-      // Now set specific PINs for rows that have them
-      const withPin = csvPreview.filter(r => r.pin);
-      for (const row of withPin) {
-        // Find the student we just added
-        const cls = classes.find(c => c.id === activeClass) || (await fetch(`${API}/roster`).then(r=>r.json()).then(d=>d.find(c=>c.id===activeClass)));
-        const found = cls?.students.find(s => s.name.toLowerCase() === row.name.toLowerCase());
-        if (found) {
-          await fetch(`${API}/roster/class/${activeClass}/student/${found.id}/pin/set?pin=${row.pin}`, { method:"PUT" });
-        }
-      }
-      await load();
-      flash(`Imported ${data.added} student${data.added!==1?"s":""}${withPin.length ? ` with ${withPin.length} PIN${withPin.length!==1?"s":""}` : ""}.`);
-      setCsvPreview(null);
-    } catch { flash("Import failed."); }
-    setCsvImporting(false);
-  }
-
-  async function saveAccommodations(cid, sid, extendedTime, reduceChoices) {
-    const cls  = classes.find(c => c.id === cid);
-    if (!cls) return;
-    const updated = cls.students.map(s =>
-      s.id === sid ? { ...s, extendedTime, reduceChoices } : s
-    );
-    try {
-      await fetch(`${API}/roster/class/${cid}`, {
+      await fetch(`${API}/tests/saved/${testId}`, {
         method:"PUT", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ name: cls.name, students: updated }),
+        body: JSON.stringify({...t, classIds})
       });
-      await load();
-      setAccomModal(null);
-    } catch(e) { console.error("saveAccommodations failed", e); }
+      await loadSavedTests();
+    } catch {}
+    setAssigningTest(null);
   }
 
-  async function removeStudent(cid, sid, name) {
-    if (!window.confirm(`Remove ${name}?`)) return;
-    try { await fetch(`${API}/roster/class/${cid}/student/${sid}`, { method:"DELETE" }); await load(); }
+  async function saveTest(name, code, adaptive=false, timerCfg={}) {
+    try {
+      const r = await fetch(`${API}/tests/saved`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,code,title:testTitle,questions:selectedQuestions,adaptive,...timerCfg})});
+      const data = await r.json();
+      if (r.status===400) return data.detail || "Code already in use";
+      await loadSavedTests();
+      setSavedMsg(`Saved! Code: ${data.code}`);
+      setTimeout(()=>setSavedMsg(""),5000);
+      setShowSaveModal(false);
+    } catch { return "Save failed"; }
+  }
+
+  async function saveDrill() {
+    if (!drillName.trim() || drillStds.length === 0 || drillCode.length < 4) return;
+    setDrillSaving(true); setDrillCodeErr("");
+    try {
+      const r = await fetch(`${API}/tests/saved`, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          name: drillName.trim(),
+          code: drillCode,
+          title: drillName.trim(),
+          questions: [],
+          type: "drill",
+          drillStandards: drillStds,
+          drillCount,
+        }),
+      });
+      const data = await r.json();
+      if (r.status === 400) { setDrillCodeErr(data.detail || "Code already in use"); setDrillSaving(false); return; }
+      await loadSavedTests();
+      setDrillMsg(`Saved! Code: ${data.code}`);
+      setDrillCode(genCode());
+      setTimeout(() => setDrillMsg(""), 5000);
+    } catch { setDrillCodeErr("Save failed"); }
+    setDrillSaving(false);
+  }
+
+  async function loadSavedTest(id) {
+    try {
+      const r=await fetch(`${API}/tests/saved/${id}`); const t=await r.json();
+      setSelected((t.questions||[]).map(q=>q.id));
+      setTestTitle(t.title||t.name||"");
+      setRightTab("current");
+    } catch {}
+  }
+
+  async function deleteSavedTest(id) {
+    try { await fetch(`${API}/tests/saved/${id}`,{method:"DELETE"}); setSavedTests(s=>s.filter(t=>t.id!==id)); }
     catch {}
   }
 
-  async function regenPin(cid, sid) {
-    try {
-      const r    = await fetch(`${API}/roster/class/${cid}/student/${sid}/pin`, { method:"PUT" });
-      const data = await r.json();
-      await load(); flash(`New PIN for student: ${data.pin}`);
-    } catch { flash("Failed to update PIN."); }
-  }
-
-  async function setPin(cid, sid, pin) {
-    try {
-      const r = await fetch(`${API}/roster/class/${cid}/student/${sid}/pin/set?pin=${pin}`, { method:"PUT" });
-      if (!r.ok) { const d = await r.json(); return d.detail || "Error"; }
-      await load(); flash(`PIN set to ${pin}`);
-      return true;
-    } catch { return "Failed to save PIN."; }
-  }
-
-  const activeClassData = classes.find(c => c.id === activeClass);
-  const totalStudents   = classes.reduce((a,c) => a + c.students.length, 0);
-  const missingPins     = classes.reduce((a,c) => a + c.students.filter(s=>!s.pin).length, 0);
-
-  if (loading) return <div style={{padding:"3rem",textAlign:"center",color:"#aaa"}}>Loading roster…</div>;
+  if (loading) return <div style={{padding:"3rem",textAlign:"center",color:"#aaa"}}>Loading question bank…</div>;
 
   return (
     <div style={{display:"flex",height:"100%",fontFamily:"sans-serif",background:"#e8edf2",overflow:"hidden"}}>
 
-      {/* ── Left: class list ── */}
-      <div style={{width:"260px",display:"flex",flexDirection:"column",borderRight:"2px solid #c8d3dd",background:"#fff",flexShrink:0,overflow:"hidden"}}>
-        <div style={{background:"#003865",color:"#fff",padding:"0.9rem 1.25rem",flexShrink:0}}>
-          <div style={{fontSize:"0.6rem",opacity:.65,letterSpacing:"0.14em"}}>TEACHER TOOLS</div>
-          <div style={{fontSize:"1rem",fontWeight:700}}>Class Roster</div>
-          <div style={{fontSize:"0.72rem",opacity:.7,marginTop:"2px"}}>{classes.length} class{classes.length!==1?"es":""} · {totalStudents} students</div>
-        </div>
-
-        <div style={{padding:"0.85rem 1rem",borderBottom:"1px solid #dde3e9",flexShrink:0}}>
-          <label style={S.lbl}>NEW CLASS / PERIOD</label>
-          <div style={{display:"flex",gap:"0.4rem"}}>
-            <input style={{...S.inp,flex:1}} value={newClassName}
-              onChange={e=>setNewClassName(e.target.value)}
-              onKeyDown={e=>e.key==="Enter"&&addClass()}
-              placeholder="e.g. Period 2"/>
-            <button onClick={addClass} style={{...S.btn,background:"#003865",color:"#fff",border:"none",flexShrink:0}}>+ Add</button>
+      {/* ── Left: Bank browser ── */}
+      <div style={{width:"55%",display:"flex",flexDirection:"column",borderRight:"2px solid #c8d3dd",overflow:"hidden"}}>
+        <div style={{background:"#fff",borderBottom:"1px solid #c8d3dd",padding:"0.75rem 1rem",display:"flex",flexDirection:"column",gap:"0.5rem",flexShrink:0}}>
+          <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
+            <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#003865"}}>QUESTION BANK</div>
+            <span style={{fontSize:"0.7rem",color:"#aaa"}}>{bank.length} questions · {filtered.length} shown</span>
           </div>
-          {msg && <div style={{fontSize:"0.72rem",color:"#1a6e2e",fontWeight:700,marginTop:"5px"}}>✓ {msg}</div>}
+          <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap"}}>
+            <select style={{...S.inp,flex:2,minWidth:"120px"}} value={filterStd} onChange={e=>setFilterStd(e.target.value)}>
+              <option value="">All Standards</option>
+              {STANDARDS.map(s=><option key={s} value={s}>{s}</option>)}
+            </select>
+            <select style={{...S.inp,flex:1,minWidth:"100px"}} value={filterDok} onChange={e=>setFilterDok(e.target.value)}>
+              <option value="">All DOK</option>
+              {[1,2,3,4].map(d=><option key={d} value={d}>DOK {d}</option>)}
+            </select>
+            <input style={{...S.inp,flex:2,minWidth:"120px"}} value={filterText} onChange={e=>setFilterText(e.target.value)} placeholder="Search by ID, keyword…"/>
+          </div>
+          <div style={{display:"flex",gap:"0.5rem",alignItems:"center",flexWrap:"wrap"}}>
+            <span style={{fontSize:"0.72rem",color:"#555"}}>
+              Auto-fill <input type="number" min={1} max={50} value={autoCount} onChange={e=>setAutoCount(Number(e.target.value))}
+                style={{width:"42px",padding:"2px 5px",border:"1px solid #c8d3dd",borderRadius:"3px",fontSize:"0.78rem",textAlign:"center"}}/> questions
+            </span>
+            <button onClick={autoFill} style={{...S.smBtn,background:"#003865",color:"#fff",borderColor:"#003865"}}>⚡ Auto-fill</button>
+            <button onClick={()=>setSelected([])} style={{...S.smBtn,color:"#8b1a1a",borderColor:"#f0b8b8"}}>Clear All</button>
+          </div>
         </div>
 
-        <div style={{flex:1,overflowY:"auto",padding:"0.5rem"}}>
-          {classes.length===0 ? (
-            <div style={{padding:"2rem 1rem",textAlign:"center",color:"#aaa",fontSize:"0.82rem"}}>No classes yet.</div>
-          ) : classes.map(cls => {
-            const isActive = cls.id===activeClass;
-            return (
-              <div key={cls.id} onClick={()=>setActiveClass(cls.id)}
-                style={{padding:"0.75rem 0.9rem",borderRadius:"4px",marginBottom:"0.35rem",background:isActive?"#ddeaf7":"#f8fafc",border:`2px solid ${isActive?"#003865":"#dde3e9"}`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <div>
-                  <div style={{fontSize:"0.88rem",fontWeight:700,color:isActive?"#003865":"#1a1a1a"}}>{cls.name}</div>
-                  <div style={{fontSize:"0.68rem",color:"#888",marginTop:"1px"}}>{cls.students.length} student{cls.students.length!==1?"s":""}</div>
+        <div style={{flex:1,overflowY:"auto",padding:"0.75rem"}}>
+          {bank.length===0?(
+            <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"3rem",textAlign:"center",color:"#aaa"}}>
+              <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>📭</div>
+              <div style={{fontWeight:600,color:"#555"}}>Question bank is empty</div>
+              <div style={{fontSize:"0.82rem",marginTop:"4px"}}>Use the Question Builder or PDF Importer to add questions.</div>
+            </div>
+          ):filtered.length===0?(
+            <div style={{padding:"2rem",textAlign:"center",color:"#aaa",fontSize:"0.85rem"}}>No questions match your filters.</div>
+          ):(
+            filtered.map(q=>{
+              const sel=isSelected(q.id);
+              return (
+                <div key={q.id} style={{background:sel?"#ddeaf7":"#fff",border:`2px solid ${sel?"#003865":"#c8d3dd"}`,borderRadius:"4px",padding:"0.7rem 1rem",marginBottom:"0.5rem",display:"flex",alignItems:"flex-start",gap:"0.75rem"}}>
+                  <div onClick={()=>toggleSelect(q)} style={{width:"20px",height:"20px",borderRadius:"4px",border:`2px solid ${sel?"#003865":"#bcc8d4"}`,background:sel?"#003865":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:"2px",cursor:"pointer"}}>
+                    {sel&&<span style={{color:"#fff",fontSize:"0.7rem",fontWeight:700}}>✓</span>}
+                  </div>
+                  <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>toggleSelect(q)}>
+                    <div style={{display:"flex",gap:"0.4rem",marginBottom:"3px",flexWrap:"wrap",alignItems:"center"}}>
+                      {q.id&&<span style={{fontSize:"0.65rem",fontWeight:700,fontFamily:"monospace",color:"#fff",background:"#003865",padding:"1px 7px",borderRadius:"3px",letterSpacing:"0.05em"}}>{q.id}</span>}
+                      <span style={{fontSize:"0.6rem",fontWeight:700,color:"#003865",background:"#ddeaf7",padding:"1px 6px",borderRadius:"2px",border:"1px solid #b3cde8"}}>{q.standard}</span>
+                      {q.dok&&<span style={{fontSize:"0.6rem",fontWeight:700,color:"#7a4e00",background:"#fff3cd",padding:"1px 6px",borderRadius:"2px",border:"1px solid #ffc107"}}>DOK {q.dok}</span>}
+                      <span style={{fontSize:"0.6rem",color:"#888"}}>{q.short}</span>
+                    </div>
+                    <div style={{fontSize:"0.85rem",color:"#1a1a1a",fontFamily:"Georgia,serif",lineHeight:1.5,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>
+                      <MathText text={q.question}/>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:"3px",flexShrink:0}}>
+                    <button onClick={e=>{e.stopPropagation();setEditingQ(q);}} style={{...S.smBtn,padding:"3px 8px",color:"#003865",borderColor:"#b3cde8",background:"#f0f6ff"}}>✏️</button>
+                    <button onClick={e=>{e.stopPropagation();setConfirmDelete(q);}} style={{...S.smBtn,padding:"3px 8px",color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2"}}>🗑</button>
+                  </div>
                 </div>
-                <div style={{display:"flex",gap:"0.35rem",alignItems:"center"}}>
-                  <button onClick={e=>{e.stopPropagation();navigator.clipboard.writeText(`${window.location.origin}/?practice=${cls.id}`);}}
-                    title="Copy practice link for Google Classroom"
-                    style={{...S.btn,padding:"2px 7px",fontSize:"0.65rem",color:"#1a6e2e",borderColor:"#b3dfc0",background:"#f0faf2"}}>
-                    📋 Practice Link
-                  </button>
-                  <button onClick={e=>{e.stopPropagation();deleteClass(cls.id);}}
-                    style={{...S.btn,padding:"2px 7px",color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",fontSize:"0.68rem"}}>✕</button>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </div>
 
-      {/* ── Right: student management ── */}
+      {/* ── Right panel ── */}
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-
-        {/* Missing PIN banner */}
-        {missingPins>0 && (
-          <div style={{background:"#fff8e1",borderBottom:"1px solid #ffd166",padding:"0.55rem 1.25rem",display:"flex",alignItems:"center",gap:"1rem",fontSize:"0.8rem",color:"#7a4e00",flexShrink:0}}>
-            <span>⚠ {missingPins} student{missingPins!==1?"s":""} missing a PIN.</span>
-            <button onClick={generateMissingPins} style={{...S.btn,padding:"3px 12px",background:"#ffd166",borderColor:"#ffc107",color:"#7a4e00",fontWeight:700,fontSize:"0.75rem"}}>
-              Generate Missing PINs
+        <div style={{background:"#004e94",display:"flex",alignItems:"flex-end",padding:"0 1rem",gap:"0.15rem",flexShrink:0}}>
+          {[["current","📋 Current Test"],["drill","⚡ Fluency Drill"],["library","📚 Test Library"]].map(([key,lbl])=>(
+            <button key={key} onClick={()=>setRightTab(key)}
+              style={{background:rightTab===key?"#fff":"transparent",color:rightTab===key?"#003865":"#cce0f5",border:"none",padding:"0.55rem 0.9rem",fontSize:"0.75rem",fontWeight:700,cursor:"pointer",borderRadius:"4px 4px 0 0"}}>
+              {lbl}{key==="library"&&savedTests.length>0&&<span style={{marginLeft:"5px",background:rightTab===key?"#003865":"rgba(255,255,255,.25)",color:"#fff",borderRadius:"10px",padding:"0px 6px",fontSize:"0.65rem"}}>{savedTests.length}</span>}
             </button>
-          </div>
-        )}
+          ))}
+        </div>
 
-        {!activeClassData ? (
-          <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",color:"#aaa",gap:"0.5rem"}}>
-            <div style={{fontSize:"2rem"}}>👈</div>
-            <div style={{fontWeight:600,color:"#555"}}>Select a class to manage students</div>
-            <div style={{fontSize:"0.82rem"}}>Or create a new class on the left</div>
-          </div>
-        ) : (
+        {/* Current Test */}
+        {rightTab==="current"&&(
           <>
-            {/* Class header */}
-            <div style={{background:"#fff",borderBottom:"1px solid #c8d3dd",padding:"0.75rem 1.25rem",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-              <div>
-                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#003865"}}>{activeClassData.name.toUpperCase()}</div>
-                <div style={{fontSize:"1rem",fontWeight:700,color:"#1a1a1a",marginTop:"2px"}}>
-                  {activeClassData.students.length} student{activeClassData.students.length!==1?"s":""}
-                </div>
+            <div style={{background:"#fff",borderBottom:"1px solid #c8d3dd",padding:"0.75rem 1rem",flexShrink:0}}>
+              <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#003865",marginBottom:"0.4rem"}}>CURRENT SELECTION</div>
+              <input style={{...S.inp,fontWeight:600}} value={testTitle} onChange={e=>setTestTitle(e.target.value)} placeholder="Test title…"/>
+              <div style={{fontSize:"0.7rem",color:"#888",marginTop:"4px"}}>
+                {selected.length} question{selected.length!==1?"s":""} selected
+                {savedMsg&&<span style={{marginLeft:"0.75rem",color:"#1a6e2e",fontWeight:700,fontFamily:"monospace"}}>✓ {savedMsg}</span>}
               </div>
-              {activeClassData.students.length>0 && (
-                <button onClick={()=>printPinSheet(activeClassData)}
-                  style={{...S.btn,background:"#003865",color:"#fff",border:"none",display:"flex",alignItems:"center",gap:"0.4rem"}}>
-                  🖨️ Print PIN Cards
-                </button>
+            </div>
+
+            <div style={{flex:1,overflowY:"auto",padding:"0.75rem"}}>
+              {selected.length===0?(
+                <div style={{padding:"3rem 1rem",textAlign:"center",color:"#aaa"}}>
+                  <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>👈</div>
+                  <div style={{fontWeight:600,color:"#555",marginBottom:"4px"}}>No questions selected</div>
+                  <div style={{fontSize:"0.82rem"}}>Click questions on the left or use Auto-fill.</div>
+                </div>
+              ):(
+                selectedQuestions.map((q,i)=>(
+                  <div key={q.id} style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"0.6rem 0.85rem",marginBottom:"0.4rem",display:"flex",alignItems:"center",gap:"0.6rem"}}>
+                    <div style={{width:"22px",height:"22px",borderRadius:"50%",background:"#003865",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      <span style={{color:"#fff",fontSize:"0.65rem",fontWeight:700}}>{i+1}</span>
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",gap:"0.35rem",marginBottom:"2px"}}>
+                        <span style={{fontSize:"0.58rem",fontWeight:700,color:"#003865",background:"#ddeaf7",padding:"1px 5px",borderRadius:"2px"}}>{q.standard}</span>
+                        {q.dok&&<span style={{fontSize:"0.58rem",fontWeight:700,color:"#7a4e00",background:"#fff3cd",padding:"1px 5px",borderRadius:"2px"}}>DOK {q.dok}</span>}
+                      </div>
+                      <div style={{fontSize:"0.8rem",color:"#1a1a1a",fontFamily:"Georgia,serif",overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>
+                        <MathText text={q.question}/>
+                      </div>
+                    </div>
+                    <div style={{display:"flex",gap:"2px",flexShrink:0}}>
+                      {i>0&&<button onClick={()=>moveUp(i)} style={{...S.smBtn,padding:"3px 7px"}}>↑</button>}
+                      {i<selected.length-1&&<button onClick={()=>moveDown(i)} style={{...S.smBtn,padding:"3px 7px"}}>↓</button>}
+                      <button onClick={()=>removeFromTest(q.id)} style={{...S.smBtn,color:"#8b1a1a",borderColor:"#f0b8b8",padding:"3px 7px"}}>✕</button>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
 
-            {/* Add students */}
-            <div style={{background:"#fff",borderBottom:"2px solid #dde3e9",padding:"1rem 1.25rem",flexShrink:0}}>
-              <div style={{display:"flex",gap:"0.4rem",marginBottom:"0.75rem",flexWrap:"wrap"}}>
-                {[["one","Add One"],["paste","Paste List"],["csv","📄 Upload CSV"]].map(([key,lbl])=>(
-                  <button key={key} onClick={()=>{setAddMode(key);setCsvPreview(null);setCsvErr("");}}
-                    style={{...S.btn,background:addMode===key?"#003865":"#f0f4f8",color:addMode===key?"#fff":"#333",borderColor:addMode===key?"#003865":"#c8d3dd"}}>
-                    {lbl}
-                  </button>
-                ))}
-              </div>
-              {addMode==="one" ? (
-                <div style={{display:"flex",gap:"0.5rem"}}>
-                  <input style={{...S.inp,flex:1}} value={oneInput}
-                    onChange={e=>setOneInput(e.target.value)}
-                    onKeyDown={e=>e.key==="Enter"&&addStudents()}
-                    placeholder="First Last (e.g. Marcus Johnson)"/>
-                  <button onClick={addStudents} disabled={adding||!oneInput.trim()}
-                    style={{...S.btn,background:oneInput.trim()?"#1a6e2e":"#c8d3dd",color:"#fff",border:"none",flexShrink:0}}>
-                    {adding?"Adding…":"+ Add"}
-                  </button>
-                </div>
-              ) : addMode==="paste" ? (
-                <div>
-                  <label style={S.lbl}>PASTE NAMES — one per line</label>
-                  <textarea style={S.ta} value={pasteInput} onChange={e=>setPasteInput(e.target.value)}
-                    placeholder={"Marcus Johnson\nAva Williams\nDeShawn Brown\nKeisha Davis"}/>
-                  <button onClick={addStudents} disabled={adding||!pasteInput.trim()}
-                    style={{...S.btn,marginTop:"0.5rem",background:pasteInput.trim()?"#003865":"#c8d3dd",color:"#fff",border:"none",padding:"0.6rem 1.5rem"}}>
-                    {adding?"Adding…":`+ Add ${pasteInput.split("\n").filter(n=>n.trim()).length} Student${pasteInput.split("\n").filter(n=>n.trim()).length!==1?"s":""}`}
-                  </button>
-                </div>
-              ) : addMode==="csv" ? (
-                <div style={{display:"flex",flexDirection:"column",gap:"0.75rem"}}>
-                  {/* Format hint */}
-                  <div style={{background:"#f0f4f8",borderRadius:"3px",padding:"0.6rem 0.9rem",fontSize:"0.76rem",color:"#555",lineHeight:1.6}}>
-                    <strong>CSV format:</strong> two columns — <code>name</code> and <code>pin</code> (PIN optional).<br/>
-                    Header row optional. Example:<br/>
-                    <code style={{display:"block",marginTop:"4px",color:"#003865"}}>
-                      Marcus Johnson,12345<br/>
-                      Ava Williams,67890<br/>
-                      DeShawn Brown
-                    </code>
-                  </div>
-                  {/* File picker */}
-                  <input ref={csvRef} type="file" accept=".csv,.txt" onChange={handleCSVFile} style={{display:"none"}}/>
-                  <button onClick={()=>csvRef.current?.click()}
-                    style={{...S.btn,background:"#003865",color:"#fff",border:"none",padding:"0.65rem",fontSize:"0.85rem",fontWeight:700}}>
-                    📂 Choose CSV File
-                  </button>
-                  {csvErr && <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"3px",padding:"0.55rem 0.85rem",fontSize:"0.76rem",color:"#8b1a1a"}}>⚠ {csvErr}</div>}
-                  {/* Preview */}
-                  {csvPreview && (
-                    <div>
-                      <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"6px"}}>
-                        PREVIEW — {csvPreview.length} student{csvPreview.length!==1?"s":""} · {csvPreview.filter(r=>r.pin).length} with PINs
-                      </div>
-                      <div style={{maxHeight:"160px",overflowY:"auto",border:"1px solid #c8d3dd",borderRadius:"3px",background:"#fafbfc"}}>
-                        {csvPreview.map((r,i)=>(
-                          <div key={i} style={{display:"flex",alignItems:"center",gap:"0.75rem",padding:"0.4rem 0.75rem",borderBottom:i<csvPreview.length-1?"1px solid #eef1f4":"none"}}>
-                            <span style={{fontSize:"0.82rem",fontWeight:600,flex:1}}>{r.name}</span>
-                            {r.pin
-                              ? <span style={{fontFamily:"monospace",fontSize:"0.85rem",fontWeight:700,color:"#003865",letterSpacing:"0.15em"}}>{r.pin}</span>
-                              : <span style={{fontSize:"0.72rem",color:"#aaa"}}>auto PIN</span>}
-                          </div>
-                        ))}
-                      </div>
-                      <button onClick={importCSV} disabled={csvImporting}
-                        style={{...S.btn,marginTop:"0.6rem",width:"100%",background:"#1a6e2e",color:"#fff",border:"none",padding:"0.65rem",fontSize:"0.85rem",fontWeight:700,opacity:csvImporting?0.7:1}}>
-                        {csvImporting?"Importing…":`✓ Import ${csvPreview.length} Student${csvPreview.length!==1?"s":""}`}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : null}
-            </div>
-
-            {/* Student list */}
-            <div style={{flex:1,overflowY:"auto",padding:"0.75rem 1.25rem"}}>
-              {activeClassData.students.length===0 ? (
-                <div style={{padding:"2rem",textAlign:"center",color:"#aaa",fontSize:"0.85rem"}}>No students yet.</div>
-              ) : (
-                <div style={{display:"flex",flexDirection:"column",gap:"0.35rem"}}>
-                  {activeClassData.students.map((s,i)=>(
-                    <div key={s.id} style={{background:"#fff",border:"1px solid #dde3e9",borderRadius:"3px",padding:"0.6rem 0.9rem",display:"flex",alignItems:"center",gap:"0.75rem",flexWrap:"wrap"}}>
-                      <div style={{width:"26px",height:"26px",borderRadius:"50%",background:"#003865",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                        <span style={{color:"#fff",fontSize:"0.65rem",fontWeight:700}}>{i+1}</span>
-                      </div>
-                      <div style={{flex:1,fontSize:"0.88rem",fontWeight:600,color:"#1a1a1a",minWidth:"120px"}}>
-                        {s.name}
-                        <span style={{display:"inline-flex",gap:"4px",marginLeft:"8px",verticalAlign:"middle"}}>
-                          {s.extendedTime && s.extendedTime !== "none" && (
-                            <span style={{background:"#ddeaf7",border:"1px solid #b3cde8",borderRadius:"3px",padding:"1px 6px",fontSize:"0.6rem",fontWeight:700,color:"#003865"}}>
-                              ⏱ {s.extendedTime === "1.5x" ? "1.5×" : "2×"} TIME
-                            </span>
-                          )}
-                          {s.reduceChoices && (
-                            <span style={{background:"#fff8e1",border:"1px solid #ffc107",borderRadius:"3px",padding:"1px 6px",fontSize:"0.6rem",fontWeight:700,color:"#7a4e00"}}>
-                              ✂ 3-CHOICE
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                      <PinEditor
-                        pin={s.pin}
-                        onSave={pin=>setPin(activeClassData.id, s.id, pin)}
-                        onRegen={()=>regenPin(activeClassData.id, s.id)}
-                      />
-                      <button onClick={()=>setAccomModal({cid:activeClassData.id, student:s})}
-                        style={{...S.btn,padding:"2px 8px",fontSize:"0.7rem",color:"#003865",borderColor:"#b3cde8",background:"#ddeaf7"}}>IEP</button>
-                      <button onClick={()=>removeStudent(activeClassData.id, s.id, s.name)}
-                        style={{...S.btn,padding:"2px 8px",color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",fontSize:"0.7rem"}}>✕</button>
-                    </div>
-                  ))}
+            <div style={{padding:"0.85rem 1rem",borderTop:"2px solid #c8d3dd",background:"#fff",flexShrink:0}}>
+              <button onClick={()=>setShowSaveModal(true)} disabled={selected.length===0}
+                style={{width:"100%",background:selected.length===0?"#c8d3dd":"#003865",border:"none",borderRadius:"4px",padding:"0.8rem",fontSize:"0.95rem",fontWeight:700,color:"#fff",cursor:selected.length===0?"not-allowed":"pointer"}}>
+                💾 Save to Library & Get Code
+              </button>
+              {selected.length>0&&(
+                <div style={{fontSize:"0.7rem",color:"#888",textAlign:"center",marginTop:"5px"}}>
+                  Students use the code to access this test
                 </div>
               )}
             </div>
           </>
         )}
+
+        {/* Fluency Drill */}
+        {rightTab==="drill"&&(
+          <div style={{flex:1,overflowY:"auto",padding:"1rem",display:"flex",flexDirection:"column",gap:"1rem"}}>
+            <div style={{background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"6px",padding:"0.85rem 1rem",fontSize:"0.8rem",color:"#7a4e00",lineHeight:1.5}}>
+              ⚡ <strong>Fluency Drill</strong> — each student gets <em>different numbers</em>, same standard. Great for fluency practice without answer sharing.
+            </div>
+
+            {/* Drill name */}
+            <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"0.9rem 1rem"}}>
+              <label style={S.lbl}>DRILL NAME</label>
+              <input style={S.inp} value={drillName} onChange={e=>setDrillName(e.target.value)} placeholder="e.g. Multiplication Fluency"/>
+            </div>
+
+            {/* Standard picker */}
+            <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"0.9rem 1rem"}}>
+              <label style={S.lbl}>STANDARDS — pick one or more (must have ⚡ generator)</label>
+              <div style={{display:"flex",flexWrap:"wrap",gap:"0.4rem",marginTop:"0.4rem"}}>
+                {["5.NR.1.1","5.NR.2.1","5.NR.2.2","5.NR.3.1","5.NR.3.2","5.NR.3.3","5.NR.4.1","5.NR.4.2"].map(std=>{
+                  const on = drillStds.includes(std);
+                  return (
+                    <button key={std} onClick={()=>setDrillStds(s=>on?s.filter(x=>x!==std):[...s,std])}
+                      style={{padding:"5px 10px",borderRadius:"4px",border:`2px solid ${on?"#1a6e2e":"#c8d3dd"}`,background:on?"#f0faf2":"#fafbfc",color:on?"#1a6e2e":"#555",fontSize:"0.75rem",fontWeight:700,cursor:"pointer"}}>
+                      {on?"✓ ":""}{std}
+                    </button>
+                  );
+                })}
+              </div>
+              {drillStds.length === 0 && <div style={{fontSize:"0.7rem",color:"#8b1a1a",marginTop:"6px"}}>Select at least one standard</div>}
+            </div>
+
+            {/* Question count */}
+            <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"0.9rem 1rem"}}>
+              <label style={S.lbl}>QUESTIONS PER SESSION</label>
+              <div style={{display:"flex",gap:"0.5rem",marginTop:"0.4rem"}}>
+                {[5,10,15,20].map(n=>(
+                  <button key={n} onClick={()=>setDrillCount(n)}
+                    style={{flex:1,padding:"0.55rem",border:`2px solid ${drillCount===n?"#003865":"#c8d3dd"}`,borderRadius:"4px",background:drillCount===n?"#003865":"#fafbfc",color:drillCount===n?"#fff":"#555",fontSize:"0.85rem",fontWeight:700,cursor:"pointer"}}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Code */}
+            <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"0.9rem 1rem"}}>
+              <label style={S.lbl}>STUDENT CODE</label>
+              <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
+                <input style={{...S.inp,...S.code,flex:1}} value={drillCode}
+                  onChange={e=>{ const v=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,8); setDrillCode(v); setDrillCodeErr(v.length<4?"Code must be at least 4 characters":""); }}
+                  maxLength={8} placeholder="e.g. MULT5"/>
+                <button onClick={()=>setDrillCode(genCode())} style={{...S.smBtn,flexShrink:0,padding:"0.5rem 0.75rem"}}>🔀</button>
+              </div>
+              {drillCodeErr
+                ? <div style={{fontSize:"0.7rem",color:"#8b1a1a",marginTop:"4px"}}>⚠ {drillCodeErr}</div>
+                : <div style={{fontSize:"0.7rem",color:"#888",marginTop:"4px"}}>Students enter this code to start the drill</div>}
+            </div>
+
+            {/* Preview */}
+            {drillStds.length > 0 && (
+              <div style={{background:"#f0f4f8",borderRadius:"4px",padding:"0.75rem 1rem",fontSize:"0.78rem",color:"#555"}}>
+                Each student gets <strong>{drillCount} unique questions</strong> on{" "}
+                <strong>{drillStds.join(", ")}</strong> — numbers randomized per student.
+              </div>
+            )}
+
+            {drillMsg && <div style={{background:"#f0faf2",border:"1px solid #b3dfc0",borderRadius:"4px",padding:"0.65rem 1rem",fontSize:"0.82rem",color:"#1a6e2e",fontWeight:700}}>✓ {drillMsg}</div>}
+
+            <button onClick={saveDrill}
+              disabled={drillSaving || drillStds.length===0 || !drillName.trim() || drillCode.length<4}
+              style={{background:(drillStds.length===0||!drillName.trim()||drillCode.length<4)?"#c8d3dd":"#1a6e2e",border:"none",borderRadius:"4px",padding:"0.85rem",fontSize:"0.95rem",fontWeight:700,color:"#fff",cursor:"pointer"}}>
+              {drillSaving ? "Saving…" : "⚡ Save Fluency Drill & Get Code"}
+            </button>
+          </div>
+        )}
+
+        {/* Library */}
+        {rightTab==="library"&&(
+          <>
+            <div style={{background:"#fff",borderBottom:"1px solid #c8d3dd",padding:"0.75rem 1rem",flexShrink:0}}>
+              <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#003865"}}>TEST LIBRARY</div>
+              <div style={{fontSize:"0.72rem",color:"#888",marginTop:"2px"}}>{savedTests.length} saved test{savedTests.length!==1?"s":""} · Click Load to select questions</div>
+            </div>
+            <div style={{flex:1,overflowY:"auto",padding:"0.75rem"}}>
+              {savedTests.length===0?(
+                <div style={{padding:"3rem 1rem",textAlign:"center",color:"#aaa"}}>
+                  <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>📚</div>
+                  <div style={{fontWeight:600,color:"#555",marginBottom:"4px"}}>No saved tests yet</div>
+                  <div style={{fontSize:"0.82rem"}}>Build a test and click "Save to Library".</div>
+                </div>
+              ):(
+                savedTests.map(t=>(
+                  <div key={t.id} style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"0.85rem 1rem",marginBottom:"0.5rem"}}>
+                    <div style={{display:"flex",alignItems:"flex-start",gap:"0.75rem"}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:"0.9rem",fontWeight:700,color:"#1a1a1a"}}>{t.name}</div>
+                        <div style={{fontSize:"0.72rem",color:"#888",marginTop:"2px"}}>
+                          {t.type==="drill"
+                            ? `⚡ Fluency Drill · ${t.drill_count||10} questions · Saved ${t.saved_at}`
+                            : `${t.count} question${t.count!==1?"s":""} · Saved ${t.saved_at}`}
+                        </div>
+                      </div>
+                      <div style={{display:"flex",gap:"0.4rem",flexShrink:0,flexWrap:"wrap"}}>
+                        <button onClick={()=>loadSavedTest(t.id)} style={{...S.smBtn,background:"#003865",color:"#fff",borderColor:"#003865",padding:"5px 12px"}}>Load</button>
+                        <button onClick={()=>setAssignClassesTest(t)} style={{...S.smBtn,padding:"5px 10px",background:"#e8f0fa",borderColor:"#b3cde8",color:"#003865"}}>🏫 Classes</button>
+                        <button onClick={()=>setConfirmDeleteTest(t)} style={{...S.smBtn,color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",padding:"5px 10px"}}>🗑</button>
+                      </div>
+                    </div>
+                    {/* Code badge */}
+                    {t.code&&(
+                      <div style={{marginTop:"0.6rem",display:"flex",alignItems:"center",gap:"0.5rem",background:"#f0f4f8",borderRadius:"3px",padding:"0.45rem 0.75rem"}}>
+                        <span style={{fontSize:"0.62rem",color:"#555",fontWeight:700,letterSpacing:"0.1em"}}>STUDENT CODE</span>
+                        <span style={{...S.code,fontSize:"1rem",letterSpacing:"0.2em",color:"#003865"}}>{t.code}</span>
+                        <button onClick={()=>navigator.clipboard.writeText(`${window.location.origin}/?code=${t.code}`)}
+                          style={{...S.smBtn,marginLeft:"auto",padding:"2px 8px",fontSize:"0.68rem"}}>📋 Copy Link</button>
+                      </div>
+                    )}
+                    {/* Class assignment badge */}
+                    <div onClick={()=>setAssignClassesTest(t)} style={{marginTop:"4px",display:"flex",alignItems:"center",gap:"0.4rem",cursor:"pointer"}}>
+                      {t.classIds?.length > 0
+                        ? <span style={{fontSize:"0.68rem",color:"#1a6e2e",background:"#f0faf2",border:"1px solid #b3dfc0",borderRadius:"10px",padding:"1px 8px"}}>🏫 {t.classIds.length} class{t.classIds.length!==1?"es":""} assigned</span>
+                        : <span style={{fontSize:"0.68rem",color:"#e67e00",background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"10px",padding:"1px 8px"}}>⚠ No class assigned — click to fix</span>
+                      }
+                    </div>
+                    {/* Class assignment */}
+                    {t.type !== "drill" && (
+                      assigningTest === t.id ? (
+                        <div style={{marginTop:"0.5rem",background:"#f8fafc",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.6rem"}}>
+                          <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"6px"}}>ASSIGN TO CLASSES</div>
+                          <div style={{display:"flex",flexDirection:"column",gap:"3px",maxHeight:"110px",overflowY:"auto",marginBottom:"6px"}}>
+                            {allClasses.map(cls => {
+                              const liveTest = savedTests.find(x=>x.id===t.id);
+                              const checked = (liveTest?.classIds||[]).includes(cls.id);
+                              return (
+                                <label key={cls.id} onClick={()=>{
+                                  const cur = savedTests.find(x=>x.id===t.id);
+                                  if (!cur) return;
+                                  const ids = checked ? (cur.classIds||[]).filter(x=>x!==cls.id) : [...(cur.classIds||[]), cls.id];
+                                  setSavedTests(prev => prev.map(x => x.id===t.id ? {...x, classIds: ids} : x));
+                                }} style={{display:"flex",alignItems:"center",gap:"0.5rem",cursor:"pointer",padding:"3px 5px",borderRadius:"3px",background:checked?"#ddeaf7":"transparent",fontSize:"0.8rem"}}>
+                                  <div style={{width:"14px",height:"14px",borderRadius:"2px",border:`2px solid ${checked?"#003865":"#c8d3dd"}`,background:checked?"#003865":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                                    {checked && <span style={{color:"#fff",fontSize:"0.55rem",fontWeight:900}}>✓</span>}
+                                  </div>
+                                  <span style={{fontWeight:checked?700:400,color:checked?"#003865":"#333"}}>{cls.name}</span>
+                                </label>
+                              );
+                            })}
+                            {allClasses.length===0 && <div style={{color:"#aaa",fontSize:"0.75rem"}}>No classes found.</div>}
+                          </div>
+                          <div style={{display:"flex",gap:"0.4rem"}}>
+                            <button onClick={async ()=>{
+                              const cur = savedTests.find(x=>x.id===t.id);
+                              if (!cur) return;
+                              await fetch(`${API}/tests/saved/${t.id}/classes`,{
+                                method:"PATCH", headers:{"Content-Type":"application/json"},
+                                body: JSON.stringify({classIds: cur.classIds||[]})
+                              });
+                              await loadSavedTests();
+                              setAssigningTest(null);
+                            }}
+                              style={{...S.smBtn,background:"#003865",color:"#fff",borderColor:"#003865",flex:1,padding:"4px"}}>💾 Save</button>
+                            <button onClick={()=>{ loadSavedTests(); setAssigningTest(null); }}
+                              style={{...S.smBtn,padding:"4px 8px"}}>Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{marginTop:"0.5rem",display:"flex",alignItems:"center",gap:"0.5rem"}}>
+                          <span style={{fontSize:"0.68rem",color:(t.classIds||[]).length?"#555":"#e67e00"}}>
+                            {(t.classIds||[]).length
+                              ? `🏫 ${(t.classIds||[]).map(id=>allClasses.find(c=>c.id===id)?.name||id).join(", ")}`
+                              : "⚠ No class assigned"}
+                          </span>
+                          <button onClick={()=>setAssigningTest(t.id)}
+                            style={{...S.smBtn,padding:"2px 8px",fontSize:"0.65rem",marginLeft:"auto",whiteSpace:"nowrap"}}>
+                            Assign Classes
+                          </button>
+                        </div>
+                      )
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </>
+        )}
       </div>
-    {/* ── IEP / Accommodations Modal ── */}
-    {accomModal && (
-      <AccomModal
-        student={accomModal.student}
-        onSave={(ext, red) => saveAccommodations(accomModal.cid, accomModal.student.id, ext, red)}
-        onClose={() => setAccomModal(null)}
-      />
-    )}
+
+      {/* Modals */}
+      {editingQ&&<EditModal question={editingQ} onSave={handleSaveEdit} onClose={()=>setEditingQ(null)}/>}
+      {showSaveModal&&<SaveTestModal count={selected.length} currentTitle={testTitle} savedTests={savedTests} onSave={saveTest} onClose={()=>setShowSaveModal(false)}/>}
+      {assignClassesTest&&<AssignClassesModal test={assignClassesTest} onSave={async(classIds)=>{
+        try {
+          await fetch(`${API}/tests/saved/${assignClassesTest.id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...assignClassesTest,classIds})});
+          await loadSavedTests();
+          setAssignClassesTest(null);
+        } catch {}
+      }} onClose={()=>setAssignClassesTest(null)}/>}
+
+      {confirmDelete&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
+          <div style={{background:"#fff",borderRadius:"6px",width:"100%",maxWidth:"380px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.25)"}}>
+            <div style={{background:"#8b1a1a",color:"#fff",padding:"0.9rem 1.25rem"}}>
+              <div style={{fontSize:"0.6rem",opacity:.75,letterSpacing:"0.12em",marginBottom:"2px"}}>QUESTION BANK</div>
+              <div style={{fontSize:"1rem",fontWeight:700}}>Delete Question?</div>
+            </div>
+            <div style={{padding:"1.25rem"}}>
+              <p style={{fontSize:"0.85rem",color:"#333",margin:"0 0 0.75rem",fontFamily:"Georgia,serif",lineHeight:1.5}}><MathText text={confirmDelete.question}/></p>
+              <p style={{fontSize:"0.78rem",color:"#888",margin:0}}>This permanently removes the question and cannot be undone.</p>
+            </div>
+            <div style={{display:"flex",gap:"0.65rem",padding:"0.9rem 1.25rem",borderTop:"1px solid #dde3e9"}}>
+              <button onClick={()=>setConfirmDelete(null)} style={{flex:1,background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600,color:"#333"}}>Cancel</button>
+              <button onClick={()=>deleteQuestion(confirmDelete.id)} style={{flex:1,background:"#8b1a1a",border:"none",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",color:"#fff",fontWeight:700}}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
