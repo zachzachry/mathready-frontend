@@ -23,7 +23,7 @@ function StudentLogin({ onStartTest, onStartPractice, onBack, prefill, codeOnly,
   // Auto-submit if code came from URL param
   useEffect(() => {
     if (prefillCode) checkCode(prefillCode);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line
 
   // Step 1 — validate test code and load roster
   async function checkCode(overrideCode) {
