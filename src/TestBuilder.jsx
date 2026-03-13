@@ -736,8 +736,8 @@ export default function TestBuilder() {
                       <div style={{marginTop:"0.6rem",display:"flex",alignItems:"center",gap:"0.5rem",background:"#f0f4f8",borderRadius:"3px",padding:"0.45rem 0.75rem"}}>
                         <span style={{fontSize:"0.62rem",color:"#555",fontWeight:700,letterSpacing:"0.1em"}}>STUDENT CODE</span>
                         <span style={{...S.code,fontSize:"1rem",letterSpacing:"0.2em",color:"#003865"}}>{t.code}</span>
-                        <button onClick={()=>navigator.clipboard.writeText(t.code)}
-                          style={{...S.smBtn,marginLeft:"auto",padding:"2px 8px",fontSize:"0.68rem"}}>Copy</button>
+                        <button onClick={()=>navigator.clipboard.writeText(`${window.location.origin}/?code=${t.code}`)}
+                          style={{...S.smBtn,marginLeft:"auto",padding:"2px 8px",fontSize:"0.68rem"}}>📋 Copy Link</button>
                       </div>
                     )}
                     {/* Class assignment badge */}
