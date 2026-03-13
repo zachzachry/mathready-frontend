@@ -379,10 +379,14 @@ export default function RosterManager({ teacher }) {
   const [gcImportOpen, setGcImportOpen] = useState(false);
 
   const load = useCallback(async () => {
-    try { const url = `${API}/roster${teacher && teacher.classIds !== null ? '?classIds='+teacher.classIds.join(',') : ''}`; const r = await fetch(url); setClasses(await r.json()); }
+    try {
+      const url = `${API}/roster${teacher && teacher.classIds !== null ? '?classIds='+teacher.classIds.join(',') : ''}`;
+      const r = await fetch(url);
+      setClasses(await r.json());
+    }
     catch { setClasses([]); }
     setLoading(false);
-  }, []);
+  }, [teacher]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -401,7 +405,7 @@ export default function RosterManager({ teacher }) {
     if (!newClassName.trim()) return;
     try {
       await fetch(`${API}/roster/class`, { method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ name: newClassName.trim() }) });
+        body: JSON.stringify({ name: newClassName.trim(), teacherId: teacher?.teacherId || null }) });
       setNewClassName(""); await load(); flash("Class added!");
     } catch {}
   }
@@ -793,9 +797,17 @@ export default function RosterManager({ teacher }) {
           // Create a new class with the course name
           const r = await fetch(`${API}/roster/class`, {
             method:"POST", headers:{"Content-Type":"application/json"},
-            body: JSON.stringify({ name: courseName }),
+            body: JSON.stringify({ name: courseName, teacherId: teacher?.teacherId || null }),
           });
           const { id: newCid } = await r.json();
+          // Assign class to teacher if we have a teacherId
+          if (teacher?.teacherId) {
+            const currentIds = classes.map(c => c.id);
+            await fetch(`${API}/teachers/${teacher.teacherId}/classes`, {
+              method:"PUT", headers:{"Content-Type":"application/json"},
+              body: JSON.stringify({ students: [...currentIds, newCid] }),
+            });
+          }
           // Add student names
           const names = students.map(s => s.name);
           await fetch(`${API}/roster/class/${newCid}/students`, {
@@ -817,6 +829,12 @@ export default function RosterManager({ teacher }) {
             });
           }
           await load();
+          // Also refresh teacher's classIds by fetching fresh roster directly
+          const freshAll = await fetch(`${API}/roster`).then(r=>r.json());
+          setClasses(teacher && teacher.classIds !== null
+            ? freshAll.filter(c => [...(teacher.classIds||[]), newCid].includes(c.id))
+            : freshAll
+          );
           setActiveClass(newCid);
           setGcImportOpen(false);
           flash(`Imported ${students.length} students from Google Classroom!`);
