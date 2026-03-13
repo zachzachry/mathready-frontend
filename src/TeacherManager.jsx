@@ -88,6 +88,7 @@ function ClassPicker({ allClasses, selected, onChange, onClassCreated }) {
 function TeacherForm({ teacher, allClasses, onSave, onCancel, onClassCreated }) {
   const [name,       setName]       = useState(teacher?.name     || "");
   const [email,      setEmail]      = useState(teacher?.email    || "");
+  const [role,       setRole]       = useState(teacher?.role     || "teacher");
   const [pin,        setPin]        = useState(teacher ? "" : genHex());
   const [changingPin,setChangingPin]= useState(!teacher);
   const [classIds,   setClassIds]   = useState(teacher?.classIds || []);
@@ -104,7 +105,7 @@ function TeacherForm({ teacher, allClasses, onSave, onCancel, onClassCreated }) 
       }
     }
     setSaving(true); setErr("");
-    const body = { name: name.trim(), email: email.trim().toLowerCase(),
+    const body = { name: name.trim(), email: email.trim().toLowerCase(), role,
                    pin: changingPin ? pin.trim().toUpperCase() : "", classIds };
     try {
       const url    = teacher ? `${API}/teachers/${teacher.id}` : `${API}/teachers`;
@@ -135,6 +136,17 @@ function TeacherForm({ teacher, allClasses, onSave, onCancel, onClassCreated }) 
           <input style={S.inp} value={email} onChange={e=>setEmail(e.target.value)}
             placeholder="teacher@school.edu" type="email"/>
         </div>
+      </div>
+
+      <div style={{ marginBottom:"1rem" }}>
+        <label style={S.lbl}>ROLE</label>
+        <select value={role} onChange={e=>setRole(e.target.value)}
+          style={{...S.inp, fontWeight:600}}>
+          <option value="teacher">Teacher — own classes only</option>
+          <option value="school_admin">School Admin — all classes, no teacher management</option>
+          <option value="observer">Observer — view only, assigned classes</option>
+          <option value="super_admin">Super Admin — full access</option>
+        </select>
       </div>
 
       <div style={{ marginBottom:"1rem" }}>
