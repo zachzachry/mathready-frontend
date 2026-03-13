@@ -52,12 +52,25 @@ function HexInput({ onConfirm, loading, err }) {
 }
 
 export default function App() {
-  const [screen,         setScreen]         = useState("home");
+  // Read URL params on mount — ?code= and ?practice= links from Google Classroom
+  function getUrlParams() {
+    const p = new URLSearchParams(window.location.search);
+    return { code: p.get("code"), practiceClass: p.get("practice") };
+  }
+  const { code: urlCode, practiceClass: urlPracticeClass } = getUrlParams();
+
+  const [screen,         setScreen]         = useState(
+    urlCode || urlPracticeClass ? "student" : "home"
+  );
   const [teacherIdentity,setTeacherIdentity]= useState(null);
   const [loading,        setLoading]        = useState(false);
   const [err,            setErr]            = useState("");
 
-  function reset() { setScreen("home"); setErr(""); setTeacherIdentity(null); }
+  function reset() {
+    // Clear URL params so refresh doesn't re-trigger
+    window.history.replaceState({}, "", window.location.pathname);
+    setScreen("home"); setErr(""); setTeacherIdentity(null);
+  }
 
   async function handlePin(pin) {
     setLoading(true); setErr("");
@@ -85,7 +98,7 @@ export default function App() {
 
   if (screen === "admin")   return <AdminShell   onBack={reset}/>;
   if (screen === "teacher") return <TeacherShell teacher={teacherIdentity} onBack={reset}/>;
-  if (screen === "student") return <MathTest     onBack={reset}/>;
+  if (screen === "student") return <MathTest onBack={reset} prefillCode={urlCode||undefined} directPracticeClassId={urlPracticeClass||undefined}/>;
 
   // ── Staff PIN screen ──
   if (screen === "pin") return (
