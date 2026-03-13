@@ -168,6 +168,41 @@ function AccomModal({ student, onSave, onClose }) {
 }
 
 
+function EmailModal({ student, onSave, onClose }) {
+  const [email, setEmail] = useState(student.email || "");
+  const [saving, setSaving] = useState(false);
+  async function handleSave() {
+    setSaving(true);
+    await onSave(email);
+    setSaving(false);
+  }
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
+      <div style={{background:"#fff",borderRadius:"8px",boxShadow:"0 8px 40px rgba(0,0,0,.18)",padding:"1.75rem 2rem",width:"100%",maxWidth:"360px",display:"flex",flexDirection:"column",gap:"1.25rem"}}>
+        <div style={{fontSize:"1rem",fontWeight:700,color:"#003865"}}>✉ Google Email — {student.name}</div>
+        <div style={{fontSize:"0.78rem",color:"#666",lineHeight:1.5}}>
+          Enter the student's school Google account email. This is used to verify their identity when they click a practice or test link.
+        </div>
+        <input
+          autoFocus
+          value={email}
+          onChange={e=>setEmail(e.target.value)}
+          onKeyDown={e=>{ if(e.key==="Enter") handleSave(); if(e.key==="Escape") onClose(); }}
+          placeholder="student@school.edu"
+          style={{padding:"0.7rem 0.9rem",border:"2px solid #b3cde8",borderRadius:"6px",fontSize:"0.95rem",outline:"none",width:"100%",boxSizing:"border-box"}}
+        />
+        <div style={{display:"flex",gap:"0.5rem",justifyContent:"flex-end"}}>
+          <button onClick={onClose} style={{padding:"0.55rem 1.25rem",border:"1px solid #c8d3dd",borderRadius:"4px",background:"#fff",cursor:"pointer",fontSize:"0.85rem"}}>Cancel</button>
+          <button onClick={handleSave} disabled={saving}
+            style={{padding:"0.55rem 1.25rem",border:"none",borderRadius:"4px",background:"#003865",color:"#fff",cursor:"pointer",fontSize:"0.85rem",fontWeight:700,opacity:saving?0.7:1}}>
+            {saving?"Saving…":"Save Email"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function RosterManager({ teacher }) {
   const [classes,    setClasses]    = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -179,6 +214,7 @@ export default function RosterManager({ teacher }) {
   const [adding,     setAdding]     = useState(false);
   const [msg,        setMsg]        = useState("");
   const [accomModal, setAccomModal] = useState(null);
+  const [emailModal, setEmailModal] = useState(null); // {cid, student}
 
   const load = useCallback(async () => {
     try { const url = `${API}/roster${teacher && teacher.classIds !== null ? '?classIds='+teacher.classIds.join(',') : ''}`; const r = await fetch(url); setClasses(await r.json()); }
@@ -307,6 +343,23 @@ export default function RosterManager({ teacher }) {
     setCsvImporting(false);
   }
 
+  async function saveEmail(cid, sid, email) {
+    const cls = classes.find(c => c.id === cid);
+    if (!cls) return;
+    const updated = cls.students.map(s =>
+      s.id === sid ? { ...s, email: email.trim().toLowerCase() } : s
+    );
+    try {
+      await fetch(`${API}/roster/class/${cid}`, {
+        method:"PUT", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ name: cls.name, students: updated }),
+      });
+      await load();
+      setEmailModal(null);
+      flash("Email saved!");
+    } catch(e) { console.error("saveEmail failed", e); }
+  }
+
   async function saveAccommodations(cid, sid, extendedTime, reduceChoices) {
     const cls  = classes.find(c => c.id === cid);
     if (!cls) return;
@@ -387,8 +440,15 @@ export default function RosterManager({ teacher }) {
                   <div style={{fontSize:"0.88rem",fontWeight:700,color:isActive?"#003865":"#1a1a1a"}}>{cls.name}</div>
                   <div style={{fontSize:"0.68rem",color:"#888",marginTop:"1px"}}>{cls.students.length} student{cls.students.length!==1?"s":""}</div>
                 </div>
-                <button onClick={e=>{e.stopPropagation();deleteClass(cls.id);}}
-                  style={{...S.btn,padding:"2px 7px",color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",fontSize:"0.68rem"}}>✕</button>
+                <div style={{display:"flex",gap:"0.35rem",alignItems:"center"}}>
+                  <button onClick={e=>{e.stopPropagation();navigator.clipboard.writeText(`${window.location.origin}/?practice=${cls.id}`);}}
+                    title="Copy practice link for Google Classroom"
+                    style={{...S.btn,padding:"2px 7px",fontSize:"0.65rem",color:"#1a6e2e",borderColor:"#b3dfc0",background:"#f0faf2"}}>
+                    📋 Practice Link
+                  </button>
+                  <button onClick={e=>{e.stopPropagation();deleteClass(cls.id);}}
+                    style={{...S.btn,padding:"2px 7px",color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",fontSize:"0.68rem"}}>✕</button>
+                </div>
               </div>
             );
           })}
@@ -541,6 +601,11 @@ export default function RosterManager({ teacher }) {
                       />
                       <button onClick={()=>setAccomModal({cid:activeClassData.id, student:s})}
                         style={{...S.btn,padding:"2px 8px",fontSize:"0.7rem",color:"#003865",borderColor:"#b3cde8",background:"#ddeaf7"}}>IEP</button>
+                      <button onClick={()=>setEmailModal({cid:activeClassData.id, student:s})}
+                        title={s.email || "Set Google email"}
+                        style={{...S.btn,padding:"2px 8px",fontSize:"0.7rem",color:s.email?"#1a6e2e":"#888",borderColor:s.email?"#b3dfc0":"#dde3e9",background:s.email?"#f0faf2":"#f8fafc"}}>
+                        {s.email ? "✉ ✓" : "✉"}
+                      </button>
                       <button onClick={()=>removeStudent(activeClassData.id, s.id, s.name)}
                         style={{...S.btn,padding:"2px 8px",color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",fontSize:"0.7rem"}}>✕</button>
                     </div>
@@ -557,6 +622,14 @@ export default function RosterManager({ teacher }) {
         student={accomModal.student}
         onSave={(ext, red) => saveAccommodations(accomModal.cid, accomModal.student.id, ext, red)}
         onClose={() => setAccomModal(null)}
+      />
+    )}
+    {/* ── Email Modal ── */}
+    {emailModal && (
+      <EmailModal
+        student={emailModal.student}
+        onSave={email => saveEmail(emailModal.cid, emailModal.student.id, email)}
+        onClose={() => setEmailModal(null)}
       />
     )}
     </div>
