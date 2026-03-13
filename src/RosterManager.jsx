@@ -543,9 +543,15 @@ export default function RosterManager({ teacher }) {
   }
 
   async function removeStudent(cid, sid, name) {
-    if (!window.confirm(`Remove ${name}?`)) return;
-    try { await fetch(`${API}/roster/class/${cid}/student/${sid}`, { method:"DELETE" }); await load(); }
-    catch {}
+    if (!cid || !sid) { console.error("removeStudent: missing cid or sid", {cid, sid}); return; }
+    if (!window.confirm(`Remove ${name} from this class?`)) return;
+    try {
+      const r = await fetch(`${API}/roster/class/${cid}/student/${sid}`, { method:"DELETE" });
+      const d = await r.json();
+      if (!r.ok) { flash("Failed to remove student."); return; }
+      await load();
+      flash(`Removed ${name}.`);
+    } catch { flash("Failed to remove student."); }
   }
 
   async function regenPin(cid, sid) {
