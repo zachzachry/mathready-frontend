@@ -82,8 +82,14 @@ function StudentLogin({ onStartTest, onStartPractice, onBack, prefill, codeOnly 
               ["TEST",         testInfo.title || "Grade 5 Mathematics"],
               ["TEST CODE",    code.toUpperCase()],
               ["QUESTIONS",    String(testInfo.questions.length)],
-              ["TIME LIMIT",   testInfo.untimed ? "No Time Limit" : `${Math.round((testInfo.timeLimitSecs||1800)/60)} Minutes`],
+              ["TIME LIMIT",   testInfo.untimed ? "No Time Limit" : (() => {
+                const extFactor = selectedStudent?.extendedTime === "2x" ? 2 : selectedStudent?.extendedTime === "1.5x" ? 1.5 : 1;
+                const base = testInfo.timeLimitSecs || 1800;
+                const final = Math.round(base * extFactor / 60);
+                return extFactor > 1 ? `${final} min (${selectedStudent.extendedTime} extended)` : `${final} Minutes`;
+              })()],
               ["CALCULATOR",   "Not Permitted"],
+              ...(selectedStudent?.reduceChoices ? [["ANSWER CHOICES", "Reduced (3 per question)"]] : []),
               ...(testInfo.oneAttempt ? [["ATTEMPTS", "1 — Cannot retake"]] : []),
             ].map(([k,v],i,a) => (
               <div key={k} style={{...S.confirmRow, borderBottom:i<a.length-1?"1px solid #eef1f4":"none"}}>
@@ -723,7 +729,8 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
     return () => clearInterval(t);
   }, [paused, untimed]);
 
-  // Poll for teacher pause/stop every 5s
+  // Poll for teacher pause/stop/extensions every 5s
+  const appliedExtRef = useRef(0); // total seconds already added to timer
   useEffect(()=>{
     const t = setInterval(async () => {
       try {
@@ -731,10 +738,19 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
         const d = await r.json();
         setPaused(!!d.paused);
         if (d.stopped && !stopped) { setStopped(true); }
+        // Apply any new time extension granted for this student
+        if (!untimed && d.extensions) {
+          const granted = d.extensions[studentName] || 0;
+          if (granted > appliedExtRef.current) {
+            const newSecs = granted - appliedExtRef.current;
+            appliedExtRef.current = granted;
+            setSecs(s => s + newSecs);
+          }
+        }
       } catch {}
     }, 5000);
     return () => clearInterval(t);
-  }, [stopped]);
+  }, [stopped, untimed, studentName]);
   useEffect(()=>{
     sendHeartbeat(studentName, cur);
     const t = setInterval(()=>sendHeartbeat(studentName, cur), 30000);
@@ -1277,14 +1293,31 @@ export default function MathTest({ onBack, identity }) {
     const drill = testInfo?.type === "drill";
     setIsDrill(drill);
     setIsAdaptive(!!testInfo?.adaptive && !drill);
+
+    // Apply accommodations from student profile
+    const extFactor = studentObj?.extendedTime === "2x" ? 2
+                    : studentObj?.extendedTime === "1.5x" ? 1.5 : 1;
+    const reduceChoices = !!studentObj?.reduceChoices;
+
     if (drill) {
       const qs = generateDrill(testInfo.drillStandards || [], testInfo.drillCount || 10);
       setQuestions(qs.length ? qs : FALLBACK_QUESTIONS.slice(0, testInfo.drillCount || 10));
     } else if (testInfo?.questions?.length) {
-      setQuestions(testInfo.questions);
+      // Apply reduce choices: remove one wrong MCQ option per question
+      const qs = testInfo.questions.map(q => {
+        if (!reduceChoices || q.type !== "mcq" || !q.choices || q.choices.length < 4) return q;
+        const wrongIdxs = q.choices
+          .map((c,i) => i)
+          .filter(i => q.choices[i] !== q.correct);
+        if (wrongIdxs.length === 0) return q;
+        const removeIdx = wrongIdxs[Math.floor(Math.random() * wrongIdxs.length)];
+        return { ...q, choices: q.choices.filter((_,i) => i !== removeIdx) };
+      });
+      setQuestions(qs);
     }
     setUntimed(!!testInfo?.untimed);
-    setTimeLimitSecs(testInfo?.timeLimitSecs ?? 1800);
+    const baseTime = testInfo?.timeLimitSecs ?? 1800;
+    setTimeLimitSecs(Math.round(baseTime * extFactor));
     setWarnSecs(testInfo?.warnSecs ?? 300);
     setScreen("test");
   }
