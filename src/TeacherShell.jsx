@@ -74,7 +74,10 @@ function TeacherApp({ onBack, teacher }) {
               const active = activeTool === t.id;
               return (
                 <button key={t.id} onClick={()=>{ setTool(t.id); if(window.innerWidth<768) setSidebarOpen(false); }}
-                  style={{display:"flex",alignItems:"center",gap:"0.75rem",padding:"0.9rem 1rem",background:active?"rgba(255,255,255,.1)":"transparent",borderLeft:active?"3px solid #4da6ff":"3px solid transparent",border:"none",borderLeft:active?"3px solid #4da6ff":"3px solid transparent",cursor:"pointer",textAlign:"left",width:"100%",transition:"all .1s"}}>
+                  style={{display:"flex",alignItems:"center",gap:"0.75rem",padding:"0.9rem 1rem",
+                    background:active?"rgba(255,255,255,.1)":"transparent",
+                    border:"none", borderLeft:active?"3px solid #4da6ff":"3px solid transparent",
+                    cursor:"pointer",textAlign:"left",width:"100%",transition:"all .1s"}}>
                   <span style={{fontSize:"1.2rem"}}>{t.icon}</span>
                   <div>
                     <div style={{fontSize:"0.82rem",fontWeight:700,color:active?"#fff":"rgba(255,255,255,.75)"}}>{t.label}</div>
@@ -87,11 +90,16 @@ function TeacherApp({ onBack, teacher }) {
         )}
 
         <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column",minWidth:0}}>
-          {activeTool==="dashboard"   && <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}><Dashboard    teacher={effectiveTeacher} readOnly={readOnly}/></div>}
-          {activeTool==="roster"      && <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}><RosterManager teacher={effectiveTeacher} readOnly={readOnly}/></div>}
-          {activeTool==="testbuilder" && <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}><TestBuilder   readOnly={readOnly}/></div>}
-          {activeTool==="builder"     && <div style={{flex:1,overflowY:"auto"}}><QuestionBuilder readOnly={readOnly}/></div>}
-          {activeTool==="importer"    && <div style={{flex:1,overflowY:"auto"}}><PDFImporter     readOnly={readOnly}/></div>}
+          {(() => {
+            switch(activeTool) {
+              case "dashboard":   return <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column",height:"100%"}}><Dashboard    teacher={effectiveTeacher} readOnly={readOnly}/></div>;
+              case "roster":      return <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column",height:"100%"}}><RosterManager teacher={effectiveTeacher} readOnly={readOnly}/></div>;
+              case "testbuilder": return <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column",height:"100%"}}><TestBuilder   readOnly={readOnly}/></div>;
+              case "builder":     return <div style={{flex:1,overflowY:"auto",height:"100%"}}><QuestionBuilder readOnly={readOnly}/></div>;
+              case "importer":    return <div style={{flex:1,overflowY:"auto",height:"100%"}}><PDFImporter     readOnly={readOnly}/></div>;
+              default:            return <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column",height:"100%"}}><Dashboard    teacher={effectiveTeacher} readOnly={readOnly}/></div>;
+            }
+          })()}
         </div>
       </div>
     </div>
