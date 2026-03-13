@@ -135,26 +135,11 @@ export default function App() {
         <div style={{fontSize:"1.8rem",fontWeight:700,color:"#003865",fontFamily:"Georgia,serif",marginBottom:"6px"}}>
           Grade 5 Mathematics
         </div>
-        <div style={{fontSize:"0.88rem",color:"#888"}}>Select who you are to continue</div>
+        <div style={{fontSize:"0.88rem",color:"#888"}}>Students: use the link from Google Classroom</div>
       </div>
 
       <div style={{display:"flex",flexDirection:"column",gap:"1rem",width:"100%",maxWidth:"360px"}}>
-        {/* Student button */}
-        <button onClick={()=>setScreen("student")}
-          style={{background:"#003865",border:"none",borderRadius:"8px",padding:"1.5rem 2rem",
-            cursor:"pointer",display:"flex",alignItems:"center",gap:"1.25rem",
-            boxShadow:"0 4px 16px rgba(0,56,101,.2)",textAlign:"left",width:"100%"}}>
-          <div style={{width:"52px",height:"52px",borderRadius:"50%",background:"rgba(255,255,255,.15)",
-            display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.6rem",flexShrink:0}}>
-            🧒
-          </div>
-          <div>
-            <div style={{fontSize:"1.1rem",fontWeight:700,color:"#fff",marginBottom:"3px"}}>I'm a Student</div>
-            <div style={{fontSize:"0.8rem",color:"rgba(255,255,255,.7)"}}>Enter your test code to begin</div>
-          </div>
-        </button>
-
-        {/* Staff button */}
+        {/* Staff button only */}
         <button onClick={()=>setScreen("pin")}
           style={{background:"#fff",border:"2px solid #c8d3dd",borderRadius:"8px",padding:"1.5rem 2rem",
             cursor:"pointer",display:"flex",alignItems:"center",gap:"1.25rem",
