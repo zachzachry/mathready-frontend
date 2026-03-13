@@ -620,7 +620,8 @@ export default function RosterManager({ teacher }) {
                     📋 Practice Link
                   </button>
                   <button onClick={e=>{e.stopPropagation();deleteClass(cls.id);}}
-                    style={{...S.btn,padding:"2px 7px",color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",fontSize:"0.68rem"}}>✕</button>
+                    title="Delete entire class"
+                    style={{...S.btn,padding:"2px 7px",color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",fontSize:"0.68rem"}}>🗑 Delete</button>
                 </div>
               </div>
             );
