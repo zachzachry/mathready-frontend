@@ -178,6 +178,7 @@ export default function RosterManager({ teacher }) {
   const [pasteInput, setPasteInput] = useState("");
   const [adding,     setAdding]     = useState(false);
   const [msg,        setMsg]        = useState("");
+  const [accomModal, setAccomModal] = useState(null);
 
   const load = useCallback(async () => {
     try { const url = `${API}/roster${teacher && teacher.classIds !== null ? '?classIds='+teacher.classIds.join(',') : ''}`; const r = await fetch(url); setClasses(await r.json()); }
@@ -307,7 +308,7 @@ export default function RosterManager({ teacher }) {
   }
 
   async function saveAccommodations(cid, sid, extendedTime, reduceChoices) {
-    const cls  = roster.find(c => c.id === cid);
+    const cls  = classes.find(c => c.id === cid);
     if (!cls) return;
     const updated = cls.students.map(s =>
       s.id === sid ? { ...s, extendedTime, reduceChoices } : s
