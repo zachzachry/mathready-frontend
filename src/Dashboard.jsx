@@ -2,14 +2,14 @@ import { useState, useEffect, useCallback } from "react";
 import { QUESTIONS, lvl, lvlC, lvlBg, lvlBd, loadSessions, clearSessions, API } from "./shared/constants";
 import { generateClassReport } from "./generateReport";
 
-const TABS = [
-  ["overview",  "📊 Overview"],
-  ["items",     "📋 Item Analysis"],
-  ["students",  "👤 Students"],
-  ["growth",    "📈 Growth"],
-  ["drills",    "🎯 Drills"],
-  ["profile",   "📋 Class Profile"],
-  ["controls",  "🎛 Test Controls"],
+const ALL_TABS = [
+  ["overview",  "📊 Overview",       false],
+  ["items",     "📋 Item Analysis",  false],
+  ["students",  "👤 Students",       false],
+  ["growth",    "📈 Growth",         false],
+  ["drills",    "🎯 Drills",         false],
+  ["profile",   "📋 Class Profile",  false],
+  ["controls",  "🎛 Test Controls",  true],  // true = hidden for readOnly
 ];
 
 // ── Focus student stats panel ──────────────────────────────
@@ -273,7 +273,8 @@ function TestControls() {
   );
 }
 
-export default function Dashboard({ teacher }) {
+export default function Dashboard({ teacher, readOnly }) {
+  const TABS = ALL_TABS.filter(([,, writeOnly]) => !readOnly || !writeOnly);
   const [tab,      setTab]      = useState("overview");
   const [sessions, setSessions] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -1013,10 +1014,12 @@ export default function Dashboard({ teacher }) {
             style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.35)",color:"#fff",borderRadius:"3px",padding:"4px 10px",cursor:sessions.length===0?"not-allowed":"pointer",fontSize:"0.68rem",fontWeight:700,opacity:sessions.length===0?.4:1}}>
             📄 Export PDF
           </button>
+          {!readOnly && (
           <button onClick={() => setClearModal(true)} disabled={clearing||sessions.length===0}
             style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.25)",color:"#fecaca",borderRadius:"3px",padding:"4px 10px",cursor:sessions.length===0?"not-allowed":"pointer",fontSize:"0.68rem",opacity:sessions.length===0?.4:1}}>
             {clearing?"Clearing…":"🗑 Clear"}
           </button>
+          )}
         </div>
       </div>
 
