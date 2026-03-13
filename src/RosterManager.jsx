@@ -168,6 +168,167 @@ function AccomModal({ student, onSave, onClose }) {
 }
 
 
+function ClassroomImportModal({ onClose, onImport }) {
+  const CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
+  const [step,      setStep]      = useState("idle"); // idle | loading | pick | importing | done
+  const [courses,   setCourses]   = useState([]);
+  const [selected,  setSelected]  = useState(null);
+  const [students,  setStudents]  = useState([]);
+  const [err,       setErr]       = useState("");
+  const [importing, setImporting] = useState(false);
+  const tokenRef = useRef(null);
+
+  function startAuth() {
+    if (!window.google) { setErr("Google API not loaded. Refresh and try again."); return; }
+    setErr(""); setStep("loading");
+    const client = window.google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: "https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.rosters.readonly",
+      callback: async (resp) => {
+        if (resp.error) { setErr("Sign-in cancelled or failed."); setStep("idle"); return; }
+        tokenRef.current = resp.access_token;
+        await fetchCourses(resp.access_token);
+      },
+    });
+    client.requestAccessToken();
+  }
+
+  async function fetchCourses(token) {
+    try {
+      const r = await fetch(
+        "https://classroom.googleapis.com/v1/courses?teacherId=me&courseStates=ACTIVE&pageSize=50",
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const d = await r.json();
+      if (!r.ok) { setErr(d.error?.message || "Failed to load courses."); setStep("idle"); return; }
+      const list = d.courses || [];
+      if (!list.length) { setErr("No active Google Classroom courses found."); setStep("idle"); return; }
+      setCourses(list);
+      setStep("pick");
+    } catch { setErr("Could not reach Google Classroom API."); setStep("idle"); }
+  }
+
+  async function fetchStudents(course) {
+    setSelected(course); setStep("loading");
+    try {
+      const r = await fetch(
+        `https://classroom.googleapis.com/v1/courses/${course.id}/students?pageSize=200`,
+        { headers: { Authorization: `Bearer ${tokenRef.current}` } }
+      );
+      const d = await r.json();
+      if (!r.ok) { setErr(d.error?.message || "Failed to load students."); setStep("pick"); return; }
+      const list = (d.students || []).map(s => ({
+        name:  `${s.profile.name.givenName} ${s.profile.name.familyName}`,
+        email: s.profile.emailAddress || "",
+      }));
+      setStudents(list);
+      setStep("confirm");
+    } catch { setErr("Could not load students."); setStep("pick"); }
+  }
+
+  async function doImport() {
+    setImporting(true);
+    await onImport(selected.name, students);
+    setImporting(false);
+  }
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",
+      justifyContent:"center",zIndex:1000,fontFamily:"sans-serif"}}>
+      <div style={{background:"#fff",borderRadius:"8px",boxShadow:"0 8px 40px rgba(0,0,0,.2)",
+        width:"100%",maxWidth:"440px",display:"flex",flexDirection:"column",maxHeight:"80vh",overflow:"hidden"}}>
+
+        {/* Header */}
+        <div style={{background:"#003865",color:"#fff",padding:"1rem 1.5rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+          <img src="https://www.gstatic.com/images/branding/product/1x/classroom_2020q4_48dp.png"
+            alt="" style={{width:"22px",height:"22px"}}/>
+          <div style={{flex:1}}>
+            <div style={{fontSize:"0.58rem",opacity:.65,letterSpacing:"0.14em"}}>GOOGLE CLASSROOM</div>
+            <div style={{fontSize:"0.95rem",fontWeight:700}}>Import Class Roster</div>
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",color:"#fff",fontSize:"1.2rem",cursor:"pointer",opacity:.7}}>✕</button>
+        </div>
+
+        <div style={{padding:"1.5rem",flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:"1rem"}}>
+          {err && (
+            <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"4px",
+              padding:"0.6rem 1rem",fontSize:"0.82rem",color:"#8b1a1a",fontWeight:600}}>⚠ {err}</div>
+          )}
+
+          {step === "idle" && (
+            <>
+              <div style={{fontSize:"0.85rem",color:"#555",lineHeight:1.6}}>
+                Sign in with your school Google account to pull your class rosters directly from Google Classroom. Student names and emails will be imported automatically.
+              </div>
+              <button onClick={startAuth}
+                style={{background:"#fff",border:"2px solid #c8d3dd",borderRadius:"6px",padding:"0.75rem 1rem",
+                  display:"flex",alignItems:"center",justifyContent:"center",gap:"0.75rem",cursor:"pointer",fontWeight:700,color:"#003865"}}>
+                <img src="https://www.gstatic.com/images/branding/googleg/1x/googleg_standard_color_128dp.png"
+                  alt="" style={{width:"20px",height:"20px"}}/>
+                Sign in with Google
+              </button>
+            </>
+          )}
+
+          {step === "loading" && (
+            <div style={{textAlign:"center",color:"#888",padding:"2rem"}}>Loading…</div>
+          )}
+
+          {step === "pick" && (
+            <>
+              <div style={{fontSize:"0.78rem",fontWeight:700,color:"#555",letterSpacing:"0.08em"}}>
+                SELECT A CLASS TO IMPORT
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:"0.4rem"}}>
+                {courses.map(c => (
+                  <button key={c.id} onClick={()=>fetchStudents(c)}
+                    style={{textAlign:"left",padding:"0.75rem 1rem",border:"2px solid #dde3e9",borderRadius:"6px",
+                      background:"#f8fafc",cursor:"pointer",fontWeight:600,color:"#1a1a1a",fontSize:"0.88rem"}}>
+                    {c.name}
+                    {c.section && <span style={{fontWeight:400,color:"#888",marginLeft:"6px"}}>· {c.section}</span>}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {step === "confirm" && selected && (
+            <>
+              <div style={{fontSize:"0.78rem",fontWeight:700,color:"#555",letterSpacing:"0.08em"}}>
+                PREVIEW — {selected.name}
+              </div>
+              <div style={{border:"1px solid #dde3e9",borderRadius:"4px",overflow:"hidden",maxHeight:"260px",overflowY:"auto"}}>
+                {students.map((s,i) => (
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:"0.75rem",padding:"0.45rem 0.75rem",
+                    borderBottom:i<students.length-1?"1px solid #eef1f4":"none",background:i%2===0?"#fff":"#f8fafc"}}>
+                    <div style={{width:"24px",height:"24px",borderRadius:"50%",background:"#003865",
+                      display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      <span style={{color:"#fff",fontSize:"0.6rem",fontWeight:700}}>{i+1}</span>
+                    </div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:"0.85rem",fontWeight:600}}>{s.name}</div>
+                      <div style={{fontSize:"0.7rem",color:"#888"}}>{s.email}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button onClick={doImport} disabled={importing}
+                style={{background:"#1a6e2e",border:"none",borderRadius:"6px",padding:"0.75rem",
+                  fontSize:"0.95rem",fontWeight:700,color:"#fff",cursor:"pointer",opacity:importing?0.7:1}}>
+                {importing ? "Importing…" : `✓ Import ${students.length} Students`}
+              </button>
+              <button onClick={()=>setStep("pick")}
+                style={{...{border:"1px solid #c8d3dd",borderRadius:"4px",padding:"0.5rem",background:"#fff",cursor:"pointer",fontSize:"0.82rem",color:"#555"}}}>
+                ← Pick a different class
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EmailModal({ student, onSave, onClose }) {
   const [email, setEmail] = useState(student.email || "");
   const [saving, setSaving] = useState(false);
@@ -215,6 +376,7 @@ export default function RosterManager({ teacher }) {
   const [msg,        setMsg]        = useState("");
   const [accomModal, setAccomModal] = useState(null);
   const [emailModal, setEmailModal] = useState(null); // {cid, student}
+  const [gcImportOpen, setGcImportOpen] = useState(false);
 
   const load = useCallback(async () => {
     try { const url = `${API}/roster${teacher && teacher.classIds !== null ? '?classIds='+teacher.classIds.join(',') : ''}`; const r = await fetch(url); setClasses(await r.json()); }
@@ -425,6 +587,13 @@ export default function RosterManager({ teacher }) {
               placeholder="e.g. Period 2"/>
             <button onClick={addClass} style={{...S.btn,background:"#003865",color:"#fff",border:"none",flexShrink:0}}>+ Add</button>
           </div>
+          <button onClick={()=>setGcImportOpen(true)}
+            style={{...S.btn,marginTop:"0.6rem",width:"100%",background:"#fff",border:"1px solid #c8d3dd",
+              display:"flex",alignItems:"center",justifyContent:"center",gap:"0.5rem",padding:"0.55rem"}}>
+            <img src="https://www.gstatic.com/images/branding/product/1x/classroom_2020q4_48dp.png"
+              alt="" style={{width:"16px",height:"16px"}}/>
+            <span style={{fontSize:"0.75rem",fontWeight:700,color:"#003865"}}>Import from Google Classroom</span>
+          </button>
           {msg && <div style={{fontSize:"0.72rem",color:"#1a6e2e",fontWeight:700,marginTop:"5px"}}>✓ {msg}</div>}
         </div>
 
@@ -616,6 +785,44 @@ export default function RosterManager({ teacher }) {
           </>
         )}
       </div>
+    {/* ── Google Classroom Import Modal ── */}
+    {gcImportOpen && (
+      <ClassroomImportModal
+        onClose={() => setGcImportOpen(false)}
+        onImport={async (courseName, students) => {
+          // Create a new class with the course name
+          const r = await fetch(`${API}/roster/class`, {
+            method:"POST", headers:{"Content-Type":"application/json"},
+            body: JSON.stringify({ name: courseName }),
+          });
+          const { id: newCid } = await r.json();
+          // Add student names
+          const names = students.map(s => s.name);
+          await fetch(`${API}/roster/class/${newCid}/students`, {
+            method:"POST", headers:{"Content-Type":"application/json"},
+            body: JSON.stringify({ students: names }),
+          });
+          // Save emails
+          await load();
+          const freshClasses = await fetch(`${API}/roster`).then(r=>r.json());
+          const newCls = freshClasses.find(c => c.id === newCid);
+          if (newCls) {
+            const updated = newCls.students.map(s => {
+              const match = students.find(gs => gs.name === s.name);
+              return match ? { ...s, email: match.email } : s;
+            });
+            await fetch(`${API}/roster/class/${newCid}`, {
+              method:"PUT", headers:{"Content-Type":"application/json"},
+              body: JSON.stringify({ name: courseName, students: updated }),
+            });
+          }
+          await load();
+          setActiveClass(newCid);
+          setGcImportOpen(false);
+          flash(`Imported ${students.length} students from Google Classroom!`);
+        }}
+      />
+    )}
     {/* ── IEP / Accommodations Modal ── */}
     {accomModal && (
       <AccomModal
