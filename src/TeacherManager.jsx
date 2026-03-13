@@ -2,6 +2,10 @@ import { useState, useEffect, useCallback } from "react";
 import { API } from "./shared/constants";
 
 const NAVY = "#003865";
+
+function genHex(len = 6) {
+  return Array.from({length: len}, () => "0123456789ABCDEF"[Math.floor(Math.random()*16)]).join("");
+}
 const S = {
   inp:  { width:"100%", padding:"0.5rem 0.75rem", border:"1px solid #c8d3dd", borderRadius:"3px", fontSize:"0.85rem", background:"#fafbfc", boxSizing:"border-box" },
   lbl:  { display:"block", fontSize:"0.62rem", fontWeight:700, letterSpacing:"0.12em", color:"#555", marginBottom:"4px" },
@@ -83,18 +87,25 @@ function ClassPicker({ allClasses, selected, onChange, onClassCreated }) {
 
 function TeacherForm({ teacher, allClasses, onSave, onCancel, onClassCreated }) {
   const [name,       setName]       = useState(teacher?.name     || "");
-  const [pin,        setPin]        = useState("");
-  const [changingPin,setChangingPin]= useState(!teacher); // true for new, false for edit
+  const [email,      setEmail]      = useState(teacher?.email    || "");
+  const [pin,        setPin]        = useState(teacher ? "" : genHex());
+  const [changingPin,setChangingPin]= useState(!teacher);
   const [classIds,   setClassIds]   = useState(teacher?.classIds || []);
   const [err,        setErr]        = useState("");
   const [saving,     setSaving]     = useState(false);
 
   async function submit() {
     if (!name.trim()) { setErr("Name is required."); return; }
-    if (changingPin && (!pin || pin.length !== 5)) { setErr("PIN must be exactly 5 digits."); return; }
-    if (changingPin && !/^[0-9]{5}$/.test(pin)) { setErr("PIN must be exactly 5 digits."); return; }
+    if (!email.trim()) { setErr("School Google email is required."); return; }
+    if (changingPin && pin.trim()) {
+      const cleanPin = pin.trim().toUpperCase();
+      if (cleanPin.length < 4 || cleanPin.length > 8 || !/^[0-9A-F]+$/.test(cleanPin)) {
+        setErr("Login code must be 4–8 hex characters (0-9, A-F)."); return;
+      }
+    }
     setSaving(true); setErr("");
-    const body = { name: name.trim(), pin: changingPin ? pin : "", classIds };
+    const body = { name: name.trim(), email: email.trim().toLowerCase(),
+                   pin: changingPin ? pin.trim().toUpperCase() : "", classIds };
     try {
       const url    = teacher ? `${API}/teachers/${teacher.id}` : `${API}/teachers`;
       const method = teacher ? "PUT" : "POST";
@@ -120,33 +131,43 @@ function TeacherForm({ teacher, allClasses, onSave, onCancel, onClassCreated }) 
             placeholder="Ms. Johnson" autoFocus/>
         </div>
         <div>
-          <label style={S.lbl}>PIN</label>
-          {!teacher || changingPin ? (
-            <div style={{display:"flex",gap:"0.4rem",alignItems:"center"}}>
-              <input style={{...S.inp, fontFamily:"monospace", letterSpacing:"0.2em", flex:1}}
-                value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,"").slice(0,5))}
-                placeholder="12345" maxLength={5} autoFocus={!!teacher}/>
-              {teacher && (
-                <button type="button" onClick={()=>{setChangingPin(false);setPin("");setErr("");}}
-                  style={{...S.btn,padding:"5px 10px",fontSize:"0.75rem",whiteSpace:"nowrap"}}>
-                  Cancel
-                </button>
-              )}
-            </div>
-          ) : (
-            <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
-              <div style={{flex:1,padding:"0.5rem 0.75rem",background:"#f0f4f8",border:"1px solid #c8d3dd",
-                borderRadius:"3px",fontFamily:"monospace",letterSpacing:"0.25em",fontSize:"1rem",color:"#888"}}>
-                {"•••••"}
-              </div>
-              <button type="button" onClick={()=>setChangingPin(true)}
-                style={{...S.btn,padding:"5px 12px",fontSize:"0.75rem",whiteSpace:"nowrap",
-                  background:"#fff3cd",borderColor:"#ffc107",color:"#7a4e00",fontWeight:700}}>
-                🔑 Change PIN
-              </button>
-            </div>
-          )}
+          <label style={S.lbl}>SCHOOL GOOGLE EMAIL</label>
+          <input style={S.inp} value={email} onChange={e=>setEmail(e.target.value)}
+            placeholder="teacher@school.edu" type="email"/>
         </div>
+      </div>
+
+      <div style={{ marginBottom:"1rem" }}>
+        <label style={S.lbl}>LOGIN CODE (HEX) — optional, for admin fallback only</label>
+        {!teacher || changingPin ? (
+          <div style={{display:"flex",gap:"0.4rem",alignItems:"center"}}>
+            <input style={{...S.inp, fontFamily:"monospace", letterSpacing:"0.2em", flex:1, textTransform:"uppercase"}}
+              value={pin} onChange={e=>setPin(e.target.value.toUpperCase().replace(/[^0-9A-F]/g,"").slice(0,8))}
+              placeholder="Leave blank or generate" maxLength={8}/>
+            <button type="button" onClick={()=>setPin(genHex())} title="Generate random code"
+              style={{...S.btn,padding:"5px 10px",fontSize:"0.75rem",whiteSpace:"nowrap",background:"#e8f0fa",borderColor:"#b3cde8",color:"#003865"}}>
+              🎲
+            </button>
+            {teacher && (
+              <button type="button" onClick={()=>{setChangingPin(false);setPin("");setErr("");}}
+                style={{...S.btn,padding:"5px 10px",fontSize:"0.75rem",whiteSpace:"nowrap"}}>
+                Cancel
+              </button>
+            )}
+          </div>
+        ) : (
+          <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
+            <div style={{flex:1,padding:"0.5rem 0.75rem",background:"#f0f4f8",border:"1px solid #c8d3dd",
+              borderRadius:"3px",fontFamily:"monospace",letterSpacing:"0.25em",fontSize:"1rem",color:"#888"}}>
+              {"•••••"}
+            </div>
+            <button type="button" onClick={()=>setChangingPin(true)}
+              style={{...S.btn,padding:"5px 12px",fontSize:"0.75rem",whiteSpace:"nowrap",
+                background:"#fff3cd",borderColor:"#ffc107",color:"#7a4e00",fontWeight:700}}>
+              🔑 Change Code
+            </button>
+          </div>
+        )}
       </div>
 
       <div style={{ marginBottom:"1rem" }}>
@@ -222,7 +243,7 @@ export default function TeacherManager() {
         <div>
           <div style={{ fontSize:"1rem", fontWeight:700, color:NAVY }}>Teacher Accounts</div>
           <div style={{ fontSize:"0.75rem", color:"#888", marginTop:"2px" }}>
-            Each teacher gets their own PIN and sees only their assigned classes.
+            Each teacher gets their own hex login code and sees only their assigned classes.
           </div>
         </div>
         <button onClick={() => setEditing("new")}
@@ -274,16 +295,19 @@ export default function TeacherManager() {
               {/* Info */}
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontWeight:700, color:"#1a1a1a", fontSize:"0.95rem" }}>{t.name}</div>
-                <div style={{ fontSize:"0.75rem", color:"#888", marginTop:"2px", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                <div style={{ fontSize:"0.72rem", color: t.email ? "#1a6e2e" : "#e67e00", marginTop:"1px", fontWeight:600 }}>
+                  {t.email ? `✉ ${t.email}` : "⚠ No Google email set"}
+                </div>
+                <div style={{ fontSize:"0.72rem", color:"#888", marginTop:"1px", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                   {classNamesFor(t.classIds)}
                 </div>
               </div>
               {/* PIN badge */}
               <div style={{ background:"#f0f4f8", border:"1px solid #c8d3dd", borderRadius:"3px",
                 padding:"3px 10px", flexShrink:0 }}>
-                <div style={{ fontSize:"0.55rem", color:"#888", letterSpacing:"0.1em" }}>PIN SET</div>
-                <div style={{ fontSize:"0.9rem", fontFamily:"monospace", fontWeight:700, color:NAVY, letterSpacing:"0.15em" }}>
-                  {"•".repeat(5)}
+                <div style={{ fontSize:"0.55rem", color:"#888", letterSpacing:"0.1em" }}>{t.pinSet ? "CODE SET" : "NO CODE"}</div>
+                <div style={{ fontSize:"0.9rem", fontFamily:"monospace", fontWeight:700, color:t.pinSet?NAVY:"#f0b8b8", letterSpacing:"0.15em" }}>
+                  {t.pinSet ? "••••••" : "⚠"}
                 </div>
               </div>
               {/* Class count */}
@@ -306,7 +330,7 @@ export default function TeacherManager() {
       {/* Note about legacy PIN */}
       <div style={{ marginTop:"1.5rem", background:"#fff8e1", border:"1px solid #ffd166",
         borderRadius:"4px", padding:"0.65rem 1rem", fontSize:"0.76rem", color:"#7a4e00" }}>
-        <strong>Note:</strong> The legacy <code>TEACHER_PIN</code> environment variable still works and gives access to all classes. Once all teachers have individual accounts, you can remove it from Railway.
+        <strong>Note:</strong> Existing numeric PINs still work — teachers can keep theirs or click ✏️ Edit → 🔑 Change Code to upgrade to a hex code. Legacy <code>TEACHER_PIN</code> env var still works until removed from Railway.
       </div>
     </div>
   );
