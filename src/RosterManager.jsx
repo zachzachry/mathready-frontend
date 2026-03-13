@@ -318,9 +318,9 @@ export default function RosterManager({ teacher }) {
         method:"PUT", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({ name: cls.name, students: updated }),
       });
-      await loadRoster();
+      await load();
       setAccomModal(null);
-    } catch {}
+    } catch(e) { console.error("saveAccommodations failed", e); }
   }
 
   async function removeStudent(cid, sid, name) {
