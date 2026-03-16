@@ -101,7 +101,7 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
     setErr(""); setStep("loading");
     const client = window.google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
-      scope: "https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.rosters.readonly https://www.googleapis.com/auth/classroom.profile.emails",
+      scope: "https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.rosters.readonly",
       callback: async (resp) => {
         if (resp.error) { setErr("Sign-in cancelled or failed."); setStep("idle"); return; }
         tokenRef.current = resp.access_token;
@@ -142,7 +142,6 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
 
       const list = all.map(s => ({
         name:  `${s.profile.name.givenName} ${s.profile.name.familyName}`,
-        email: s.profile.emailAddress || "",
         _last: s.profile.name.familyName || "",
       })).sort((a, b) => a._last.localeCompare(b._last) || a.name.localeCompare(b.name));
       list.forEach(s => delete s._last);
@@ -228,7 +227,7 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
           {step === "idle" && (
             <>
               <div style={{fontSize:"0.85rem",color:"#555",lineHeight:1.6}}>
-                Sign in with your school Google account to pull your class rosters directly from Google Classroom. Student names and emails will be imported automatically.
+                Sign in with your school Google account to pull your class rosters directly from Google Classroom. Student names will be imported automatically.
               </div>
               <button onClick={startAuth}
                 style={{background:"#fff",border:"2px solid #c8d3dd",borderRadius:"6px",padding:"0.75rem 1rem",
@@ -277,7 +276,6 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
                     </div>
                     <div style={{flex:1}}>
                       <div style={{fontSize:"0.85rem",fontWeight:600}}>{s.name}</div>
-                      <div style={{fontSize:"0.7rem",color:"#888"}}>{s.email}</div>
                     </div>
                   </div>
                 ))}
@@ -433,18 +431,17 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
 
 function ClassroomSyncModal({ cls, onClose, onSync }) {
   const CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
-  const [step,         setStep]         = useState("idle"); // idle|loading|review
-  const [newStudents,  setNewStudents]  = useState([]);
-  const [emailUpdates, setEmailUpdates] = useState([]); // existing students missing email
-  const [err,          setErr]          = useState("");
-  const [syncing,      setSyncing]      = useState(false);
+  const [step,        setStep]       = useState("idle"); // idle|loading|review
+  const [newStudents, setNewStudents] = useState([]);
+  const [err,         setErr]        = useState("");
+  const [syncing,     setSyncing]    = useState(false);
 
   function startSync() {
     if (!window.google) { setErr("Google API not loaded. Refresh and try again."); return; }
     setErr(""); setStep("loading");
     const client = window.google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
-      scope: "https://www.googleapis.com/auth/classroom.rosters.readonly https://www.googleapis.com/auth/classroom.profile.emails",
+      scope: "https://www.googleapis.com/auth/classroom.rosters.readonly",
       callback: async (resp) => {
         if (resp.error) { setErr("Sign-in cancelled or failed."); setStep("idle"); return; }
         await fetchAndDiff(resp.access_token);
@@ -466,30 +463,18 @@ function ClassroomSyncModal({ cls, onClose, onSync }) {
         pageToken = d.nextPageToken || null;
       } while (pageToken);
       const gcStudents = all.map(s => ({
-        name:  `${s.profile.name.givenName} ${s.profile.name.familyName}`,
-        email: s.profile.emailAddress || "",
+        name: `${s.profile.name.givenName} ${s.profile.name.familyName}`,
       }));
-      const existingEmails = new Set(cls.students.filter(s => s.email).map(s => s.email.toLowerCase()));
-      const existingNames  = new Set(cls.students.map(s => s.name.toLowerCase()));
-      const newOnes = gcStudents.filter(gs => {
-        if (gs.email && existingEmails.has(gs.email.toLowerCase())) return false;
-        if (existingNames.has(gs.name.toLowerCase())) return false;
-        return true;
-      });
-      // Find existing students who have no email but match a GC student by name
-      const needsEmail = gcStudents.filter(gs =>
-        gs.email && existingNames.has(gs.name.toLowerCase()) &&
-        !existingEmails.has(gs.email.toLowerCase())
-      );
+      const existingNames = new Set(cls.students.map(s => s.name.toLowerCase()));
+      const newOnes = gcStudents.filter(gs => !existingNames.has(gs.name.toLowerCase()));
       setNewStudents(newOnes);
-      setEmailUpdates(needsEmail);
       setStep("review");
     } catch { setErr("Could not reach Google Classroom API."); setStep("idle"); }
   }
 
   async function doSync() {
     setSyncing(true);
-    await onSync(cls, newStudents, emailUpdates);
+    await onSync(cls, newStudents);
     setSyncing(false);
   }
 
@@ -530,42 +515,32 @@ function ClassroomSyncModal({ cls, onClose, onSync }) {
 
           {step === "review" && (
             <>
-              {newStudents.length === 0 && emailUpdates.length === 0 ? (
+              {newStudents.length === 0 ? (
                 <div style={{textAlign:"center",color:"#1a6e2e",fontWeight:700,padding:"1.5rem",background:"#f0faf2",borderRadius:"6px",fontSize:"0.9rem"}}>
-                  ✓ Class is up to date — no changes needed.
+                  ✓ Class is up to date — no new students found.
                 </div>
               ) : (
                 <>
-                  {emailUpdates.length > 0 && (
-                    <div style={{background:"#fff8e1",border:"1px solid #ffe082",borderRadius:"6px",padding:"0.75rem 1rem",fontSize:"0.82rem",color:"#7a5800"}}>
-                      🔑 Will add missing login emails for <strong>{emailUpdates.length} existing student{emailUpdates.length!==1?"s":""}</strong> so they can sign in.
-                    </div>
-                  )}
-                  {newStudents.length > 0 && (
-                    <>
-                      <div style={{fontSize:"0.82rem",color:"#555"}}>
-                        Found <strong>{newStudents.length} new student{newStudents.length!==1?"s":""}</strong> in Google Classroom:
+                  <div style={{fontSize:"0.82rem",color:"#555"}}>
+                    Found <strong>{newStudents.length} new student{newStudents.length!==1?"s":""}</strong> in Google Classroom:
+                  </div>
+                  <div style={{border:"1px solid #dde3e9",borderRadius:"4px",overflow:"hidden",maxHeight:"200px",overflowY:"auto"}}>
+                    {newStudents.map((s, i) => (
+                      <div key={i} style={{padding:"0.45rem 0.75rem",borderBottom:i<newStudents.length-1?"1px solid #eef1f4":"none",background:i%2===0?"#fff":"#f8fafc"}}>
+                        <div style={{fontSize:"0.85rem",fontWeight:600}}>{s.name}</div>
                       </div>
-                      <div style={{border:"1px solid #dde3e9",borderRadius:"4px",overflow:"hidden",maxHeight:"180px",overflowY:"auto"}}>
-                        {newStudents.map((s, i) => (
-                          <div key={i} style={{padding:"0.45rem 0.75rem",borderBottom:i<newStudents.length-1?"1px solid #eef1f4":"none",background:i%2===0?"#fff":"#f8fafc"}}>
-                            <div style={{fontSize:"0.85rem",fontWeight:600}}>{s.name}</div>
-                            <div style={{fontSize:"0.7rem",color:"#888"}}>{s.email}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
+                    ))}
+                  </div>
                   <button onClick={doSync} disabled={syncing}
                     style={{background:"#1a6e2e",border:"none",borderRadius:"6px",padding:"0.75rem",
                       fontSize:"0.88rem",fontWeight:700,color:"#fff",cursor:"pointer",opacity:syncing?0.7:1}}>
-                    {syncing ? "Updating…" : `✓ Apply ${newStudents.length + emailUpdates.length} Update${(newStudents.length+emailUpdates.length)!==1?"s":""}`}
+                    {syncing ? "Adding…" : `✓ Add ${newStudents.length} Student${newStudents.length!==1?"s":""}`}
                   </button>
                 </>
               )}
               <button onClick={onClose}
                 style={{border:"1px solid #c8d3dd",borderRadius:"4px",padding:"0.5rem",background:"#fff",cursor:"pointer",fontSize:"0.82rem",color:"#555"}}>
-                {newStudents.length === 0 && emailUpdates.length === 0 ? "Done" : "Cancel"}
+                {newStudents.length === 0 ? "Done" : "Cancel"}
               </button>
             </>
           )}
@@ -575,40 +550,6 @@ function ClassroomSyncModal({ cls, onClose, onSync }) {
   );
 }
 
-function EmailModal({ student, onSave, onClose }) {
-  const [email, setEmail] = useState(student.email || "");
-  const [saving, setSaving] = useState(false);
-  async function handleSave() {
-    setSaving(true);
-    await onSave(email);
-    setSaving(false);
-  }
-  return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
-      <div style={{background:"#fff",borderRadius:"8px",boxShadow:"0 8px 40px rgba(0,0,0,.18)",padding:"1.75rem 2rem",width:"100%",maxWidth:"360px",display:"flex",flexDirection:"column",gap:"1.25rem"}}>
-        <div style={{fontSize:"1rem",fontWeight:700,color:"#003865"}}>✉ Google Email — {student.name}</div>
-        <div style={{fontSize:"0.78rem",color:"#666",lineHeight:1.5}}>
-          Enter the student's school Google account email. This is used to verify their identity when they click a practice or test link.
-        </div>
-        <input
-          autoFocus
-          value={email}
-          onChange={e=>setEmail(e.target.value)}
-          onKeyDown={e=>{ if(e.key==="Enter") handleSave(); if(e.key==="Escape") onClose(); }}
-          placeholder="student@school.edu"
-          style={{padding:"0.7rem 0.9rem",border:"2px solid #b3cde8",borderRadius:"6px",fontSize:"0.95rem",outline:"none",width:"100%",boxSizing:"border-box"}}
-        />
-        <div style={{display:"flex",gap:"0.5rem",justifyContent:"flex-end"}}>
-          <button onClick={onClose} style={{padding:"0.55rem 1.25rem",border:"1px solid #c8d3dd",borderRadius:"4px",background:"#fff",cursor:"pointer",fontSize:"0.85rem"}}>Cancel</button>
-          <button onClick={handleSave} disabled={saving}
-            style={{padding:"0.55rem 1.25rem",border:"none",borderRadius:"4px",background:"#003865",color:"#fff",cursor:"pointer",fontSize:"0.85rem",fontWeight:700,opacity:saving?0.7:1}}>
-            {saving?"Saving…":"Save Email"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function RosterManager({ teacher, readOnly }) {
   const [classes,    setClasses]    = useState([]);
@@ -621,7 +562,6 @@ export default function RosterManager({ teacher, readOnly }) {
   const [adding,     setAdding]     = useState(false);
   const [msg,        setMsg]        = useState("");
   const [accomModal, setAccomModal] = useState(null);
-  const [emailModal, setEmailModal] = useState(null); // {cid, student}
   const [gcImportOpen, setGcImportOpen] = useState(false);
   const [syncModal,    setSyncModal]    = useState(null); // class object or null
 
@@ -728,22 +668,6 @@ export default function RosterManager({ teacher, readOnly }) {
     setCsvImporting(false);
   }
 
-  async function saveEmail(cid, sid, email) {
-    const cls = classes.find(c => c.id === cid);
-    if (!cls) return;
-    const updated = cls.students.map(s =>
-      s.id === sid ? { ...s, email: email.trim().toLowerCase() } : s
-    );
-    try {
-      await fetch(`${API}/roster/class/${cid}`, {
-        method:"PUT", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ name: cls.name, students: updated }),
-      });
-      await load();
-      setEmailModal(null);
-      flash("Email saved!");
-    } catch(e) { console.error("saveEmail failed", e); }
-  }
 
   async function saveAccommodations(cid, sid, extendedTime, reduceChoices) {
     const cls  = classes.find(c => c.id === cid);
@@ -773,35 +697,24 @@ export default function RosterManager({ teacher, readOnly }) {
     } catch { flash("Failed to remove student."); }
   }
 
-  // ── Google Classroom: sync new students + backfill emails ──
-  async function handleGcSync(cls, newStudents, emailUpdates = []) {
+  // ── Google Classroom: sync new students ──
+  async function handleGcSync(cls, newStudents) {
     let addedCount = 0;
-    // 1. Add brand-new students (with email included)
     if (newStudents.length > 0) {
       await fetch(`${API}/roster/class/${cls.id}/students`, {
         method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ students: newStudents.map(s => ({ name: s.name, email: s.email })) }),
+        body: JSON.stringify({ students: newStudents.map(s => ({ name: s.name })) }),
       });
       addedCount = newStudents.length;
     }
-    // 2. Backfill emails for existing students who were missing them
-    if (emailUpdates.length > 0) {
-      await fetch(`${API}/roster/class/${cls.id}/backfill-emails`, {
-        method:"PATCH", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ updates: emailUpdates }),
-      });
-    }
     await load();
     setSyncModal(null);
-    const parts = [];
-    if (addedCount)          parts.push(`${addedCount} new student${addedCount!==1?"s":""} added`);
-    if (emailUpdates.length) parts.push(`${emailUpdates.length} login email${emailUpdates.length!==1?"s":""} updated`);
-    flash(`Synced! ${parts.join(", ") || "No changes"}.`);
+    flash(`Synced! ${addedCount ? `${addedCount} new student${addedCount!==1?"s":""} added` : "No changes"}.`);
   }
 
   // ── Google Classroom: import multiple groups ───────────────
   async function handleImportGroups(groups) {
-    // groups = [{name, extendedTime, reduceChoices, gcCourseId, students:[{name,email}]}]
+    // groups = [{name, extendedTime, reduceChoices, gcCourseId, students:[{name}]}]
     let lastCid = null;
     const allCurrentIds = classes.map(c => c.id);
     for (const g of groups) {
@@ -813,25 +726,20 @@ export default function RosterManager({ teacher, readOnly }) {
       const { id: newCid } = await r.json();
       lastCid = newCid;
       // Add students
-      const names = g.students.map(s => s.name);
       await fetch(`${API}/roster/class/${newCid}/students`, {
         method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ students: names }),
+        body: JSON.stringify({ students: g.students.map(s => ({ name: s.name })) }),
       });
-      // Save emails + accommodations
+      // Apply accommodations
       await load();
       const freshAll = await fetch(`${API}/roster`).then(r => r.json());
       const newCls   = freshAll.find(c => c.id === newCid);
       if (newCls) {
-        const updated = newCls.students.map(s => {
-          const match = g.students.find(gs => gs.name === s.name);
-          return {
-            ...s,
-            ...(match?.email ? { email: match.email } : {}),
-            extendedTime:  g.extendedTime  || "none",
-            reduceChoices: g.reduceChoices || false,
-          };
-        });
+        const updated = newCls.students.map(s => ({
+          ...s,
+          extendedTime:  g.extendedTime  || "none",
+          reduceChoices: g.reduceChoices || false,
+        }));
         await fetch(`${API}/roster/class/${newCid}`, {
           method:"PUT", headers:{"Content-Type":"application/json"},
           body: JSON.stringify({ name: g.name, students: updated }),
@@ -1043,11 +951,6 @@ export default function RosterManager({ teacher, readOnly }) {
                       {!readOnly && (<>
                       <button onClick={()=>setAccomModal({cid:activeClassData.id, student:s})}
                         style={{...S.btn,padding:"2px 8px",fontSize:"0.7rem",color:"#003865",borderColor:"#b3cde8",background:"#ddeaf7"}}>IEP</button>
-                      <button onClick={()=>setEmailModal({cid:activeClassData.id, student:s})}
-                        title={s.email || "Set Google email"}
-                        style={{...S.btn,padding:"2px 8px",fontSize:"0.7rem",color:s.email?"#1a6e2e":"#888",borderColor:s.email?"#b3dfc0":"#dde3e9",background:s.email?"#f0faf2":"#f8fafc"}}>
-                        {s.email ? "✉ ✓" : "✉"}
-                      </button>
                       <button onClick={()=>removeStudent(activeClassData.id, s.id, s.name)}
                         style={{...S.btn,padding:"2px 8px",color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",fontSize:"0.7rem"}}>✕</button>
                       </>)}
@@ -1071,26 +974,10 @@ export default function RosterManager({ teacher, readOnly }) {
             body: JSON.stringify({ name: courseName, teacherId: teacher?.teacherId || null, gcCourseId }),
           });
           const { id: newCid } = await r.json();
-          // Add student names
-          const names = students.map(s => s.name);
           await fetch(`${API}/roster/class/${newCid}/students`, {
             method:"POST", headers:{"Content-Type":"application/json"},
-            body: JSON.stringify({ students: names }),
+            body: JSON.stringify({ students: students.map(s => ({ name: s.name })) }),
           });
-          // Save emails
-          await load();
-          const freshClasses = await fetch(`${API}/roster`).then(r => r.json());
-          const newCls = freshClasses.find(c => c.id === newCid);
-          if (newCls) {
-            const updated = newCls.students.map(s => {
-              const match = students.find(gs => gs.name === s.name);
-              return match ? { ...s, email: match.email } : s;
-            });
-            await fetch(`${API}/roster/class/${newCid}`, {
-              method:"PUT", headers:{"Content-Type":"application/json"},
-              body: JSON.stringify({ name: courseName, students: updated }),
-            });
-          }
           await load();
           const freshAll = await fetch(`${API}/roster`).then(r => r.json());
           setClasses(teacher && teacher.classIds !== null
@@ -1119,14 +1006,7 @@ export default function RosterManager({ teacher, readOnly }) {
         onClose={() => setAccomModal(null)}
       />
     )}
-    {/* ── Email Modal ── */}
-    {emailModal && (
-      <EmailModal
-        student={emailModal.student}
-        onSave={email => saveEmail(emailModal.cid, emailModal.student.id, email)}
-        onClose={() => setEmailModal(null)}
-      />
-    )}
+
     </div>
   );
 }
