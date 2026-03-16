@@ -70,7 +70,7 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
           const ar = await fetch(`${API}/test/attempt-check?code=${encodeURIComponent(c)}&studentId=${encodeURIComponent(vd.student.id)}`);
           const ad = await ar.json();
           if (ad.attempted) { setErr("You have already submitted this test. Only one attempt is allowed."); setChecking(false); return; }
-        } catch {}
+        } catch { setErr("Something went wrong checking attempt status. Please try again."); setChecking(false); return; }
       }
       setTestInfo(data); setStudent(vd.student); setCls(vd.cls);
       setStep("confirm");
@@ -82,7 +82,7 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
   if (step === "google") return (
     <div style={S.page}>
       <div style={{background:"#003865",width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
-        {onBack && <button onClick={onBack} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"4px 10px",cursor:"pointer",fontSize:"0.72rem"}}>← Back</button>}
+        {onBack && <button onClick={onBack} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"6px 14px",cursor:"pointer",fontSize:"0.8rem"}}>← Back</button>}
         <div style={{color:"#fff",fontSize:"0.95rem",fontWeight:700}}>Georgia Milestones Readiness Trainer</div>
       </div>
       <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem 1rem",width:"100%"}}>
@@ -107,7 +107,7 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
   if (step === "choice") return (
     <div style={S.page}>
       <div style={{background:"#003865",width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
-        <button onClick={()=>{setStep("google");setErr("");}} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"4px 10px",cursor:"pointer",fontSize:"0.72rem"}}>← Back</button>
+        <button onClick={()=>{setStep("google");setErr("");}} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"6px 14px",cursor:"pointer",fontSize:"0.8rem"}}>← Back</button>
         <div style={{color:"#fff",fontSize:"0.95rem",fontWeight:700}}>Georgia Milestones Readiness Trainer</div>
       </div>
       <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem 1rem",width:"100%"}}>
@@ -151,7 +151,7 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
   if (step === "code") return (
     <div style={S.page}>
       <div style={{background:"#003865",width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
-        <button onClick={()=>{setStep("choice");setErr("");}} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"4px 10px",cursor:"pointer",fontSize:"0.72rem"}}>← Back</button>
+        <button onClick={()=>{setStep("choice");setErr("");}} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"6px 14px",cursor:"pointer",fontSize:"0.8rem"}}>← Back</button>
         <div style={{color:"#fff",fontSize:"0.95rem",fontWeight:700}}>Georgia Milestones Readiness Trainer</div>
       </div>
       <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem 1rem",width:"100%"}}>
@@ -271,7 +271,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
         ]);
         if (Array.isArray(qRes) && qRes.length) bank = qRes;
         if (Array.isArray(hRes) && hRes.length)  initWeights = buildWeightMap(hRes);
-      } catch {}
+      } catch (e) { console.warn("Failed to load practice questions/history, using fallback:", e); }
       // Seed all standards at 0.5 if not in history
       ALL_STANDARDS.forEach(std => { if (!initWeights[std]) initWeights[std] = 0.5; });
       setBankQ(bank);
@@ -354,7 +354,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
 
   if (loading) return (
     <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#e8edf2",fontFamily:"sans-serif"}}>
-      <div style={{textAlign:"center",color:"#aaa"}}>
+      <div style={{textAlign:"center",color:"#777"}}>
         <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>🎯</div>
         <div>Building your practice session…</div>
       </div>
@@ -382,15 +382,15 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
         <div style={{marginLeft:"auto",display:"flex",gap:"1.25rem",alignItems:"center"}}>
           {streak >= 3 && <div style={{fontSize:"0.75rem",background:"rgba(255,255,255,.2)",padding:"3px 10px",borderRadius:"12px",fontWeight:700}}>🔥 {streak} streak!</div>}
           <div style={{textAlign:"center"}}>
-            <div style={{fontSize:"0.55rem",opacity:.7,letterSpacing:"0.08em"}}>SCORE</div>
+            <div style={{fontSize:"0.75rem",opacity:.7,letterSpacing:"0.08em"}}>SCORE</div>
             <div style={{fontSize:"0.9rem",fontWeight:700}}>{totalCorrect}/{history.length}</div>
           </div>
           <div style={{textAlign:"center"}}>
-            <div style={{fontSize:"0.55rem",opacity:.7,letterSpacing:"0.08em"}}>TIME</div>
+            <div style={{fontSize:"0.75rem",opacity:.7,letterSpacing:"0.08em"}}>TIME</div>
             <div style={{fontSize:"0.9rem",fontWeight:700,fontFamily:"monospace"}}>{fmtTime(totalSecs)}</div>
           </div>
           <div style={{textAlign:"center"}}>
-            <div style={{fontSize:"0.55rem",opacity:.7,letterSpacing:"0.08em"}}>STUDENT</div>
+            <div style={{fontSize:"0.75rem",opacity:.7,letterSpacing:"0.08em"}}>STUDENT</div>
             <div style={{fontSize:"0.82rem",fontWeight:600}}>{student?.name}</div>
           </div>
           <button onClick={handleQuit}
@@ -401,7 +401,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
       </div>
 
       {/* Question counter strip */}
-      <div style={{background:"#155a27",color:"#a8e6b8",padding:"0.4rem 1.5rem",fontSize:"0.7rem",display:"flex",gap:"1rem",alignItems:"center"}}>
+      <div style={{background:"#155a27",color:"#a8e6b8",padding:"0.4rem 1.5rem",fontSize:"0.8rem",display:"flex",gap:"1rem",alignItems:"center"}}>
         <span>Question {questionNum} of {LIMIT}</span>
         <span style={{opacity:.6}}>·</span>
         <span style={{color:"#fff",fontWeight:700}}>{q.standard}</span>
@@ -494,14 +494,14 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
               if (revealed) {
                 if (isCorrect)       { bg="#f0faf2"; border="2px solid #1a6e2e"; color="#1a6e2e"; }
                 else if (isChosen)   { bg="#fdf2f2"; border="2px solid #8b1a1a"; color="#8b1a1a"; }
-                else                 { bg="#fafbfc"; border="2px solid #e0e0e0"; color="#aaa"; }
+                else                 { bg="#fafbfc"; border="2px solid #e0e0e0"; color="#777"; }
               } else if (isChosen)   { bg="#ddeaf7"; border="2px solid #003865"; }
 
               return (
                 <button key={i} onClick={() => handleChoose(choice)} disabled={revealed}
                   style={{background:bg,border,borderRadius:"6px",padding:"0.9rem 1.25rem",textAlign:"left",cursor:revealed?"default":"pointer",display:"flex",alignItems:"center",gap:"1rem",transition:"all .15s"}}>
                   <div style={{width:"30px",height:"30px",borderRadius:"50%",border:`2px solid ${revealed?(isCorrect?"#1a6e2e":isChosen?"#8b1a1a":"#ddd"):"#9aabba"}`,background:revealed?(isCorrect?"#1a6e2e":isChosen?"#8b1a1a":"#f0f0f0"):(isChosen?"#003865":"#fff"),display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    <span style={{fontSize:"0.75rem",fontWeight:700,color:revealed?(isCorrect||isChosen?"#fff":"#aaa"):(isChosen?"#fff":"#667")}}>
+                    <span style={{fontSize:"0.75rem",fontWeight:700,color:revealed?(isCorrect||isChosen?"#fff":"#777"):(isChosen?"#fff":"#667")}}>
                       {revealed && isCorrect ? "✓" : revealed && isChosen ? "✗" : LETTERS[i]}
                     </span>
                   </div>
@@ -632,7 +632,7 @@ function normalizeQuestion(q) {
   // Normalize answer field — may be stored as JSON string or array
   let answer = q.answer;
   if (typeof answer === "string") {
-    try { answer = JSON.parse(answer); } catch { answer = null; }
+    try { answer = JSON.parse(answer); } catch (e) { console.warn("Could not parse question answer field:", e); answer = null; }
   }
   // Detect plotpoint: explicit type OR answer is [x,y] and choices are empty
   const hasRealChoices = Array.isArray(q.choices) && q.choices.filter(c => c).length > 0;
@@ -644,19 +644,64 @@ function normalizeQuestion(q) {
   return { ...q, type, answer };
 }
 
-function StudentTest({ studentName, studentId, questions: initialQuestions, adaptive, onFinish, untimed=false, timeLimitSecs=1800, warnSecs=300 }) {
+function StudentTest({ studentName, studentId, testCode, questions: initialQuestions, adaptive, onFinish, untimed=false, timeLimitSecs=1800, warnSecs=300 }) {
+  // ── Session persistence key ──
+  const sessionKey = testCode && studentId ? `mathready_test_${testCode}_${studentId}` : null;
+
+  // Restore saved state from sessionStorage (runs once, synchronously before first render)
+  const restored = useRef(null);
+  if (restored.current === null) {
+    restored.current = false;
+    if (sessionKey) {
+      try {
+        const raw = sessionStorage.getItem(sessionKey);
+        if (raw) {
+          const saved = JSON.parse(raw);
+          if (saved && typeof saved === "object" && saved.endTime) {
+            restored.current = saved;
+          }
+        }
+      } catch (e) { console.warn("Could not restore saved test state:", e); }
+    }
+  }
+
   const [questions, setQuestions] = useState(initialQuestions.map(normalizeQuestion));
   const [weights,   setWeights]   = useState({});
   const [seenIds,   setSeenIds]   = useState(new Set(initialQuestions.map(q=>q.id)));
   const TOTAL = questions.length;
-  const [cur,   setCur]   = useState(0);
-  const [ans,   setAns]   = useState({});
-  const [flg,   setFlg]   = useState({});
+  const [cur,   setCur]   = useState(restored.current ? (restored.current.cur ?? 0) : 0);
+  const [ans,   setAns]   = useState(restored.current ? (restored.current.ans ?? {}) : {});
+  const [flg,   setFlg]   = useState(restored.current ? (restored.current.flg ?? {}) : {});
   const [secs,     setSecs]     = useState(untimed ? 0 : timeLimitSecs);
   const [paused,   setPaused]   = useState(false);
   const [stopped,  setStopped]  = useState(false);
+  const endTimeRef    = useRef(
+    untimed ? null
+    : restored.current?.endTime ? restored.current.endTime
+    : Date.now() + timeLimitSecs * 1000
+  );
+  const pausedAtRef   = useRef(null);   // timestamp when pause started
+  const submittedRef  = useRef(false);
   const [modal, setModal] = useState(false);
   const [nav,   setNav]   = useState(window.innerWidth > 640);
+
+  // Auto-submit if restored endTime is already in the past
+  useEffect(() => {
+    if (restored.current && !untimed && endTimeRef.current && endTimeRef.current <= Date.now()) {
+      doSubmit();
+    }
+  }, []); // eslint-disable-line
+
+  // Persist test state to sessionStorage on every answer / navigation / flag change
+  useEffect(() => {
+    if (!sessionKey || submittedRef.current) return;
+    try {
+      sessionStorage.setItem(sessionKey, JSON.stringify({
+        ans, cur, flg,
+        endTime: endTimeRef.current,
+      }));
+    } catch (e) { console.warn("Could not persist test state to sessionStorage:", e); }
+  }, [ans, cur, flg, sessionKey]);
 
   // Adaptive: fetch student history and seed weights
   useEffect(() => {
@@ -669,19 +714,40 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
         const initW = buildWeightMap(Array.isArray(hRes) ? hRes : []);
         ALL_STANDARDS.forEach(std => { if (!initW[std]) initW[std] = 0.5; });
         setWeights(initW);
-      } catch {}
+      } catch (e) { console.warn("Failed to seed adaptive weights:", e); }
     }
     seedWeights();
   }, [adaptive, studentId]);  // eslint-disable-line
+
+  // Grade a single answer — handles all question types (MCQ, multiselect, keypad, plotpoint)
+  function gradeOne(q, given) {
+    if (!given) return false;
+    if (q.type === "plotpoint") {
+      const ans = Array.isArray(q.answer) ? q.answer
+        : (()=>{ try { return JSON.parse(q.answer); } catch { return null; } })();
+      return given === JSON.stringify(ans);
+    }
+    if (q.type === "multiselect") {
+      const correct = Array.isArray(q.answer) ? q.answer : [];
+      try {
+        const given_arr = JSON.parse(given);
+        return JSON.stringify([...given_arr].sort()) === JSON.stringify([...correct].sort());
+      } catch { return false; }
+    }
+    if (q.type === "keypad") {
+      return String(q.answer ?? "").trim().toLowerCase() === String(given).trim().toLowerCase();
+    }
+    return given === q.correct;
+  }
 
   // Adaptive: when student answers, swap in an adaptive next question
   function handleAdaptiveAnswer(qId, choice) {
     if (!adaptive) return;
     setAns(prev => {
       const newAns = {...prev, [qId]: choice};
-      // Build mini history from current answers
+      // Build mini history from current answers — use gradeOne for all question types
       const miniHistory = questions.slice(0, cur+1).map(q => ({
-        q, chosen: newAns[q.id], correct: newAns[q.id] === q.correct
+        q, chosen: newAns[q.id], correct: gradeOne(q, newAns[q.id])
       }));
       const newW = updateSessionWeights(weights, miniHistory, ALL_STANDARDS);
       setWeights(newW);
@@ -702,14 +768,38 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
     });
   }
 
-  // Countdown timer (skipped if untimed)
+  // Countdown timer (skipped if untimed) — uses Date.now() to avoid drift
   useEffect(()=>{
     if (untimed) return;
+    if (paused) {
+      // Record when we paused so we can shift endTime on resume
+      if (!pausedAtRef.current) pausedAtRef.current = Date.now();
+      return;
+    }
+    // Resuming from pause — shift endTime by the duration we were paused
+    if (pausedAtRef.current) {
+      const pausedMs = Date.now() - pausedAtRef.current;
+      endTimeRef.current += pausedMs;
+      pausedAtRef.current = null;
+    }
     const t = setInterval(()=>{
-      if (!paused) setSecs(s => s > 0 ? s - 1 : 0);
-    }, 1000);
+      const remaining = Math.max(0, Math.round((endTimeRef.current - Date.now()) / 1000));
+      setSecs(remaining);
+    }, 250);
     return () => clearInterval(t);
   }, [paused, untimed]);
+
+  // Auto-submit when timer reaches 0
+  const hasStartedRef = useRef(false);
+  useEffect(()=>{
+    if (untimed) return;
+    // Skip the initial render (secs starts at timeLimitSecs, not 0, but guard anyway)
+    if (!hasStartedRef.current) { hasStartedRef.current = true; return; }
+    if (secs === 0 && !submittedRef.current) {
+      submittedRef.current = true;
+      doSubmit();
+    }
+  }, [secs]); // eslint-disable-line
 
   // Poll for teacher pause/stop/extensions every 5s
   const appliedExtRef = useRef(0); // total seconds already added to timer
@@ -726,10 +816,10 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
           if (granted > appliedExtRef.current) {
             const newSecs = granted - appliedExtRef.current;
             appliedExtRef.current = granted;
-            setSecs(s => s + newSecs);
+            endTimeRef.current += newSecs * 1000;
           }
         }
-      } catch {}
+      } catch (e) { console.warn("Teacher control poll failed:", e); }
     }, 5000);
     return () => clearInterval(t);
   }, [stopped, untimed, studentName]);
@@ -744,6 +834,8 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
   const [violations,    setViolations]    = useState(0);
   const [lockWarning,   setLockWarning]   = useState(null); // message string or null
   const [isFullscreen,  setIsFullscreen]  = useState(false);
+  const [graceWarning,  setGraceWarning]  = useState(false); // gentle "please return" prompt
+  const fsGraceTimer    = useRef(null);
 
   function addViolation(reason) {
     setViolations(v => v + 1);
@@ -753,7 +845,7 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
   // Enter fullscreen on mount
   useEffect(() => {
     const el = document.documentElement;
-    if (el.requestFullscreen) el.requestFullscreen().then(()=>setIsFullscreen(true)).catch(()=>{});
+    if (el.requestFullscreen) el.requestFullscreen().then(()=>setIsFullscreen(true)).catch((e)=>{ console.warn("Could not enter fullscreen:", e); });
     else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
 
     return () => {
@@ -761,18 +853,35 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
     };
   }, []);
 
-  // Detect fullscreen exit
+  // Detect fullscreen exit — 3-second grace period before counting as violation
   useEffect(() => {
     function onFsChange() {
       const inFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
       setIsFullscreen(inFs);
-      if (!inFs) addViolation("You exited fullscreen. Click below to return.");
+      if (!inFs) {
+        // Show gentle prompt immediately, start grace timer
+        setGraceWarning(true);
+        if (fsGraceTimer.current) clearTimeout(fsGraceTimer.current);
+        fsGraceTimer.current = setTimeout(() => {
+          // Still not in fullscreen after grace period — count violation
+          const stillFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+          if (!stillFs) {
+            setGraceWarning(false);
+            addViolation("You exited fullscreen. Your teacher has been notified. Click below to continue.");
+          }
+        }, 3000);
+      } else {
+        // Returned to fullscreen — cancel grace timer, clear gentle prompt
+        if (fsGraceTimer.current) { clearTimeout(fsGraceTimer.current); fsGraceTimer.current = null; }
+        setGraceWarning(false);
+      }
     }
     document.addEventListener("fullscreenchange", onFsChange);
     document.addEventListener("webkitfullscreenchange", onFsChange);
     return () => {
       document.removeEventListener("fullscreenchange", onFsChange);
       document.removeEventListener("webkitfullscreenchange", onFsChange);
+      if (fsGraceTimer.current) clearTimeout(fsGraceTimer.current);
     };
   }, []);
 
@@ -834,12 +943,14 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
 
   function reEnterFullscreen() {
     const el = document.documentElement;
-    if (el.requestFullscreen) el.requestFullscreen().then(()=>{ setIsFullscreen(true); setLockWarning(null); }).catch(()=>{});
+    if (fsGraceTimer.current) { clearTimeout(fsGraceTimer.current); fsGraceTimer.current = null; }
+    setGraceWarning(false);
+    if (el.requestFullscreen) el.requestFullscreen().then(()=>{ setIsFullscreen(true); setLockWarning(null); }).catch((e)=>{ console.warn("Could not re-enter fullscreen:", e); });
     else if (el.webkitRequestFullscreen) { el.webkitRequestFullscreen(); setLockWarning(null); }
   }
 
   const q = questions[cur];
-  if (!q) return <div style={{padding:"3rem",textAlign:"center",color:"#aaa"}}>Loading…</div>;
+  if (!q) return <div style={{padding:"3rem",textAlign:"center",color:"#777"}}>Loading…</div>;
 
   const sel  = ans[q.id] ?? null;
   const isFl = flg[q.id] ?? false;
@@ -867,6 +978,10 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
   }
 
   async function doSubmit() {
+    if (submittedRef.current) return;   // guard against double-submit
+    submittedRef.current = true;
+    // Clear persisted session state on submit
+    if (sessionKey) { try { sessionStorage.removeItem(sessionKey); } catch (e) { console.warn("Could not clear session state:", e); } }
     const score = questions.reduce((a,q) => {
       const given = ans[q.id] ?? null;
       return a + (gradeAnswer(q, given) ? 1 : 0);
@@ -908,27 +1023,48 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
         </div>
       )}
 
-      {/* Lockdown warning overlay */}
+      {/* Grace period gentle prompt — shown immediately when fullscreen is exited, before counting a violation */}
+      {graceWarning && !lockWarning && (
+        <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem"}}>
+          <div style={{background:"#fff",borderRadius:"8px",maxWidth:"400px",width:"100%",overflow:"hidden",boxShadow:"0 8px 40px rgba(0,0,0,.3)"}}>
+            <div style={{background:"#003865",color:"#fff",padding:"1rem 1.5rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+              <span style={{fontSize:"1.3rem"}}>&#x1F4CB;</span>
+              <div style={{fontWeight:700,fontSize:"1rem"}}>Please return to fullscreen to continue your test.</div>
+            </div>
+            <div style={{padding:"1.5rem"}}>
+              <div style={{fontSize:"0.85rem",color:"#555",marginBottom:"1.25rem",lineHeight:1.5}}>
+                It looks like you left fullscreen. Click below to go back — no worries!
+              </div>
+              <button onClick={reEnterFullscreen}
+                style={{width:"100%",background:"#003865",color:"#fff",border:"none",borderRadius:"4px",padding:"0.75rem",fontSize:"0.9rem",fontWeight:700,cursor:"pointer"}}>
+                Return to Fullscreen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lockdown warning overlay — shown after grace period expires or for non-fullscreen violations */}
       {lockWarning && (
-        <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.85)",display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem"}}>
+        <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem"}}>
           <div style={{background:"#fff",borderRadius:"8px",maxWidth:"420px",width:"100%",overflow:"hidden",boxShadow:"0 8px 40px rgba(0,0,0,.4)"}}>
-            <div style={{background:"#8b1a1a",color:"#fff",padding:"1rem 1.5rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
-              <span style={{fontSize:"1.5rem"}}>⚠️</span>
+            <div style={{background:"#d97706",color:"#fff",padding:"1rem 1.5rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+              <span style={{fontSize:"1.3rem"}}>&#x1F514;</span>
               <div>
-                <div style={{fontWeight:700,fontSize:"1rem"}}>Testing Violation</div>
-                <div style={{fontSize:"0.72rem",opacity:.8}}>This has been recorded</div>
+                <div style={{fontWeight:700,fontSize:"1rem"}}>Heads Up</div>
+                <div style={{fontSize:"0.72rem",opacity:.85}}>Your teacher has been notified</div>
               </div>
             </div>
             <div style={{padding:"1.5rem"}}>
               <div style={{fontSize:"0.92rem",color:"#333",marginBottom:"1.25rem",lineHeight:1.5}}>
                 {lockWarning}
               </div>
-              <div style={{fontSize:"0.75rem",color:"#888",marginBottom:"1rem"}}>
-                Violation count: <strong style={{color:"#8b1a1a"}}>{violations}</strong> — your teacher will see this on your results.
+              <div style={{fontSize:"0.72rem",color:"#999",marginBottom:"1rem"}}>
+                Times left fullscreen: {violations}
               </div>
               <button onClick={reEnterFullscreen}
                 style={{width:"100%",background:"#003865",color:"#fff",border:"none",borderRadius:"4px",padding:"0.75rem",fontSize:"0.9rem",fontWeight:700,cursor:"pointer"}}>
-                Return to Test →
+                Continue My Test
               </button>
             </div>
           </div>
@@ -951,31 +1087,31 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
           </div>
         )}
         {violations > 0 && (
-            <div style={{background:"#8b1a1a",borderRadius:"3px",padding:"2px 8px",fontSize:"0.65rem",fontWeight:700,color:"#fff"}}>
-              ⚠ {violations} violation{violations!==1?"s":""}
+            <div style={{background:"rgba(255,255,255,0.15)",borderRadius:"3px",padding:"2px 8px",fontSize:"0.6rem",fontWeight:600,color:"rgba(255,255,255,0.7)"}}>
+              {violations}x left fullscreen
             </div>
           )}
           <div style={{textAlign:"right"}}>
-            <div style={{fontSize:"0.55rem",opacity:.6,letterSpacing:"0.08em"}}>TIME</div>
+            <div style={{fontSize:"0.75rem",opacity:.6,letterSpacing:"0.08em"}}>TIME</div>
             <div style={{fontSize:"1rem",fontWeight:"bold",fontFamily:"monospace",color:(!untimed&&secs<warnSecs)?"#ffaaaa":"#fff"}}>
               {untimed ? "∞" : fmtTime(secs)}
             </div>
           </div>
           <div style={{textAlign:"right",display:window.innerWidth>480?"block":"none"}}>
-            <div style={{fontSize:"0.55rem",opacity:.6,letterSpacing:"0.08em"}}>STUDENT</div>
+            <div style={{fontSize:"0.75rem",opacity:.6,letterSpacing:"0.08em"}}>STUDENT</div>
             <div style={{fontSize:"0.78rem",fontWeight:600}}>{studentName}</div>
           </div>
         </div>
       }/>
 
-      <div style={{background:"#004e94",color:"#cce0f5",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 0.75rem",height:"30px",flexShrink:0,fontSize:"0.7rem"}}>
+      <div style={{background:"#004e94",color:"#cce0f5",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 0.75rem",height:"30px",flexShrink:0,fontSize:"0.8rem"}}>
         <div style={{display:"flex",gap:"0.75rem",alignItems:"center"}}>
           <button onClick={()=>setNav(o=>!o)} style={{background:"none",border:"none",color:"#cce0f5",cursor:"pointer",fontSize:"0.7rem",padding:0}}>{nav?"◀ Hide":"▶ Nav"}</button>
           <span style={{opacity:.5}}>|</span>
           <span>{ansCount}/{TOTAL} answered</span>
           {flgCount>0&&<><span style={{opacity:.5}}>|</span><span style={{color:"#ffd166"}}>🚩{flgCount}</span></>}
         </div>
-        <span style={{opacity:.65,fontSize:"0.65rem"}}>No Calculator</span>
+        <span style={{opacity:.65,fontSize:"0.78rem"}}>No Calculator</span>
       </div>
 
       <div style={{display:"flex",flex:1,overflow:"hidden"}}>
@@ -990,7 +1126,7 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
                 else if (isFg)   { bg="#fff8e1"; border="#ffc107"; color="#7a4e00"; }
                 else if (isAns)  { bg="#d4edda"; border="#1a6e2e"; color="#1a5c28"; }
                 return <button key={item.id} onClick={()=>setCur(i)}
-                  style={{width:"36px",height:"36px",borderRadius:"3px",border:`2px solid ${border}`,background:bg,color,fontSize:"0.75rem",fontWeight:700,cursor:"pointer",position:"relative",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  style={{width:"44px",height:"44px",borderRadius:"3px",border:`2px solid ${border}`,background:bg,color,fontSize:"0.75rem",fontWeight:700,cursor:"pointer",position:"relative",display:"flex",alignItems:"center",justifyContent:"center"}}>
                   {isFg && !isCur ? <span style={{position:"absolute",top:"-4px",right:"-4px",fontSize:"0.55rem",lineHeight:1}}>🚩</span> : null}
                   {i+1}
                 </button>;
@@ -1002,7 +1138,7 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
                 ["#fff8e1","#ffc107","Flagged for Review"],
                 ["#fafbfc","#bcc8d4","Not Answered"],
               ].map(([bg,bd,lbl])=>(
-                <div key={lbl} style={{display:"flex",alignItems:"center",gap:"6px",marginBottom:"4px",fontSize:"0.62rem",color:"#555"}}>
+                <div key={lbl} style={{display:"flex",alignItems:"center",gap:"6px",marginBottom:"4px",fontSize:"0.75rem",color:"#555"}}>
                   <div style={{width:"13px",height:"13px",background:bg,border:`2px solid ${bd}`,borderRadius:"2px",flexShrink:0}}/>{lbl}
                 </div>
               ))}
@@ -1086,7 +1222,7 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
                 <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"0.9rem"}}>SELECT ONE ANSWER</div>
                 <div style={{display:"flex",flexDirection:"column",gap:"0.55rem"}}>
                   {(q.choices||[]).filter(c=>c).length === 0 ? (
-                    <div style={{color:"#aaa",fontSize:"0.85rem",padding:"1rem",textAlign:"center",border:"1px dashed #c8d3dd",borderRadius:"4px"}}>
+                    <div style={{color:"#777",fontSize:"0.85rem",padding:"1rem",textAlign:"center",border:"1px dashed #c8d3dd",borderRadius:"4px"}}>
                       ⚠ This question has no answer choices. Contact your teacher.
                     </div>
                   ) : (q.choices||[]).map((choice,i)=>{
@@ -1108,7 +1244,7 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
 
       <div style={{background:"#fff",borderTop:"2px solid #c8d3dd",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0.65rem 1.5rem",flexShrink:0}}>
         <button onClick={()=>setCur(c=>Math.max(0,c-1))} disabled={cur===0}
-          style={{background:cur===0?"#e8edf2":"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"7px 20px",fontSize:"0.83rem",cursor:cur===0?"not-allowed":"pointer",color:cur===0?"#aaa":"#333",fontWeight:600}}>◀ Back</button>
+          style={{background:cur===0?"#e8edf2":"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"7px 20px",fontSize:"0.83rem",cursor:cur===0?"not-allowed":"pointer",color:cur===0?"#777":"#333",fontWeight:600}}>◀ Back</button>
         <div style={{display:"flex",gap:"0.75rem",alignItems:"center",fontSize:"0.75rem"}}>
           <span style={{color:"#1a6e2e",fontWeight:700}}>✓ {ansCount} answered</span>
           {flgCount>0&&<span style={{color:"#7a4e00",fontWeight:700}}>🚩 {flgCount} flagged</span>}
@@ -1134,11 +1270,11 @@ function StudentTest({ studentName, studentId, questions: initialQuestions, adap
                   <div style={{fontSize:"0.65rem",color:"#555"}}>Answered</div>
                 </div>
                 <div style={{flex:1,background:flgCount?"#fff8e1":"#f8fafc",border:`1px solid ${flgCount?"#ffc107":"#dde3e9"}`,borderRadius:"4px",padding:"0.65rem 0.85rem",textAlign:"center"}}>
-                  <div style={{fontSize:"1.4rem",fontWeight:700,color:flgCount?"#7a4e00":"#aaa"}}>{flgCount}</div>
+                  <div style={{fontSize:"1.4rem",fontWeight:700,color:flgCount?"#7a4e00":"#777"}}>{flgCount}</div>
                   <div style={{fontSize:"0.65rem",color:"#555"}}>Flagged</div>
                 </div>
                 <div style={{flex:1,background:TOTAL-ansCount?"#fdf2f2":"#f8fafc",border:`1px solid ${TOTAL-ansCount?"#f0b8b8":"#dde3e9"}`,borderRadius:"4px",padding:"0.65rem 0.85rem",textAlign:"center"}}>
-                  <div style={{fontSize:"1.4rem",fontWeight:700,color:TOTAL-ansCount?"#8b1a1a":"#aaa"}}>{TOTAL-ansCount}</div>
+                  <div style={{fontSize:"1.4rem",fontWeight:700,color:TOTAL-ansCount?"#8b1a1a":"#777"}}>{TOTAL-ansCount}</div>
                   <div style={{fontSize:"0.65rem",color:"#555"}}>Unanswered</div>
                 </div>
               </div>
@@ -1200,7 +1336,7 @@ function DrillLogin({ onSuccess, onBack }) {
   return (
     <div style={S.page}>
       <div style={{background:"#7a4500",width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
-        {onBack && <button onClick={onBack} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"4px 10px",cursor:"pointer",fontSize:"0.72rem"}}>← Back</button>}
+        {onBack && <button onClick={onBack} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"6px 14px",cursor:"pointer",fontSize:"0.8rem"}}>← Back</button>}
         <div style={{color:"#fff",fontSize:"0.95rem",fontWeight:700}}>⚡ Fact Fluency Practice</div>
       </div>
       <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem 1rem",width:"100%"}}>
@@ -1487,7 +1623,7 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
               div: Math.max(1, Math.min(10, d.div || 1)),
             };
           }
-        } catch {}
+        } catch (e) { console.warn("Could not load drill progress, starting from level 1:", e); }
       }
       levelsRef.current = lv;
       setLevels(lv);
@@ -1546,7 +1682,7 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
         log:         logRef.current,
         submitted:   now(),
       }),
-    }).catch(() => {});
+    }).catch((e) => { console.warn("Failed to save drill session to server:", e); });
   }
 
   function handleDone(dest) {
@@ -2113,7 +2249,7 @@ function GoogleSignIn({ mode, codeOrClassId, onSuccess, onBack }) {
 // ── Session persistence (survives refresh, clears on tab close) ──────────────
 const SESSION_KEY = "mathready_session";
 function _loadSaved() {
-  try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null"); } catch { return null; }
+  try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null"); } catch (e) { console.warn("Could not load saved session:", e); return null; }
 }
 
 // ── Main shell ─────────────────────────────────────────────
@@ -2215,7 +2351,10 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify(enriched),
       });
-    } catch {}
+    } catch (e) {
+      console.warn("Failed to submit test results to server:", e);
+      alert("Your test could not be saved to the server. Please let your teacher know so they can help recover your results.");
+    }
     setFinalSession(enriched);
     setScreen("results");
   }
@@ -2226,7 +2365,10 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify(session),
       });
-    } catch {}
+    } catch (e) {
+      console.warn("Failed to submit practice results to server:", e);
+      alert("Your practice session could not be saved to the server. Your results are still shown below, but your teacher may not see them.");
+    }
     setFinalSession(session);
     setPracticeHistory(history);
     setScreen("practice-results");
@@ -2273,7 +2415,7 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
               }}/>;
 
   if (screen === "test")
-    return <StudentTest studentName={student?.name || ""} studentId={student?.id || ""} questions={questions} adaptive={isAdaptive} onFinish={handleFinishTest} untimed={untimed} timeLimitSecs={timeLimitSecs} warnSecs={warnSecs}/>;
+    return <StudentTest studentName={student?.name || ""} studentId={student?.id || ""} testCode={testCode} questions={questions} adaptive={isAdaptive} onFinish={handleFinishTest} untimed={untimed} timeLimitSecs={timeLimitSecs} warnSecs={warnSecs}/>;
 
   if (screen === "results")
     return <StudentResults session={finalSession} questions={questions} onReset={()=>{ reset(); onBack(); }}/>;

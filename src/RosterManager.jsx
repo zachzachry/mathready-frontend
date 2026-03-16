@@ -3,7 +3,7 @@ import { API } from "./shared/constants";
 
 const S = {
   inp:   { width:"100%", padding:"0.5rem 0.75rem", border:"1px solid #c8d3dd", borderRadius:"3px", fontSize:"0.85rem", background:"#fafbfc", boxSizing:"border-box" },
-  lbl:   { display:"block", fontSize:"0.62rem", fontWeight:700, letterSpacing:"0.12em", color:"#555", marginBottom:"4px" },
+  lbl:   { display:"block", fontSize:"0.75rem", fontWeight:700, letterSpacing:"0.12em", color:"#555", marginBottom:"4px" },
   btn:   { border:"1px solid #c8d3dd", borderRadius:"3px", padding:"6px 14px", cursor:"pointer", fontSize:"0.78rem", fontWeight:600, background:"#f0f4f8", color:"#333" },
   ta:    { width:"100%", padding:"0.5rem 0.75rem", border:"1px solid #c8d3dd", borderRadius:"3px", fontSize:"0.82rem", background:"#fafbfc", boxSizing:"border-box", resize:"vertical", fontFamily:"sans-serif", minHeight:"120px" },
 };
@@ -26,14 +26,14 @@ function AccomModal({ student, onSave, onClose }) {
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}}>
       <div style={{background:"#fff",borderRadius:"6px",width:"100%",maxWidth:"380px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.22)"}}>
         <div style={{background:"#003865",color:"#fff",padding:"0.9rem 1.25rem"}}>
-          <div style={{fontSize:"0.62rem",letterSpacing:"0.12em",opacity:.7,marginBottom:"2px"}}>ACCOMMODATIONS</div>
+          <div style={{fontSize:"0.75rem",letterSpacing:"0.12em",opacity:.7,marginBottom:"2px"}}>ACCOMMODATIONS</div>
           <div style={{fontSize:"1rem",fontWeight:700}}>{student.name}</div>
         </div>
         <div style={{padding:"1.25rem",display:"flex",flexDirection:"column",gap:"1rem"}}>
 
           {/* Extended Time */}
           <div>
-            <label style={{display:"block",fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"8px"}}>⏱ EXTENDED TIME (IEP / 504)</label>
+            <label style={{display:"block",fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"8px"}}>⏱ EXTENDED TIME (IEP / 504)</label>
             <div style={{display:"flex",gap:"0.5rem"}}>
               {[["none","Standard"],["1.5x","1.5×"],["2x","2×"]].map(([val,lbl])=>(
                 <button key={val} onClick={()=>setExtTime(val)}
@@ -51,7 +51,7 @@ function AccomModal({ student, onSave, onClose }) {
 
           {/* Reduce Answer Choices */}
           <div>
-            <label style={{display:"block",fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"8px"}}>✂ REDUCE ANSWER CHOICES</label>
+            <label style={{display:"block",fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"8px"}}>✂ REDUCE ANSWER CHOICES</label>
             <div style={{display:"flex",gap:"0.5rem"}}>
               {[[false,"Standard (4 choices)"],[true,"Reduced (3 choices)"]].map(([val,lbl])=>(
                 <button key={String(val)} onClick={()=>setReduce(val)}
@@ -212,7 +212,7 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
           <img src="https://www.gstatic.com/images/branding/product/1x/classroom_2020q4_48dp.png"
             alt="" style={{width:"22px",height:"22px"}}/>
           <div style={{flex:1}}>
-            <div style={{fontSize:"0.58rem",opacity:.65,letterSpacing:"0.14em"}}>GOOGLE CLASSROOM</div>
+            <div style={{fontSize:"0.75rem",opacity:.65,letterSpacing:"0.14em"}}>GOOGLE CLASSROOM</div>
             <div style={{fontSize:"0.95rem",fontWeight:700}}>Import Class Roster</div>
           </div>
           <button onClick={onClose} style={{background:"none",border:"none",color:"#fff",fontSize:"1.2rem",cursor:"pointer",opacity:.7}}>✕</button>
@@ -272,7 +272,7 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
                     borderBottom:i<students.length-1?"1px solid #eef1f4":"none",background:i%2===0?"#fff":"#f8fafc"}}>
                     <div style={{width:"24px",height:"24px",borderRadius:"50%",background:"#003865",
                       display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                      <span style={{color:"#fff",fontSize:"0.6rem",fontWeight:700}}>{i+1}</span>
+                      <span style={{color:"#fff",fontSize:"0.75rem",fontWeight:700}}>{i+1}</span>
                     </div>
                     <div style={{flex:1}}>
                       <div style={{fontSize:"0.85rem",fontWeight:600}}>{s.name}</div>
@@ -319,7 +319,7 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
                         <div style={{width:"10px",height:"10px",borderRadius:"50%",background:color,flexShrink:0}}/>
                         <div style={{flex:1}}>
                           <span style={{fontWeight:700,fontSize:"0.88rem",color:"#1a1a1a"}}>{g.name}</span>
-                          <span style={{fontSize:"0.7rem",color:"#888",marginLeft:"8px"}}>
+                          <span style={{fontSize:"0.75rem",color:"#888",marginLeft:"8px"}}>
                             {count} student{count!==1?"s":""}
                             {g.extendedTime !== "none" && ` · ⏱ ${g.extendedTime === "1.5x" ? "1.5×" : "2×"}`}
                             {g.reduceChoices && " · ✂ 3-choice"}
@@ -329,18 +329,18 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
                           <button onClick={e => { e.stopPropagation(); removeGroup(gi); }}
                             style={{background:"none",border:"none",color:"#bbb",cursor:"pointer",fontSize:"0.78rem",padding:"2px 6px",lineHeight:1}}>✕</button>
                         )}
-                        <span style={{fontSize:"0.65rem",color:"#aaa"}}>{isEditing ? "▲" : "▼"}</span>
+                        <span style={{fontSize:"0.75rem",color:"#666"}}>{isEditing ? "▲" : "▼"}</span>
                       </div>
                       {/* Inline editor */}
                       {isEditing && (
                         <div style={{padding:"0.85rem",borderTop:"1px solid #eef1f4",display:"flex",flexDirection:"column",gap:"0.6rem"}}>
                           <div>
-                            <label style={{display:"block",fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"4px"}}>GROUP NAME</label>
+                            <label style={{display:"block",fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"4px"}}>GROUP NAME</label>
                             <input value={g.name} onChange={e => updateGroup(gi, {name: e.target.value})}
                               style={{width:"100%",padding:"0.45rem 0.65rem",border:"1px solid #b3cde8",borderRadius:"3px",fontSize:"0.88rem",boxSizing:"border-box",outline:"none"}}/>
                           </div>
                           <div>
-                            <label style={{display:"block",fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"5px"}}>⏱ EXTENDED TIME (IEP / 504)</label>
+                            <label style={{display:"block",fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"5px"}}>⏱ EXTENDED TIME (IEP / 504)</label>
                             <div style={{display:"flex",gap:"0.4rem"}}>
                               {[["none","Standard"],["1.5x","1.5×"],["2x","2×"]].map(([val,lbl]) => (
                                 <button key={val} onClick={() => updateGroup(gi, {extendedTime: val})}
@@ -353,7 +353,7 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
                             </div>
                           </div>
                           <div>
-                            <label style={{display:"block",fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"5px"}}>✂ ANSWER CHOICES</label>
+                            <label style={{display:"block",fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"5px"}}>✂ ANSWER CHOICES</label>
                             <div style={{display:"flex",gap:"0.4rem"}}>
                               {[[false,"Standard (4)"],[true,"Reduced (3)"]].map(([val,lbl]) => (
                                 <button key={String(val)} onClick={() => updateGroup(gi, {reduceChoices: val})}
@@ -395,7 +395,7 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
                           <button key={idx}
                             onClick={() => setAssignments(prev => ({ ...prev, [si]: idx }))}
                             style={{padding:"2px 8px",border:`2px solid ${assigned === idx ? GRP_COLORS[idx % GRP_COLORS.length] : "#dde3e9"}`,
-                              borderRadius:"12px",fontSize:"0.68rem",fontWeight:700,cursor:"pointer",
+                              borderRadius:"12px",fontSize:"0.75rem",fontWeight:700,cursor:"pointer",
                               background:assigned === idx ? GRP_COLORS[idx % GRP_COLORS.length] : "#f8fafc",
                               color:assigned === idx ? "#fff" : "#888",whiteSpace:"nowrap"}}>
                             {g.name}
@@ -484,7 +484,7 @@ function ClassroomSyncModal({ cls, onClose, onSync }) {
         <div style={{background:"#003865",color:"#fff",padding:"1rem 1.5rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
           <img src="https://www.gstatic.com/images/branding/product/1x/classroom_2020q4_48dp.png" alt="" style={{width:"22px",height:"22px"}}/>
           <div style={{flex:1}}>
-            <div style={{fontSize:"0.58rem",opacity:.65,letterSpacing:"0.14em"}}>GOOGLE CLASSROOM · RE-SYNC</div>
+            <div style={{fontSize:"0.75rem",opacity:.65,letterSpacing:"0.14em"}}>GOOGLE CLASSROOM · RE-SYNC</div>
             <div style={{fontSize:"0.95rem",fontWeight:700}}>{cls.name}</div>
           </div>
           <button onClick={onClose} style={{background:"none",border:"none",color:"#fff",fontSize:"1.2rem",cursor:"pointer",opacity:.7}}>✕</button>
@@ -564,6 +564,7 @@ export default function RosterManager({ teacher, readOnly }) {
   const [accomModal, setAccomModal] = useState(null);
   const [gcImportOpen, setGcImportOpen] = useState(false);
   const [syncModal,    setSyncModal]    = useState(null); // class object or null
+  const [copiedId,     setCopiedId]     = useState(null); // classId that was just copied
 
   const load = useCallback(async () => {
     try {
@@ -571,7 +572,7 @@ export default function RosterManager({ teacher, readOnly }) {
       const r = await fetch(url);
       setClasses(await r.json());
     }
-    catch { setClasses([]); }
+    catch { setClasses([]); flash("Could not load classes. Please refresh."); }
     setLoading(false);
   }, [teacher]);
 
@@ -585,13 +586,14 @@ export default function RosterManager({ teacher, readOnly }) {
       await fetch(`${API}/roster/class`, { method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({ name: newClassName.trim(), teacherId: teacher?.teacherId || null }) });
       setNewClassName(""); await load(); flash("Class added!");
-    } catch {}
+    } catch { flash("Failed to add class. Check your connection."); }
   }
 
   async function deleteClass(cid) {
-    if (!window.confirm("Delete this class and all its students?")) return;
+    const cls = classes.find(c => c.id === cid);
+    if (!window.confirm(`Delete "${cls?.name || "this class"}" and all its students? This cannot be undone.`)) return;
     try { await fetch(`${API}/roster/class/${cid}`, { method:"DELETE" }); await load(); }
-    catch {}
+    catch { flash("Failed to delete class. Check your connection."); }
   }
 
   async function addStudents() {
@@ -610,7 +612,7 @@ export default function RosterManager({ teacher, readOnly }) {
       const data = await r.json();
       setOneInput(""); setPasteInput(""); await load();
       flash(`Added ${data.added} student${data.added!==1?"s":""}!`);
-    } catch {}
+    } catch { flash("Failed to add students. Check your connection."); }
     setAdding(false);
   }
 
@@ -756,7 +758,7 @@ export default function RosterManager({ teacher, readOnly }) {
   const activeClassData = classes.find(c => c.id === activeClass);
   const totalStudents   = classes.reduce((a,c) => a + c.students.length, 0);
 
-  if (loading) return <div style={{padding:"3rem",textAlign:"center",color:"#aaa"}}>Loading roster…</div>;
+  if (loading) return <div style={{padding:"3rem",textAlign:"center",color:"#666"}}>Loading roster…</div>;
 
   return (
     <div style={{display:"flex",height:"100%",fontFamily:"sans-serif",background:"#e8edf2",overflow:"hidden"}}>
@@ -764,7 +766,7 @@ export default function RosterManager({ teacher, readOnly }) {
       {/* ── Left: class list ── */}
       <div style={{width:"260px",display:"flex",flexDirection:"column",borderRight:"2px solid #c8d3dd",background:"#fff",flexShrink:0,overflow:"hidden"}}>
         <div style={{background:"#003865",color:"#fff",padding:"0.9rem 1.25rem",flexShrink:0}}>
-          <div style={{fontSize:"0.6rem",opacity:.65,letterSpacing:"0.14em"}}>TEACHER TOOLS</div>
+          <div style={{fontSize:"0.75rem",opacity:.65,letterSpacing:"0.14em"}}>TEACHER TOOLS</div>
           <div style={{fontSize:"1rem",fontWeight:700}}>Class Roster</div>
           <div style={{fontSize:"0.72rem",opacity:.7,marginTop:"2px"}}>{classes.length} class{classes.length!==1?"es":""} · {totalStudents} students</div>
         </div>
@@ -792,7 +794,7 @@ export default function RosterManager({ teacher, readOnly }) {
 
         <div style={{flex:1,overflowY:"auto",padding:"0.5rem"}}>
           {classes.length===0 ? (
-            <div style={{padding:"2rem 1rem",textAlign:"center",color:"#aaa",fontSize:"0.82rem"}}>No classes yet.</div>
+            <div style={{padding:"2rem 1rem",textAlign:"center",color:"#666",fontSize:"0.82rem"}}>No classes yet.</div>
           ) : classes.map(cls => {
             const isActive = cls.id===activeClass;
             return (
@@ -800,25 +802,25 @@ export default function RosterManager({ teacher, readOnly }) {
                 style={{padding:"0.75rem 0.9rem",borderRadius:"4px",marginBottom:"0.35rem",background:isActive?"#ddeaf7":"#f8fafc",border:`2px solid ${isActive?"#003865":"#dde3e9"}`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <div>
                   <div style={{fontSize:"0.88rem",fontWeight:700,color:isActive?"#003865":"#1a1a1a"}}>{cls.name}</div>
-                  <div style={{fontSize:"0.68rem",color:"#888",marginTop:"1px"}}>{cls.students.length} student{cls.students.length!==1?"s":""}</div>
+                  <div style={{fontSize:"0.75rem",color:"#888",marginTop:"1px"}}>{cls.students.length} student{cls.students.length!==1?"s":""}</div>
                 </div>
                 <div style={{display:"flex",gap:"0.35rem",alignItems:"center",flexWrap:"wrap"}}>
-                  <button onClick={e=>{e.stopPropagation();navigator.clipboard.writeText(`${window.location.origin}/?practice=${cls.id}`);}}
+                  <button onClick={e=>{e.stopPropagation();navigator.clipboard.writeText(`${window.location.origin}/?practice=${cls.id}`).then(()=>{setCopiedId(cls.id);setTimeout(()=>setCopiedId(null),2000);}).catch(()=>{setCopiedId(null);flash("Copy failed");});}}
                     title="Copy practice link for Google Classroom"
-                    style={{...S.btn,padding:"2px 7px",fontSize:"0.65rem",color:"#1a6e2e",borderColor:"#b3dfc0",background:"#f0faf2"}}>
-                    📋 Practice Link
+                    style={{...S.btn,padding:"2px 7px",fontSize:"0.75rem",color:"#1a6e2e",borderColor:"#b3dfc0",background:"#f0faf2"}}>
+                    {copiedId===cls.id ? "✓ Copied!" : "📋 Practice Link"}
                   </button>
                   {cls.gcCourseId && !readOnly && (
                     <button onClick={e=>{e.stopPropagation();setSyncModal(cls);}}
                       title="Sync new students from Google Classroom"
-                      style={{...S.btn,padding:"2px 7px",fontSize:"0.65rem",color:"#003865",borderColor:"#b3cde8",background:"#ddeaf7"}}>
+                      style={{...S.btn,padding:"2px 7px",fontSize:"0.75rem",color:"#003865",borderColor:"#b3cde8",background:"#ddeaf7"}}>
                       ↻ Sync
                     </button>
                   )}
                   {!readOnly && (
                   <button onClick={e=>{e.stopPropagation();deleteClass(cls.id);}}
                     title="Delete entire class"
-                    style={{...S.btn,padding:"2px 7px",color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",fontSize:"0.68rem"}}>🗑 Delete</button>
+                    style={{...S.btn,padding:"2px 7px",color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",fontSize:"0.75rem"}}>🗑 Delete</button>
                   )}
                 </div>
               </div>
@@ -831,7 +833,7 @@ export default function RosterManager({ teacher, readOnly }) {
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
 
         {!activeClassData ? (
-          <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",color:"#aaa",gap:"0.5rem"}}>
+          <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",color:"#666",gap:"0.5rem"}}>
             <div style={{fontSize:"2rem"}}>👈</div>
             <div style={{fontWeight:600,color:"#555"}}>Select a class to manage students</div>
             <div style={{fontSize:"0.82rem"}}>Or create a new class on the left</div>
@@ -841,7 +843,7 @@ export default function RosterManager({ teacher, readOnly }) {
             {/* Class header */}
             <div style={{background:"#fff",borderBottom:"1px solid #c8d3dd",padding:"0.75rem 1.25rem",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
               <div>
-                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#003865"}}>{activeClassData.name.toUpperCase()}</div>
+                <div style={{fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.12em",color:"#003865"}}>{activeClassData.name.toUpperCase()}</div>
                 <div style={{fontSize:"1rem",fontWeight:700,color:"#1a1a1a",marginTop:"2px"}}>
                   {activeClassData.students.length} student{activeClassData.students.length!==1?"s":""}
                 </div>
@@ -901,7 +903,7 @@ export default function RosterManager({ teacher, readOnly }) {
                   {/* Preview */}
                   {csvPreview && (
                     <div>
-                      <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"6px"}}>
+                      <div style={{fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"6px"}}>
                         PREVIEW — {csvPreview.length} student{csvPreview.length!==1?"s":""}
                       </div>
                       <div style={{maxHeight:"160px",overflowY:"auto",border:"1px solid #c8d3dd",borderRadius:"3px",background:"#fafbfc"}}>
@@ -925,24 +927,24 @@ export default function RosterManager({ teacher, readOnly }) {
             {/* Student list */}
             <div style={{flex:1,overflowY:"auto",padding:"0.75rem 1.25rem"}}>
               {activeClassData.students.length===0 ? (
-                <div style={{padding:"2rem",textAlign:"center",color:"#aaa",fontSize:"0.85rem"}}>No students yet.</div>
+                <div style={{padding:"2rem",textAlign:"center",color:"#666",fontSize:"0.85rem"}}>No students yet.</div>
               ) : (
                 <div style={{display:"flex",flexDirection:"column",gap:"0.35rem"}}>
                   {activeClassData.students.map((s,i)=>(
                     <div key={s.id} style={{background:"#fff",border:"1px solid #dde3e9",borderRadius:"3px",padding:"0.6rem 0.9rem",display:"flex",alignItems:"center",gap:"0.75rem",flexWrap:"wrap"}}>
                       <div style={{width:"26px",height:"26px",borderRadius:"50%",background:"#003865",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                        <span style={{color:"#fff",fontSize:"0.65rem",fontWeight:700}}>{i+1}</span>
+                        <span style={{color:"#fff",fontSize:"0.75rem",fontWeight:700}}>{i+1}</span>
                       </div>
                       <div style={{flex:1,fontSize:"0.88rem",fontWeight:600,color:"#1a1a1a",minWidth:"120px"}}>
                         {s.name}
                         <span style={{display:"inline-flex",gap:"4px",marginLeft:"8px",verticalAlign:"middle"}}>
                           {s.extendedTime && s.extendedTime !== "none" && (
-                            <span style={{background:"#ddeaf7",border:"1px solid #b3cde8",borderRadius:"3px",padding:"1px 6px",fontSize:"0.6rem",fontWeight:700,color:"#003865"}}>
+                            <span style={{background:"#ddeaf7",border:"1px solid #b3cde8",borderRadius:"3px",padding:"1px 6px",fontSize:"0.75rem",fontWeight:700,color:"#003865"}}>
                               ⏱ {s.extendedTime === "1.5x" ? "1.5×" : "2×"} TIME
                             </span>
                           )}
                           {s.reduceChoices && (
-                            <span style={{background:"#fff8e1",border:"1px solid #ffc107",borderRadius:"3px",padding:"1px 6px",fontSize:"0.6rem",fontWeight:700,color:"#7a4e00"}}>
+                            <span style={{background:"#fff8e1",border:"1px solid #ffc107",borderRadius:"3px",padding:"1px 6px",fontSize:"0.75rem",fontWeight:700,color:"#7a4e00"}}>
                               ✂ 3-CHOICE
                             </span>
                           )}
@@ -950,9 +952,10 @@ export default function RosterManager({ teacher, readOnly }) {
                       </div>
                       {!readOnly && (<>
                       <button onClick={()=>setAccomModal({cid:activeClassData.id, student:s})}
-                        style={{...S.btn,padding:"2px 8px",fontSize:"0.7rem",color:"#003865",borderColor:"#b3cde8",background:"#ddeaf7"}}>IEP</button>
+                        title="Accommodations (extended time, reduced choices)"
+                        style={{...S.btn,padding:"2px 8px",fontSize:"0.75rem",color:"#003865",borderColor:"#b3cde8",background:"#ddeaf7"}}>IEP</button>
                       <button onClick={()=>removeStudent(activeClassData.id, s.id, s.name)}
-                        style={{...S.btn,padding:"2px 8px",color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",fontSize:"0.7rem"}}>✕</button>
+                        style={{...S.btn,padding:"2px 8px",color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",fontSize:"0.75rem"}}>✕</button>
                       </>)}
                     </div>
                   ))}

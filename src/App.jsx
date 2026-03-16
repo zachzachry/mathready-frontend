@@ -10,9 +10,19 @@ function UnifiedGoogleSignIn({ onTeacher, onStudent }) {
   const btnRef   = useRef(null);
   const [err,    setErr]     = useState("");
   const [loading,setLoading] = useState(false);
+  const [googleFallback, setGoogleFallback] = useState("");
 
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID || !window.google) return;
+    if (!GOOGLE_CLIENT_ID) return;
+    if (!window.google) {
+      setGoogleFallback("Google Sign-In is loading...");
+      const timer = setTimeout(() => {
+        if (!window.google) {
+          setGoogleFallback("Google Sign-In could not load. Please check your internet connection and refresh.");
+        }
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
     window.google.accounts.id.initialize({
       client_id: GOOGLE_CLIENT_ID,
       callback:  handleCredential,
@@ -44,10 +54,22 @@ function UnifiedGoogleSignIn({ onTeacher, onStudent }) {
     setLoading(false);
   }
 
+  if (!GOOGLE_CLIENT_ID) {
+    return (
+      <div style={{color:"#888",fontSize:"0.9rem",textAlign:"center",padding:"1rem"}}>
+        Google Sign-In is not configured.
+      </div>
+    );
+  }
+
   return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"1.25rem",width:"100%"}}>
       {loading ? (
         <div style={{color:"#888",fontSize:"0.9rem"}}>Signing in…</div>
+      ) : googleFallback ? (
+        <div style={{color:"#888",fontSize:"0.9rem",textAlign:"center",padding:"0.5rem"}}>
+          {googleFallback}
+        </div>
       ) : (
         <div ref={btnRef}/>
       )}
