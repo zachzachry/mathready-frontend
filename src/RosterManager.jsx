@@ -433,10 +433,11 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
 
 function ClassroomSyncModal({ cls, onClose, onSync }) {
   const CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
-  const [step,        setStep]        = useState("idle"); // idle|loading|review
-  const [newStudents, setNewStudents] = useState([]);
-  const [err,         setErr]         = useState("");
-  const [syncing,     setSyncing]     = useState(false);
+  const [step,         setStep]         = useState("idle"); // idle|loading|review
+  const [newStudents,  setNewStudents]  = useState([]);
+  const [emailUpdates, setEmailUpdates] = useState([]); // existing students missing email
+  const [err,          setErr]          = useState("");
+  const [syncing,      setSyncing]      = useState(false);
 
   function startSync() {
     if (!window.google) { setErr("Google API not loaded. Refresh and try again."); return; }
@@ -475,14 +476,20 @@ function ClassroomSyncModal({ cls, onClose, onSync }) {
         if (existingNames.has(gs.name.toLowerCase())) return false;
         return true;
       });
+      // Find existing students who have no email but match a GC student by name
+      const needsEmail = gcStudents.filter(gs =>
+        gs.email && existingNames.has(gs.name.toLowerCase()) &&
+        !existingEmails.has(gs.email.toLowerCase())
+      );
       setNewStudents(newOnes);
+      setEmailUpdates(needsEmail);
       setStep("review");
     } catch { setErr("Could not reach Google Classroom API."); setStep("idle"); }
   }
 
   async function doSync() {
     setSyncing(true);
-    await onSync(cls, newStudents);
+    await onSync(cls, newStudents, emailUpdates);
     setSyncing(false);
   }
 
@@ -523,33 +530,42 @@ function ClassroomSyncModal({ cls, onClose, onSync }) {
 
           {step === "review" && (
             <>
-              {newStudents.length === 0 ? (
+              {newStudents.length === 0 && emailUpdates.length === 0 ? (
                 <div style={{textAlign:"center",color:"#1a6e2e",fontWeight:700,padding:"1.5rem",background:"#f0faf2",borderRadius:"6px",fontSize:"0.9rem"}}>
-                  ✓ Class is up to date — no new students found.
+                  ✓ Class is up to date — no changes needed.
                 </div>
               ) : (
                 <>
-                  <div style={{fontSize:"0.82rem",color:"#555"}}>
-                    Found <strong>{newStudents.length} new student{newStudents.length!==1?"s":""}</strong> in Google Classroom:
-                  </div>
-                  <div style={{border:"1px solid #dde3e9",borderRadius:"4px",overflow:"hidden",maxHeight:"220px",overflowY:"auto"}}>
-                    {newStudents.map((s, i) => (
-                      <div key={i} style={{padding:"0.45rem 0.75rem",borderBottom:i<newStudents.length-1?"1px solid #eef1f4":"none",background:i%2===0?"#fff":"#f8fafc"}}>
-                        <div style={{fontSize:"0.85rem",fontWeight:600}}>{s.name}</div>
-                        <div style={{fontSize:"0.7rem",color:"#888"}}>{s.email}</div>
+                  {emailUpdates.length > 0 && (
+                    <div style={{background:"#fff8e1",border:"1px solid #ffe082",borderRadius:"6px",padding:"0.75rem 1rem",fontSize:"0.82rem",color:"#7a5800"}}>
+                      🔑 Will add missing login emails for <strong>{emailUpdates.length} existing student{emailUpdates.length!==1?"s":""}</strong> so they can sign in.
+                    </div>
+                  )}
+                  {newStudents.length > 0 && (
+                    <>
+                      <div style={{fontSize:"0.82rem",color:"#555"}}>
+                        Found <strong>{newStudents.length} new student{newStudents.length!==1?"s":""}</strong> in Google Classroom:
                       </div>
-                    ))}
-                  </div>
+                      <div style={{border:"1px solid #dde3e9",borderRadius:"4px",overflow:"hidden",maxHeight:"180px",overflowY:"auto"}}>
+                        {newStudents.map((s, i) => (
+                          <div key={i} style={{padding:"0.45rem 0.75rem",borderBottom:i<newStudents.length-1?"1px solid #eef1f4":"none",background:i%2===0?"#fff":"#f8fafc"}}>
+                            <div style={{fontSize:"0.85rem",fontWeight:600}}>{s.name}</div>
+                            <div style={{fontSize:"0.7rem",color:"#888"}}>{s.email}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
                   <button onClick={doSync} disabled={syncing}
                     style={{background:"#1a6e2e",border:"none",borderRadius:"6px",padding:"0.75rem",
                       fontSize:"0.88rem",fontWeight:700,color:"#fff",cursor:"pointer",opacity:syncing?0.7:1}}>
-                    {syncing ? "Adding…" : `✓ Add ${newStudents.length} Student${newStudents.length!==1?"s":""} to Class`}
+                    {syncing ? "Updating…" : `✓ Apply ${newStudents.length + emailUpdates.length} Update${(newStudents.length+emailUpdates.length)!==1?"s":""}`}
                   </button>
                 </>
               )}
               <button onClick={onClose}
                 style={{border:"1px solid #c8d3dd",borderRadius:"4px",padding:"0.5rem",background:"#fff",cursor:"pointer",fontSize:"0.82rem",color:"#555"}}>
-                {newStudents.length === 0 ? "Done" : "Cancel"}
+                {newStudents.length === 0 && emailUpdates.length === 0 ? "Done" : "Cancel"}
               </button>
             </>
           )}
@@ -757,30 +773,30 @@ export default function RosterManager({ teacher, readOnly }) {
     } catch { flash("Failed to remove student."); }
   }
 
-  // ── Google Classroom: sync new students into a class ──────
-  async function handleGcSync(cls, newStudents) {
-    const names = newStudents.map(s => s.name);
-    await fetch(`${API}/roster/class/${cls.id}/students`, {
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ students: names }),
-    });
-    await load();
-    // Save emails for new students
-    const freshAll  = await fetch(`${API}/roster`).then(r => r.json());
-    const freshCls  = freshAll.find(c => c.id === cls.id);
-    if (freshCls) {
-      const updated = freshCls.students.map(s => {
-        const match = newStudents.find(gs => gs.name === s.name);
-        return match?.email ? { ...s, email: match.email } : s;
+  // ── Google Classroom: sync new students + backfill emails ──
+  async function handleGcSync(cls, newStudents, emailUpdates = []) {
+    let addedCount = 0;
+    // 1. Add brand-new students (with email included)
+    if (newStudents.length > 0) {
+      await fetch(`${API}/roster/class/${cls.id}/students`, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ students: newStudents.map(s => ({ name: s.name, email: s.email })) }),
       });
-      await fetch(`${API}/roster/class/${cls.id}`, {
-        method:"PUT", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ name: cls.name, students: updated }),
+      addedCount = newStudents.length;
+    }
+    // 2. Backfill emails for existing students who were missing them
+    if (emailUpdates.length > 0) {
+      await fetch(`${API}/roster/class/${cls.id}/backfill-emails`, {
+        method:"PATCH", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ updates: emailUpdates }),
       });
     }
     await load();
     setSyncModal(null);
-    flash(`Synced! Added ${names.length} new student${names.length!==1?"s":""}.`);
+    const parts = [];
+    if (addedCount)          parts.push(`${addedCount} new student${addedCount!==1?"s":""} added`);
+    if (emailUpdates.length) parts.push(`${emailUpdates.length} login email${emailUpdates.length!==1?"s":""} updated`);
+    flash(`Synced! ${parts.join(", ") || "No changes"}.`);
   }
 
   // ── Google Classroom: import multiple groups ───────────────
