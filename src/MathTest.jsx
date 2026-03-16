@@ -6,14 +6,14 @@ import TopBar from "./shared/TopBar";
 import { QUESTIONS as FALLBACK_QUESTIONS, START_SECS, LETTERS, S, pct, lvl, lvlC, lvlBg, lvlBd, fmtTime, now, saveSession, sendHeartbeat, API } from "./shared/constants";
 import { buildWeightMap, updateSessionWeights, pickAdaptiveQuestion, ALL_STANDARDS, generateDrill } from "./adaptive";
 import PlotGrid from "./shared/PlotGrid";
-import AvatarScreen, { GRACIE_THEMES } from "./Avatar";
+
 
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
 
 // ── Student Login ──────────────────────────────────────────
 // Flow: google → choice (drill | test code) → [code → confirm] or [drill start]
-function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode }) {
-  const [credential, setCredential] = useState(null); // stored Google ID token
+function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillCredential }) {
+  const [credential, setCredential] = useState(prefillCredential || null);
   const [code,       setCode]       = useState(prefillCode || "");
   const [err,        setErr]        = useState("");
   const [checking,   setChecking]   = useState(false);
@@ -21,7 +21,7 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode }) {
   const [student,    setStudent]    = useState(null);
   const [cls,        setCls]        = useState(null);
   // skip google step if credential already provided from home screen sign-in
-  const [step, setStep] = useState("google"); // google → choice → code → confirm
+  const [step, setStep] = useState(prefillCredential ? (prefillCode ? "code" : "choice") : "google");
   const googleBtnRef = useRef(null);
 
   // Mount Google button on the google step
@@ -1470,7 +1470,6 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
 
   const levelsRef   = useRef({ add:1, sub:1, mul:1, div:1 });
   const streaksRef  = useRef({ add:0, sub:0, mul:0, div:0 });
-  const levelUpsRef = useRef(0);   // total level-up events this session
   const logRef      = useRef([]);
   const fbTimer     = useRef(null);
   const inputRef    = useRef(null);
@@ -1523,22 +1522,13 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
     if (phase === "active" && !feedback && inputRef.current) inputRef.current.focus();
   }, [problem, feedback, phase]);
 
-  const earningsRef    = useRef(0);
   const sessionHistRef = useRef([...priorHistory]); // grows across Play Again restarts
 
   function endSession() {
     clearTimeout(fbTimer.current);
 
-    // Calculate earnings:  $0.02 per correct, $0.10 accuracy bonus (≥80%), $0.10 per level-up
     const totalP   = logRef.current.length;
     const correctP = logRef.current.filter(e => e.correct).length;
-    const accFrac  = totalP ? correctP / totalP : 0;
-    const earned   = Math.round((
-      correctP * 0.02 +
-      (accFrac >= 0.80 ? 0.10 : 0) +
-      levelUpsRef.current * 0.10
-    ) * 100) / 100;
-    earningsRef.current = earned;
 
     // Append this session to history for the progress chart
     sessionHistRef.current = [
@@ -1559,14 +1549,12 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
         levels:      { ...levelsRef.current },
         log:         logRef.current,
         submitted:   now(),
-        earnings:    earned,
       }),
     }).catch(() => {});
   }
 
-  // Pass earnings + session history up when user clicks a button
   function handleDone(dest) {
-    onDone(dest, earningsRef.current, sessionHistRef.current);
+    onDone(dest, sessionHistRef.current);
   }
 
   function submitAnswer() {
@@ -1595,7 +1583,6 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
     if (newStreak <= -3) newLevel = Math.max(1,  newLevel - 1);
     if (newLevel !== levelsRef.current[problem.op]) {
       streaksRef.current = { ...streaksRef.current, [problem.op]: 0 };
-      if (newLevel > levelsRef.current[problem.op]) levelUpsRef.current += 1;
     }
     levelsRef.current = { ...levelsRef.current, [problem.op]: newLevel };
     setLevels({ ...levelsRef.current });
@@ -1804,29 +1791,6 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
               </div>
             )}
 
-            {/* ── Earnings ── */}
-            {earningsRef.current > 0 && (
-              <div style={{...glassCard,overflow:"hidden"}}>
-                <div style={{padding:"0.7rem 1.25rem",
-                  borderBottom:"1px solid rgba(255,255,255,0.08)",
-                  display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                  <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.14em",
-                    color:"rgba(255,255,255,0.45)"}}>EARNINGS THIS DRILL</div>
-                  <div style={{fontFamily:"monospace",fontWeight:800,fontSize:"1.4rem",color:"#2ecc71"}}>
-                    +${earningsRef.current.toFixed(2)}
-                  </div>
-                </div>
-                <div style={{padding:"0.6rem 1.25rem",fontSize:"0.75rem",
-                  color:"rgba(255,255,255,0.55)",display:"flex",gap:"1rem",flexWrap:"wrap"}}>
-                  <span>💰 ${(correct * 0.02).toFixed(2)} correct</span>
-                  {correct/totalP >= 0.80 && <span>🎯 $0.10 accuracy bonus</span>}
-                  {levelUpsRef.current > 0 && (
-                    <span>⬆ ${(levelUpsRef.current*0.10).toFixed(2)} level-up{levelUpsRef.current>1?"s":""}</span>
-                  )}
-                </div>
-              </div>
-            )}
-
             {/* ── Action buttons ── */}
             <div style={{display:"flex",gap:"0.75rem",justifyContent:"center",flexWrap:"wrap",
               padding:"0.25rem 0 0.5rem"}}>
@@ -1838,15 +1802,7 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
                   letterSpacing:"0.02em"}}>
                 🎮 Play Again
               </button>
-              <button onClick={() => handleDone("avatar")}
-                style={{background:"linear-gradient(135deg,#e67e22,#d35400)",color:"#fff",
-                  border:"none",borderRadius:"12px",padding:"0.9rem 1.75rem",
-                  fontSize:"1rem",fontWeight:800,cursor:"pointer",
-                  boxShadow:"0 4px 16px rgba(230,126,34,0.35)",
-                  letterSpacing:"0.02em"}}>
-                🏪 Store
-              </button>
-              <button onClick={() => handleDone(null)}
+<button onClick={() => handleDone(null)}
                 style={{background:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.7)",
                   border:"1px solid rgba(255,255,255,0.2)",borderRadius:"12px",
                   padding:"0.9rem 1.75rem",fontSize:"1rem",fontWeight:700,cursor:"pointer",
@@ -2165,7 +2121,7 @@ function _loadSaved() {
 }
 
 // ── Main shell ─────────────────────────────────────────────
-export default function MathTest({ onBack, prefillCode, directPracticeClassId, directDrillMode }) {
+export default function MathTest({ onBack, prefillCode, directPracticeClassId, directDrillMode, prefillCredential }) {
   // prefillCode           = test code from ?code= URL param (goes straight to Google step)
   // directPracticeClassId = class ID from ?practice= URL param (direct practice via Google)
   // directDrillMode       = true when launched from "Practice Drill" home button (no code)
@@ -2184,9 +2140,7 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
   const [testCode,        setTestCode]        = useState("");
   const [finalSession,    setFinalSession]    = useState(null);
   const [practiceHistory, setPracticeHistory] = useState([]);
-  const [drillEarnings,   setDrillEarnings]   = useState(0);
   const [drillKey,        setDrillKey]        = useState(0);   // increment to remount (Play Again)
-  const [avatarDeepLink,  setAvatarDeepLink]  = useState(null); // {tab, shopCat} — set by Store button
   const [drillHistory,    setDrillHistory]    = useState([]);  // grows across Play Again sessions
   const [questions,       setQuestions]       = useState(FALLBACK_QUESTIONS);
   const [isAdaptive,      setIsAdaptive]      = useState(false);
@@ -2282,12 +2236,6 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
     setScreen("practice-results");
   }
 
-  if (screen === "avatar")
-    return <AvatarScreen student={student} onBack={() => { setAvatarDeepLink(null); setScreen("test-done"); }}
-                         earnedThisSession={drillEarnings}
-                         startTab={avatarDeepLink?.tab ?? "look"}
-                         startShopCat={avatarDeepLink?.shopCat ?? "hair"}/>;
-
   if (screen === "test-done") { reset(); return null; }
 
   if (screen === "drill-google")
@@ -2303,6 +2251,7 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
       }}
       onBack={onBack}
       prefillCode={prefillCode}
+      prefillCredential={prefillCredential}
     />;
 
   if (screen === "google-practice")
@@ -2321,11 +2270,9 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
               student={student} cls={cls} testCode={testCode}
               priorHistory={drillHistory}
               drillNumber={drillKey + 1}
-              onDone={(dest, earned, history) => {
-                if (history)           setDrillHistory(history);
-                if (earned !== undefined) setDrillEarnings(earned);
-                if (dest === "again")  { setDrillKey(k => k + 1); return; }
-                if (dest === "avatar") { setAvatarDeepLink({ tab:"shop", shopCat:"theme" }); setScreen("avatar"); return; }
+              onDone={(dest, history) => {
+                if (history) setDrillHistory(history);
+                if (dest === "again") { setDrillKey(k => k + 1); return; }
                 reset();
               }}/>;
 
