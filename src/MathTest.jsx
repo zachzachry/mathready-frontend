@@ -1421,9 +1421,6 @@ function DrillCharacter({ accuracy, studentId }) {
   const stars   = accuracy >= 90 ? 5 : accuracy >= 75 ? 4 : accuracy >= 60 ? 3 : accuracy >= 40 ? 2 : 1;
   const smiling = accuracy >= 60;
 
-  // Read theme from localStorage (written by Avatar store on equip)
-  const themeId   = (studentId && localStorage.getItem(`gracie_theme_${studentId}`)) || "gracie_default";
-  const cssFilter = GRACIE_THEMES[themeId]?.filter ?? "none";
 
   const { rive, RiveComponent } = useRive({
     src: "/gracie.riv",
@@ -1441,8 +1438,7 @@ function DrillCharacter({ accuracy, studentId }) {
   return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"0.5rem"}}>
       {/* CSS filter applied to wrapper div — tints the entire Rive canvas */}
-      <div style={{width:200,height:260,filter:cssFilter,
-        transition:"filter 0.4s ease"}}>
+      <div style={{width:200,height:260}}>
         <RiveComponent style={{width:"100%",height:"100%"}} />
       </div>
       <div style={{display:"flex",gap:"3px",fontSize:"1.25rem"}}>
