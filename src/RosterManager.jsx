@@ -101,7 +101,7 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
     setErr(""); setStep("loading");
     const client = window.google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
-      scope: "https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.rosters.readonly",
+      scope: "https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.rosters.readonly https://www.googleapis.com/auth/classroom.profile.emails",
       callback: async (resp) => {
         if (resp.error) { setErr("Sign-in cancelled or failed."); setStep("idle"); return; }
         tokenRef.current = resp.access_token;
@@ -443,7 +443,7 @@ function ClassroomSyncModal({ cls, onClose, onSync }) {
     setErr(""); setStep("loading");
     const client = window.google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
-      scope: "https://www.googleapis.com/auth/classroom.rosters.readonly",
+      scope: "https://www.googleapis.com/auth/classroom.rosters.readonly https://www.googleapis.com/auth/classroom.profile.emails",
       callback: async (resp) => {
         if (resp.error) { setErr("Sign-in cancelled or failed."); setStep("idle"); return; }
         await fetchAndDiff(resp.access_token);
