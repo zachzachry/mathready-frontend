@@ -102,11 +102,6 @@ function UnifiedGoogleSignIn({ onTeacher, onStudent, onAdminFallback }) {
           padding:"0.55rem 1.25rem",fontSize:"0.82rem",color:"#8b1a1a",fontWeight:600,
           textAlign:"center",width:"100%",boxSizing:"border-box"}}>⚠ {err}</div>
       )}
-      <button onClick={onAdminFallback}
-        style={{fontSize:"0.68rem",color:"#bbb",background:"none",border:"none",
-          cursor:"pointer",textDecoration:"underline",marginTop:"0.25rem"}}>
-        Admin access
-      </button>
     </div>
   );
 }
