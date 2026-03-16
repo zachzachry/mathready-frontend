@@ -20,7 +20,7 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode }) {
   const [testInfo,   setTestInfo]   = useState(null);
   const [student,    setStudent]    = useState(null);
   const [cls,        setCls]        = useState(null);
-  // if prefillCode skip straight to code entry after google
+  // skip google step if credential already provided from home screen sign-in
   const [step, setStep] = useState("google"); // google → choice → code → confirm
   const googleBtnRef = useRef(null);
 
@@ -1838,7 +1838,14 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
                   letterSpacing:"0.02em"}}>
                 🎮 Play Again
               </button>
-              {/* 🏪 Store button — re-enable once avatar system is complete */}
+              <button onClick={() => handleDone("avatar")}
+                style={{background:"linear-gradient(135deg,#e67e22,#d35400)",color:"#fff",
+                  border:"none",borderRadius:"12px",padding:"0.9rem 1.75rem",
+                  fontSize:"1rem",fontWeight:800,cursor:"pointer",
+                  boxShadow:"0 4px 16px rgba(230,126,34,0.35)",
+                  letterSpacing:"0.02em"}}>
+                🏪 Store
+              </button>
               <button onClick={() => handleDone(null)}
                 style={{background:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.7)",
                   border:"1px solid rgba(255,255,255,0.2)",borderRadius:"12px",
