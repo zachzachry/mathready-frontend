@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import MathTest from "./MathTest";
 import TeacherShell from "./TeacherShell";
-import AdminShell from "./AdminShell";
 import { API } from "./shared/constants";
 
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
@@ -64,6 +63,7 @@ function TeacherGoogleSignIn({ onSuccess, onAdminFallback }) {
       client_id: GOOGLE_CLIENT_ID,
       callback: handleCredential,
       ux_mode: "popup",
+      auto_select: false,
     });
     window.google.accounts.id.renderButton(btnRef.current, {
       theme: "outline", size: "large", text: "signin_with", shape: "rectangular", width: 280,
@@ -97,10 +97,6 @@ function TeacherGoogleSignIn({ onSuccess, onAdminFallback }) {
           padding:"0.55rem 1.25rem",fontSize:"0.82rem",color:"#8b1a1a",fontWeight:600,
           textAlign:"center",width:"100%",boxSizing:"border-box"}}>⚠ {err}</div>
       )}
-      <button onClick={onAdminFallback}
-        style={{fontSize:"0.7rem",color:"#aaa",background:"none",border:"none",cursor:"pointer",textDecoration:"underline"}}>
-        Admin access
-      </button>
     </div>
   );
 }
@@ -124,24 +120,23 @@ export default function App() {
 
   function handleTeacherSuccess(data) {
     setTeacherIdentity({
+      teacherRole: data.teacherRole,
       teacherId:   data.teacherId,
       teacherName: data.teacherName,
       classIds:    data.classIds,
-      isLegacy:    data.isLegacy,
     });
     setScreen("teacher");
   }
 
-  // Admin-only hex login
+  // Emergency hex login — routes to TeacherShell as super_admin
   async function handleAdminPin(pin) {
     setLoading(true); setErr("");
     try {
       const r    = await fetch(`${API}/auth/pin/${pin}`);
       const data = await r.json();
       if (data.role === "admin") {
-        setScreen("admin");
+        handleTeacherSuccess({ teacherRole: "super_admin", teacherId: null, teacherName: "Admin", classIds: null });
       } else if (data.role === "teacher") {
-        // Legacy teacher PIN fallback
         handleTeacherSuccess(data);
       } else {
         setErr("Admin code not recognized.");
@@ -150,7 +145,6 @@ export default function App() {
     setLoading(false);
   }
 
-  if (screen === "admin")   return <AdminShell   onBack={reset}/>;
   if (screen === "teacher") return <TeacherShell teacher={teacherIdentity} onBack={reset}/>;
   if (screen === "student") return <MathTest onBack={reset} prefillCode={urlCode||undefined} directPracticeClassId={urlPracticeClass||undefined}/>;
 
@@ -216,10 +210,22 @@ export default function App() {
         <div style={{fontSize:"1.8rem",fontWeight:700,color:"#003865",fontFamily:"Georgia,serif",marginBottom:"6px"}}>
           Grade 5 Mathematics
         </div>
-        <div style={{fontSize:"0.88rem",color:"#888"}}>Students: use the link from Google Classroom</div>
       </div>
 
       <div style={{display:"flex",flexDirection:"column",gap:"1rem",width:"100%",maxWidth:"360px"}}>
+        <button onClick={()=>setScreen("student")}
+          style={{background:"#fff",border:"2px solid #1a6e2e",borderRadius:"8px",padding:"1.5rem 2rem",
+            cursor:"pointer",display:"flex",alignItems:"center",gap:"1.25rem",
+            boxShadow:"0 2px 8px rgba(0,0,0,.06)",textAlign:"left",width:"100%"}}>
+          <div style={{width:"52px",height:"52px",borderRadius:"50%",background:"#f0faf2",
+            display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.6rem",flexShrink:0}}>
+            🎓
+          </div>
+          <div>
+            <div style={{fontSize:"1.1rem",fontWeight:700,color:"#1a6e2e",marginBottom:"3px"}}>I'm a Student</div>
+            <div style={{fontSize:"0.8rem",color:"#888"}}>Sign in with your school Google account</div>
+          </div>
+        </button>
         <button onClick={()=>setScreen("teacher-login")}
           style={{background:"#fff",border:"2px solid #c8d3dd",borderRadius:"8px",padding:"1.5rem 2rem",
             cursor:"pointer",display:"flex",alignItems:"center",gap:"1.25rem",

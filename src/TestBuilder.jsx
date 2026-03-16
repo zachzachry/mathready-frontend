@@ -260,13 +260,16 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose }
 
 
 // ── Assign Classes Modal ───────────────────────────────────
-function AssignClassesModal({ test, onSave, onClose }) {
+function AssignClassesModal({ test, onSave, onClose, teacher }) {
   const [classes,  setClasses]  = useState([]);
   const [selected, setSelected] = useState(test.classIds || []);
   const [saving,   setSaving]   = useState(false);
 
   useEffect(() => {
-    fetch(`${API}/roster`).then(r=>r.json()).then(d=>setClasses(Array.isArray(d)?d:[])).catch(()=>{});
+    const classFilter = teacher?.classIds !== null && teacher?.classIds?.length
+      ? `?classIds=${teacher.classIds.join(",")}`
+      : "";
+    fetch(`${API}/roster${classFilter}`).then(r=>r.json()).then(d=>setClasses(Array.isArray(d)?d:[])).catch(()=>{});
   }, []);
 
   function toggle(id) {
@@ -751,8 +754,7 @@ export default function TestBuilder({ teacher, readOnly }) {
                       }
                     </div>
                     {/* Class assignment */}
-                    {t.type !== "drill" && (
-                      assigningTest === t.id ? (
+                    {assigningTest === t.id ? (
                         <div style={{marginTop:"0.5rem",background:"#f8fafc",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.6rem"}}>
                           <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"6px"}}>ASSIGN TO CLASSES</div>
                           <div style={{display:"flex",flexDirection:"column",gap:"3px",maxHeight:"110px",overflowY:"auto",marginBottom:"6px"}}>
@@ -804,7 +806,7 @@ export default function TestBuilder({ teacher, readOnly }) {
                           </button>
                         </div>
                       )
-                    )}
+                    }
                   </div>
                 ))
               )}
@@ -816,9 +818,9 @@ export default function TestBuilder({ teacher, readOnly }) {
       {/* Modals */}
       {editingQ&&<EditModal question={editingQ} onSave={handleSaveEdit} onClose={()=>setEditingQ(null)}/>}
       {showSaveModal&&<SaveTestModal count={selected.length} currentTitle={testTitle} savedTests={savedTests} onSave={saveTest} onClose={()=>setShowSaveModal(false)}/>}
-      {assignClassesTest&&<AssignClassesModal test={assignClassesTest} onSave={async(classIds)=>{
+      {assignClassesTest&&<AssignClassesModal test={assignClassesTest} teacher={teacher} onSave={async(classIds)=>{
         try {
-          await fetch(`${API}/tests/saved/${assignClassesTest.id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...assignClassesTest,classIds})});
+          await fetch(`${API}/tests/saved/${assignClassesTest.id}/classes`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({classIds})});
           await loadSavedTests();
           setAssignClassesTest(null);
         } catch {}

@@ -339,11 +339,6 @@ export default function TeacherManager() {
         </div>
       )}
 
-      {/* Note about legacy PIN */}
-      <div style={{ marginTop:"1.5rem", background:"#fff8e1", border:"1px solid #ffd166",
-        borderRadius:"4px", padding:"0.65rem 1rem", fontSize:"0.76rem", color:"#7a4e00" }}>
-        <strong>Note:</strong> Existing numeric PINs still work — teachers can keep theirs or click ✏️ Edit → 🔑 Change Code to upgrade to a hex code. Legacy <code>TEACHER_PIN</code> env var still works until removed from Railway.
-      </div>
     </div>
   );
 }
