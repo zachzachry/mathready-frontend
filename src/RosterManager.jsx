@@ -564,7 +564,6 @@ export default function RosterManager({ teacher, readOnly }) {
   const [accomModal, setAccomModal] = useState(null);
   const [gcImportOpen, setGcImportOpen] = useState(false);
   const [syncModal,    setSyncModal]    = useState(null); // class object or null
-  const [copiedId,     setCopiedId]     = useState(null); // classId that was just copied
 
   const load = useCallback(async () => {
     try {
@@ -805,11 +804,6 @@ export default function RosterManager({ teacher, readOnly }) {
                   <div style={{fontSize:"0.75rem",color:"#888",marginTop:"1px"}}>{cls.students.length} student{cls.students.length!==1?"s":""}</div>
                 </div>
                 <div style={{display:"flex",gap:"0.35rem",alignItems:"center",flexWrap:"wrap"}}>
-                  <button onClick={e=>{e.stopPropagation();navigator.clipboard.writeText(`${window.location.origin}/?practice=${cls.id}`).then(()=>{setCopiedId(cls.id);setTimeout(()=>setCopiedId(null),2000);}).catch(()=>{setCopiedId(null);flash("Copy failed");});}}
-                    title="Copy practice link for Google Classroom"
-                    style={{...S.btn,padding:"2px 7px",fontSize:"0.75rem",color:"#1a6e2e",borderColor:"#b3dfc0",background:"#f0faf2"}}>
-                    {copiedId===cls.id ? "✓ Copied!" : "📋 Practice Link"}
-                  </button>
                   {cls.gcCourseId && !readOnly && (
                     <button onClick={e=>{e.stopPropagation();setSyncModal(cls);}}
                       title="Sync new students from Google Classroom"

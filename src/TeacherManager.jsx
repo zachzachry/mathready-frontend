@@ -3,9 +3,7 @@ import { API } from "./shared/constants";
 
 const NAVY = "#003865";
 
-function genHex(len = 6) {
-  return Array.from({length: len}, () => "0123456789ABCDEF"[Math.floor(Math.random()*16)]).join("");
-}
+
 const S = {
   inp:  { width:"100%", padding:"0.5rem 0.75rem", border:"1px solid #c8d3dd", borderRadius:"3px", fontSize:"0.85rem", background:"#fafbfc", boxSizing:"border-box" },
   lbl:  { display:"block", fontSize:"0.62rem", fontWeight:700, letterSpacing:"0.12em", color:"#555", marginBottom:"4px" },
@@ -28,7 +26,7 @@ function ClassPicker({ allClasses, selected, onChange, onClassCreated }) {
       const d = await r.json();
       setNewName(""); setAdding(false);
       onClassCreated(d.id); // auto-select the new class
-    } catch {}
+    } catch (e) { console.warn("Failed to create class:", e); }
     setCreating(false);
   }
 
@@ -89,8 +87,6 @@ function TeacherForm({ teacher, allClasses, onSave, onCancel, onClassCreated }) 
   const [name,       setName]       = useState(teacher?.name     || "");
   const [email,      setEmail]      = useState(teacher?.email    || "");
   const [role,       setRole]       = useState(teacher?.role     || "teacher");
-  const [pin,        setPin]        = useState(teacher ? "" : genHex());
-  const [changingPin,setChangingPin]= useState(!teacher);
   const [classIds,   setClassIds]   = useState(teacher?.classIds || []);
   const [err,        setErr]        = useState("");
   const [saving,     setSaving]     = useState(false);
@@ -98,15 +94,8 @@ function TeacherForm({ teacher, allClasses, onSave, onCancel, onClassCreated }) 
   async function submit() {
     if (!name.trim()) { setErr("Name is required."); return; }
     if (!email.trim()) { setErr("School Google email is required."); return; }
-    if (changingPin && pin.trim()) {
-      const cleanPin = pin.trim().toUpperCase();
-      if (cleanPin.length < 4 || cleanPin.length > 8 || !/^[0-9A-F]+$/.test(cleanPin)) {
-        setErr("Login code must be 4–8 hex characters (0-9, A-F)."); return;
-      }
-    }
     setSaving(true); setErr("");
-    const body = { name: name.trim(), email: email.trim().toLowerCase(), role,
-                   pin: changingPin ? pin.trim().toUpperCase() : "", classIds };
+    const body = { name: name.trim(), email: email.trim().toLowerCase(), role, classIds };
     try {
       const url    = teacher ? `${API}/teachers/${teacher.id}` : `${API}/teachers`;
       const method = teacher ? "PUT" : "POST";
@@ -149,38 +138,6 @@ function TeacherForm({ teacher, allClasses, onSave, onCancel, onClassCreated }) 
         </select>
       </div>
 
-      <div style={{ marginBottom:"1rem" }}>
-        <label style={S.lbl}>LOGIN CODE (HEX) — optional, for admin fallback only</label>
-        {!teacher || changingPin ? (
-          <div style={{display:"flex",gap:"0.4rem",alignItems:"center"}}>
-            <input style={{...S.inp, fontFamily:"monospace", letterSpacing:"0.2em", flex:1, textTransform:"uppercase"}}
-              value={pin} onChange={e=>setPin(e.target.value.toUpperCase().replace(/[^0-9A-F]/g,"").slice(0,8))}
-              placeholder="Leave blank or generate" maxLength={8}/>
-            <button type="button" onClick={()=>setPin(genHex())} title="Generate random code"
-              style={{...S.btn,padding:"5px 10px",fontSize:"0.75rem",whiteSpace:"nowrap",background:"#e8f0fa",borderColor:"#b3cde8",color:"#003865"}}>
-              🎲
-            </button>
-            {teacher && (
-              <button type="button" onClick={()=>{setChangingPin(false);setPin("");setErr("");}}
-                style={{...S.btn,padding:"5px 10px",fontSize:"0.75rem",whiteSpace:"nowrap"}}>
-                Cancel
-              </button>
-            )}
-          </div>
-        ) : (
-          <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
-            <div style={{flex:1,padding:"0.5rem 0.75rem",background:"#f0f4f8",border:"1px solid #c8d3dd",
-              borderRadius:"3px",fontFamily:"monospace",letterSpacing:"0.25em",fontSize:"1rem",color:"#888"}}>
-              {"•••••"}
-            </div>
-            <button type="button" onClick={()=>setChangingPin(true)}
-              style={{...S.btn,padding:"5px 12px",fontSize:"0.75rem",whiteSpace:"nowrap",
-                background:"#fff3cd",borderColor:"#ffc107",color:"#7a4e00",fontWeight:700}}>
-              🔑 Change Code
-            </button>
-          </div>
-        )}
-      </div>
 
       <div style={{ marginBottom:"1rem" }}>
         <label style={S.lbl}>ASSIGN CLASSES</label>
@@ -220,7 +177,7 @@ export default function TeacherManager() {
       ]);
       setTeachers(t);
       setAllClasses(r);
-    } catch {}
+    } catch (e) { console.warn("Failed to load teacher data:", e); }
     setLoading(false);
   }, []);
 
@@ -239,10 +196,10 @@ export default function TeacherManager() {
 
   function classNamesFor(classIds) {
     if (!classIds?.length) return <span style={{ color:"#bbb", fontStyle:"italic" }}>No classes</span>;
-    return classIds.map(id => {
-      const cls = allClasses.find(c => c.id === id);
-      return cls ? cls.name : id;
-    }).join(", ");
+    const names = classIds
+      .map(id => allClasses.find(c => c.id === id)?.name)
+      .filter(Boolean);
+    return names.length ? names.join(", ") : <span style={{ color:"#bbb", fontStyle:"italic" }}>No classes</span>;
   }
 
   if (loading) return <div style={{ padding:"3rem", textAlign:"center", color:"#aaa" }}>Loading…</div>;
@@ -255,7 +212,7 @@ export default function TeacherManager() {
         <div>
           <div style={{ fontSize:"1rem", fontWeight:700, color:NAVY }}>Teacher Accounts</div>
           <div style={{ fontSize:"0.75rem", color:"#888", marginTop:"2px" }}>
-            Each teacher gets their own hex login code and sees only their assigned classes.
+            Each teacher signs in with Google and sees only their assigned classes.
           </div>
         </div>
         <button onClick={() => setEditing("new")}
@@ -289,7 +246,7 @@ export default function TeacherManager() {
           <div style={{ fontSize:"1.5rem", marginBottom:"0.5rem" }}>👩‍🏫</div>
           <div style={{ fontWeight:600, color:"#555" }}>No teacher accounts yet</div>
           <div style={{ fontSize:"0.82rem", marginTop:"4px" }}>
-            Create accounts so each teacher has their own PIN and class access.
+            Create accounts so each teacher has their own Google login and class access.
           </div>
         </div>
       ) : (
@@ -314,14 +271,7 @@ export default function TeacherManager() {
                   {classNamesFor(t.classIds)}
                 </div>
               </div>
-              {/* PIN badge */}
-              <div style={{ background:"#f0f4f8", border:"1px solid #c8d3dd", borderRadius:"3px",
-                padding:"3px 10px", flexShrink:0 }}>
-                <div style={{ fontSize:"0.55rem", color:"#888", letterSpacing:"0.1em" }}>{t.pinSet ? "CODE SET" : "NO CODE"}</div>
-                <div style={{ fontSize:"0.9rem", fontFamily:"monospace", fontWeight:700, color:t.pinSet?NAVY:"#f0b8b8", letterSpacing:"0.15em" }}>
-                  {t.pinSet ? "••••••" : "⚠"}
-                </div>
-              </div>
+
               {/* Class count */}
               <div style={{ textAlign:"center", minWidth:"60px", flexShrink:0 }}>
                 <div style={{ fontSize:"1.2rem", fontWeight:700, color:NAVY }}>{t.classIds?.length || 0}</div>

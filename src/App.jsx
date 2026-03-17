@@ -4,6 +4,18 @@ import TeacherShell from "./TeacherShell";
 import { API } from "./shared/constants";
 
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
+const SESSION_KEY = "mathready_session";
+
+// Persist / restore session across refresh (sessionStorage = tab lifetime only)
+function saveSession(data) {
+  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(data)); } catch {}
+}
+function loadSession() {
+  try { const s = sessionStorage.getItem(SESSION_KEY); return s ? JSON.parse(s) : null; } catch { return null; }
+}
+function clearSession() {
+  try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+}
 
 // ── Unified Google Sign-In — tries teacher first, falls back to student ──
 function UnifiedGoogleSignIn({ onTeacher, onStudent }) {
@@ -45,13 +57,17 @@ function UnifiedGoogleSignIn({ onTeacher, onStudent }) {
       });
       if (r.ok) {
         const data = await r.json();
+        setLoading(false);
         onTeacher(data);
         return;
       }
       // 2. Not a teacher — hand credential off to student flow
+      setLoading(false);
       onStudent(response.credential);
-    } catch { setErr("Could not connect. Try again."); }
-    setLoading(false);
+    } catch {
+      setErr("Could not connect to the server. Please try again.");
+      setLoading(false);
+    }
   }
 
   if (!GOOGLE_CLIENT_ID) {
@@ -89,26 +105,65 @@ export default function App() {
   }
   const { code: urlCode, practiceClass: urlPracticeClass } = getUrlParams();
 
-  const [screen,           setScreen]           = useState(urlCode || urlPracticeClass ? "student" : "home");
-  const [teacherIdentity,  setTeacherIdentity]  = useState(null);
+  // Restore session from sessionStorage on mount
+  const restored = loadSession();
+  const [screen,           setScreen]           = useState(() => {
+    if (urlCode || urlPracticeClass) return "student";
+    if (restored?.screen === "teacher" && restored?.teacher) return "teacher";
+    return "home";
+  });
+  const [teacherIdentity,  setTeacherIdentity]  = useState(restored?.teacher || null);
   const [studentCredential,setStudentCredential] = useState(null);
+  const [adminIdentity,    setAdminIdentity]     = useState(null); // stashed admin when impersonating
 
   function reset() {
+    // If impersonating, return to admin view instead of signing out
+    if (adminIdentity) {
+      setTeacherIdentity(adminIdentity);
+      setAdminIdentity(null);
+      setScreen("teacher");
+      setStudentCredential(null);
+      return;
+    }
     window.history.replaceState({}, "", window.location.pathname);
+    clearSession();
     setScreen("home"); setTeacherIdentity(null); setStudentCredential(null);
   }
 
   function handleTeacherSuccess(data) {
-    setTeacherIdentity({
+    const teacher = {
       teacherRole: data.teacherRole,
       teacherId:   data.teacherId,
       teacherName: data.teacherName,
       classIds:    data.classIds,
-    });
+    };
+    setTeacherIdentity(teacher);
     setScreen("teacher");
+    saveSession({ screen: "teacher", teacher });
   }
 
-  if (screen === "teacher") return <TeacherShell teacher={teacherIdentity} onBack={reset}/>;
+  // Super admin: view as a specific teacher
+  function handleViewAsTeacher(impersonated) {
+    setAdminIdentity(teacherIdentity); // stash the real admin
+    setTeacherIdentity(impersonated);
+    // Don't save impersonation to session — it's temporary
+  }
+
+  // Super admin: view as student (jump to student flow)
+  function handleViewAsStudent() {
+    setAdminIdentity(teacherIdentity); // stash the real admin
+    setScreen("student");
+    setStudentCredential(null);
+  }
+
+  if (screen === "teacher") return (
+    <TeacherShell
+      teacher={teacherIdentity}
+      onBack={reset}
+      onViewAsTeacher={teacherIdentity?.teacherRole === "super_admin" ? handleViewAsTeacher : undefined}
+      onViewAsStudent={teacherIdentity?.teacherRole === "super_admin" ? handleViewAsStudent : undefined}
+    />
+  );
   if (screen === "student") return <MathTest onBack={reset} prefillCode={urlCode||undefined}
     directPracticeClassId={urlPracticeClass||undefined} prefillCredential={studentCredential}/>;
 

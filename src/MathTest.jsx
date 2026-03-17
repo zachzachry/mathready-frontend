@@ -23,10 +23,17 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
   // skip google step if credential already provided from home screen sign-in
   const [step, setStep] = useState(prefillCredential ? (prefillCode ? "code" : "choice") : "google");
   const googleBtnRef = useRef(null);
+  const [googleReady, setGoogleReady] = useState(!!window.google);
 
   // Mount Google button on the google step
   useEffect(() => {
-    if (step !== "google" || !GOOGLE_CLIENT_ID || !window.google) return;
+    if (step !== "google" || !GOOGLE_CLIENT_ID) return;
+    if (!window.google) {
+      // Wait up to 5s for the script to load
+      const timer = setTimeout(() => { if (!window.google) setGoogleReady(false); }, 5000);
+      const poll = setInterval(() => { if (window.google) { setGoogleReady(true); clearInterval(poll); clearTimeout(timer); } }, 300);
+      return () => { clearTimeout(timer); clearInterval(poll); };
+    }
     window.google.accounts.id.initialize({
       client_id: GOOGLE_CLIENT_ID,
       callback: (resp) => {
@@ -42,7 +49,7 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
         theme: "outline", size: "large", text: "signin_with", shape: "rectangular", width: 280,
       });
     }
-  }, [step]); // eslint-disable-line
+  }, [step, googleReady]); // eslint-disable-line
 
   // Step 2 — validate test code + verify stored credential against roster
   async function checkCode() {
@@ -95,7 +102,11 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
             <div style={{fontSize:"0.85rem",color:"#555",textAlign:"center",lineHeight:1.6}}>
               Use your <strong>school Google account</strong> to get started.
             </div>
-            <div ref={googleBtnRef}></div>
+            {googleReady ? <div ref={googleBtnRef}></div> : (
+              <div style={{color:"#888",fontSize:"0.85rem",textAlign:"center",padding:"0.5rem",lineHeight:1.6}}>
+                {window.google ? "Loading…" : "Google Sign-In could not load. Please check your internet connection and refresh the page."}
+              </div>
+            )}
             {err && <div style={{...S.errBox,width:"100%"}}>⚠ {err}</div>}
           </div>
         </div>
@@ -867,7 +878,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
           const stillFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
           if (!stillFs) {
             setGraceWarning(false);
-            addViolation("You exited fullscreen. Your teacher has been notified. Click below to continue.");
+            addViolation("Oops! You left the test screen. Please click below to get back to your test.");
           }
         }, 3000);
       } else {
@@ -887,8 +898,8 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
 
   // Detect tab/window blur
   useEffect(() => {
-    function onBlur()       { addViolation("You left this window. Return to your test."); }
-    function onVisibility() { if (document.hidden) addViolation("You switched tabs. Return to your test."); }
+    function onBlur()       { addViolation("Looks like you clicked away from the test. Click below to get back."); }
+    function onVisibility() { if (document.hidden) addViolation("Looks like you switched away from the test. Click below to get back."); }
     window.addEventListener("blur", onBlur);
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
@@ -1052,7 +1063,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
               <span style={{fontSize:"1.3rem"}}>&#x1F514;</span>
               <div>
                 <div style={{fontWeight:700,fontSize:"1rem"}}>Heads Up</div>
-                <div style={{fontSize:"0.72rem",opacity:.85}}>Your teacher has been notified</div>
+                <div style={{fontSize:"0.72rem",opacity:.85}}>Let's get back on track</div>
               </div>
             </div>
             <div style={{padding:"1.5rem"}}>
@@ -1077,11 +1088,10 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:"1.5rem"}}>
             <div style={{fontSize:"3rem"}}>🚫</div>
             <div style={{color:"#fff",fontSize:"1.3rem",fontWeight:700,textAlign:"center",maxWidth:"380px"}}>
-              Developer Tools Detected
+              Please Close Developer Tools
             </div>
             <div style={{color:"#ffb3b3",fontSize:"0.95rem",textAlign:"center",maxWidth:"340px",lineHeight:1.5}}>
-              Close the browser developer tools to continue your test.<br/>
-              <strong>This incident has been logged for your teacher.</strong>
+              Developer tools need to be closed before you can continue your test.
             </div>
             <div style={{color:"#888",fontSize:"0.75rem"}}>Press F12 or close the DevTools panel to dismiss this screen.</div>
           </div>
@@ -1600,12 +1610,13 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
   const [log,      setLog]      = useState([]);
   const [timeLeft, setTimeLeft] = useState(DRILL_SECS);
 
-  const levelsRef   = useRef({ add:1, sub:1, mul:1, div:1 });
-  const streaksRef  = useRef({ add:0, sub:0, mul:0, div:0 });
-  const logRef      = useRef([]);
-  const fbTimer     = useRef(null);
-  const inputRef    = useRef(null);
-  const endedRef    = useRef(false);
+  const levelsRef    = useRef({ add:1, sub:1, mul:1, div:1 });
+  const streaksRef   = useRef({ add:0, sub:0, mul:0, div:0 });
+  const logRef       = useRef([]);
+  const fbTimer      = useRef(null);
+  const inputRef     = useRef(null);
+  const endedRef     = useRef(false);
+  const drillEndTime = useRef(null); // Date.now() + DRILL_SECS*1000
 
   // Load saved levels and start drill
   useEffect(() => {
@@ -1629,15 +1640,19 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
       setLevels(lv);
       const op = pickDrillOp(lv, {});
       setProblem(genDrillProblem(op, lv[op]));
+      drillEndTime.current = Date.now() + DRILL_SECS * 1000;
       setPhase("active");
     }
     init();
   }, []); // eslint-disable-line
 
-  // Countdown timer
+  // Countdown timer — uses Date.now() to avoid drift
   useEffect(() => {
     if (phase !== "active") return;
-    const t = setInterval(() => setTimeLeft(s => Math.max(0, s - 1)), 1000);
+    const t = setInterval(() => {
+      const remaining = Math.max(0, Math.round((drillEndTime.current - Date.now()) / 1000));
+      setTimeLeft(remaining);
+    }, 250);
     return () => clearInterval(t);
   }, [phase]);
 
