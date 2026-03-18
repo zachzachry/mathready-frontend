@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useRive } from "@rive-app/react-canvas";
-import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
+import { AreaChart, Area, LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import MathText from "./shared/MathText";
 import TopBar from "./shared/TopBar";
 import { QUESTIONS as FALLBACK_QUESTIONS, START_SECS, LETTERS, S, pct, lvl, lvlC, lvlBg, lvlBd, fmtTime, now, saveSession, sendHeartbeat, API } from "./shared/constants";
@@ -1605,18 +1605,21 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
   const [levels,   setLevels]   = useState({ add:1, sub:1, mul:1, div:1 });
   const [problem,  setProblem]  = useState(null);
   const [inputVal, setInputVal] = useState("");
+  const [newBest,  setNewBest]  = useState(null); // {accuracy: bool, ppm: bool}
   const [lastInput,setLastInput]= useState("");
   const [feedback, setFeedback] = useState(null); // {correct, correctAnswer}
   const [log,      setLog]      = useState([]);
   const [timeLeft, setTimeLeft] = useState(DRILL_SECS);
 
-  const levelsRef    = useRef({ add:1, sub:1, mul:1, div:1 });
-  const streaksRef   = useRef({ add:0, sub:0, mul:0, div:0 });
-  const logRef       = useRef([]);
-  const fbTimer      = useRef(null);
-  const inputRef     = useRef(null);
-  const endedRef     = useRef(false);
-  const drillEndTime = useRef(null); // Date.now() + DRILL_SECS*1000
+  const levelsRef         = useRef({ add:1, sub:1, mul:1, div:1 });
+  const streaksRef        = useRef({ add:0, sub:0, mul:0, div:0 });
+  const logRef            = useRef([]);
+  const fbTimer           = useRef(null);
+  const inputRef          = useRef(null);
+  const endedRef          = useRef(false);
+  const drillEndTime      = useRef(null); // Date.now() + DRILL_SECS*1000
+  const personalBestsRef  = useRef({ bestAccuracy: 0, bestPPM: 0 });
+  const sessionHistoryRef = useRef([]);
 
   // Load saved levels and start drill
   useEffect(() => {
@@ -1633,6 +1636,8 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
               mul: Math.max(1, Math.min(10, d.mul || 1)),
               div: Math.max(1, Math.min(10, d.div || 1)),
             };
+            if (d.personalBests) personalBestsRef.current = d.personalBests;
+            if (d.sessions) sessionHistoryRef.current = d.sessions;
           }
         } catch (e) { console.warn("Could not load drill progress, starting from level 1:", e); }
       }
@@ -1683,6 +1688,14 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
       { n: drillNumber, accuracy: totalP ? Math.round(correctP / totalP * 100) : 0,
         correct: correctP, total: totalP, ppm: parseFloat((totalP / 3).toFixed(1)) },
     ];
+
+    // Check personal bests locally before server round-trip
+    const accuracy = totalP ? Math.round(correctP / totalP * 100) : 0;
+    const ppm = parseFloat((totalP / 3).toFixed(1));
+    const pb = personalBestsRef.current;
+    const isBestAcc = accuracy > (pb.bestAccuracy || 0);
+    const isBestPPM = ppm > (pb.bestPPM || 0);
+    if (isBestAcc || isBestPPM) setNewBest({ accuracy: isBestAcc, ppm: isBestPPM });
 
     setPhase("summary");
     fetch(`${API}/fluency/session`, {
@@ -1795,6 +1808,26 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
         <div style={{flex:1,overflowY:"auto",padding:"1.25rem 1rem 2rem"}}>
           <div style={{maxWidth:"760px",margin:"0 auto",display:"flex",flexDirection:"column",gap:"1rem"}}>
 
+            {/* ── Personal Best banner ── */}
+            {newBest && (
+              <div style={{
+                background:"linear-gradient(135deg,#ffd700 0%,#ffaa00 100%)",
+                borderRadius:"12px",padding:"0.75rem 1.25rem",
+                display:"flex",alignItems:"center",gap:"0.75rem",
+                animation:"pulseBest 0.6s ease-out",
+                boxShadow:"0 4px 20px rgba(255,215,0,0.4)"
+              }}>
+                <span style={{fontSize:"1.8rem"}}>🏆</span>
+                <div>
+                  <div style={{fontWeight:800,fontSize:"1rem",color:"#1a1a1a"}}>Personal Best!</div>
+                  <div style={{fontSize:"0.78rem",color:"#5a4500"}}>
+                    {newBest.accuracy && newBest.ppm ? "New accuracy & speed record!" :
+                     newBest.accuracy ? "New accuracy record!" : "New speed record!"}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* ── Hero row: character + stats ── */}
             <div style={{display:"flex",gap:"1rem",flexWrap:"wrap",alignItems:"stretch"}}>
 
@@ -1860,6 +1893,44 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
                 )}
               </div>
             </div>
+
+            {/* ── Level Progression Chart ── */}
+            {sessionHistoryRef.current.length >= 2 && (() => {
+              const levelData = sessionHistoryRef.current.map((s, i) => ({
+                session: i + 1,
+                Addition: s.levels?.add || 1,
+                Subtraction: s.levels?.sub || 1,
+                Multiplication: s.levels?.mul || 1,
+                Division: s.levels?.div || 1,
+              }));
+              // Append current session
+              levelData.push({
+                session: levelData.length + 1,
+                Addition: levelsRef.current.add,
+                Subtraction: levelsRef.current.sub,
+                Multiplication: levelsRef.current.mul,
+                Division: levelsRef.current.div,
+              });
+              return (
+                <div style={{...glassCard,padding:"1rem 1.25rem"}}>
+                  <div style={sectionLabel}>LEVEL PROGRESSION</div>
+                  <ResponsiveContainer width="100%" height={160}>
+                    <LineChart data={levelData} margin={{top:4,right:4,bottom:0,left:-20}}>
+                      <XAxis dataKey="session" tick={{fill:"rgba(255,255,255,0.35)",fontSize:9}}
+                        axisLine={false} tickLine={false} label={{value:"Session",position:"insideBottomRight",fill:"rgba(255,255,255,0.25)",fontSize:9,offset:-2}}/>
+                      <YAxis domain={[1,10]} tick={{fill:"rgba(255,255,255,0.35)",fontSize:9}}
+                        axisLine={false} tickLine={false}/>
+                      <Tooltip contentStyle={{background:"#0f2d4a",border:"1px solid rgba(255,255,255,0.15)",borderRadius:"8px",fontSize:"0.72rem",color:"#fff"}}/>
+                      <Legend wrapperStyle={{fontSize:"0.68rem",color:"rgba(255,255,255,0.6)"}}/>
+                      <Line type="monotone" dataKey="Addition" stroke="#4ecdc4" strokeWidth={2} dot={{r:2}} />
+                      <Line type="monotone" dataKey="Subtraction" stroke="#ff6b6b" strokeWidth={2} dot={{r:2}} />
+                      <Line type="monotone" dataKey="Multiplication" stroke="#ffd166" strokeWidth={2} dot={{r:2}} />
+                      <Line type="monotone" dataKey="Division" stroke="#a78bfa" strokeWidth={2} dot={{r:2}} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              );
+            })()}
 
             {/* ── Math Levels ── */}
             <div style={{...glassCard,overflow:"hidden"}}>
@@ -1973,9 +2044,11 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
     <div style={{display:"flex",flexDirection:"column",height:"100vh",fontFamily:"sans-serif",background:"#e8edf2"}}>
       {/* Header */}
       <div style={{background:opColor,color:"#fff",padding:"0.75rem 1.25rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0,width:"100%",boxSizing:"border-box"}}>
+        {!(cls?.hideTimer ?? true) && (
         <div style={{fontFamily:"monospace",fontWeight:700,fontSize:"1.4rem",background:"rgba(0,0,0,0.25)",padding:"3px 12px",borderRadius:"4px",color:timeColor,minWidth:"68px",textAlign:"center",flexShrink:0}}>
           {String(Math.floor(timeLeft/60)).padStart(2,"0")}:{String(timeLeft%60).padStart(2,"0")}
         </div>
+        )}
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontWeight:700,fontSize:"0.9rem"}}>{OP_LABEL[problem.op]} — Level {problem.level}</div>
           <div style={{fontSize:"0.72rem",opacity:.8}}>{LEVEL_DEFS[problem.op][problem.level-1].desc}</div>
@@ -2362,10 +2435,19 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
       mode: isDrill ? "drill" : "test",
     };
     try {
-      await fetch(`${API}/submit`, {
+      const r = await fetch(`${API}/submit`, {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify(enriched),
       });
+      // Use server-authoritative score (server re-grades against answer key)
+      if (r.ok) {
+        const data = await r.json();
+        if (data.score !== undefined) {
+          enriched.score = data.score;
+          enriched.total = data.total;
+          enriched.pct   = data.pct;
+        }
+      }
     } catch (e) {
       console.warn("Failed to submit test results to server:", e);
       alert("Your test could not be saved to the server. Please let your teacher know so they can help recover your results.");

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { QUESTIONS, lvl, lvlC, lvlBg, lvlBd, loadSessions, clearSessions, API } from "./shared/constants";
 import { generateClassReport } from "./generateReport";
 
@@ -282,6 +282,8 @@ export default function Dashboard({ teacher, readOnly }) {
   const [clearing, setClearing] = useState(false);
   const [clearModal, setClearModal] = useState(false);
   const [roster,   setRoster]   = useState([]);
+  const [fluencyReport, setFluencyReport] = useState([]);
+  const [leaderboard,   setLeaderboard]   = useState([]);
 
   // Growth filters
   const [growthClass,   setGrowthClass]   = useState("all");
@@ -291,14 +293,28 @@ export default function Dashboard({ teacher, readOnly }) {
 
   const refresh = useCallback(async () => {
     try {
+      const classFilter = teacher && teacher.classIds !== null && teacher.classIds.length > 0
+        ? "?classIds="+teacher.classIds.join(",") : teacher && teacher.classIds !== null ? "?classIds=" : "";
       const [s, r, q] = await Promise.all([
-        fetch(`${API}/sessions${teacher && teacher.classIds !== null ? "?classIds="+teacher.classIds.join(",") : ""}`).then(r=>r.json()),
-        fetch(`${API}/roster${teacher && teacher.classIds !== null ? "?classIds="+teacher.classIds.join(",") : ""}`).then(r=>r.json()),
+        fetch(`${API}/sessions${classFilter}`).then(r=>r.json()),
+        fetch(`${API}/roster${classFilter}`).then(r=>r.json()),
         fetch(`${API}/questions`).then(r=>r.json()).catch(()=>[]),
       ]);
       setSessions(Array.isArray(s) ? s : []);
-      setRoster(Array.isArray(r) ? r : []);
+      const rosterArr = Array.isArray(r) ? r : [];
+      setRoster(rosterArr);
       if (Array.isArray(q) && q.length > 0) setBankQ(q);
+      // Fetch fluency reports and leaderboards per class
+      try {
+        const reports = await Promise.all(
+          rosterArr.map(c => fetch(`${API}/fluency/class/${c.id}/report`).then(r=>r.json()).catch(()=>[]))
+        );
+        setFluencyReport(rosterArr.map((c, i) => ({ classId: c.id, className: c.name, students: reports[i] || [] })));
+        const boards = await Promise.all(
+          rosterArr.map(c => fetch(`${API}/fluency/class/${c.id}/leaderboard`).then(r=>r.json()).catch(()=>[]))
+        );
+        setLeaderboard(rosterArr.map((c, i) => ({ classId: c.id, className: c.name, top5: boards[i] || [] })));
+      } catch (e) { console.warn("Failed to load fluency reports:", e); }
     } catch { setSessions([]); }
     setLoading(false);
   }, []);
@@ -692,7 +708,8 @@ export default function Dashboard({ teacher, readOnly }) {
     }
 
     if (tab === "drills") {
-      if (drillSessions.length === 0) return (
+      const hasFluency = fluencyReport.some(c => c.students.some(s => s.sessionCount > 0));
+      if (drillSessions.length === 0 && !hasFluency) return (
         <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"3rem",textAlign:"center",color:"#aaa",maxWidth:"600px"}}>
           <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>🎯</div>
           <div style={{fontSize:"1rem",fontWeight:600,color:"#555",marginBottom:"4px"}}>No drill data yet</div>
@@ -785,6 +802,58 @@ export default function Dashboard({ teacher, readOnly }) {
               );
             })}
           </div>
+
+          {/* Top 5 Leaderboard per class */}
+          {leaderboard.filter(c => c.top5.length > 0).map(cls => (
+            <div key={cls.classId} style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden"}}>
+              <div style={{padding:"0.75rem 1rem",background:"#fff8e1",borderBottom:"1px solid #dde3e9",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#7a4e00",display:"flex",alignItems:"center",gap:"0.5rem"}}>
+                <span>🏆</span> TOP 5 — {cls.className.toUpperCase()}
+              </div>
+              {cls.top5.map((s, i) => (
+                <div key={i} style={{padding:"0.55rem 1rem",borderBottom:"1px solid #f0f4f8",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+                  <div style={{width:"22px",textAlign:"center",fontWeight:800,fontSize:"0.85rem",color:i===0?"#ffd700":i===1?"#aaa":i===2?"#cd7f32":"#888"}}>
+                    {i < 3 ? ["🥇","🥈","🥉"][i] : `${i+1}`}
+                  </div>
+                  <div style={{flex:1,fontSize:"0.82rem",fontWeight:600,color:"#1a1a1a"}}>{s.studentName}</div>
+                  <div style={{fontSize:"0.72rem",color:"#888"}}>{s.sessionCount} drill{s.sessionCount!==1?"s":""}</div>
+                  <div style={{fontWeight:700,fontSize:"0.88rem",color:"#1a6e2e",minWidth:"44px",textAlign:"right"}}>{s.bestAccuracy}%</div>
+                </div>
+              ))}
+            </div>
+          ))}
+
+          {/* Fluency Levels per class */}
+          {fluencyReport.filter(c => c.students.some(s => s.sessionCount > 0)).map(cls => (
+            <div key={cls.classId} style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden"}}>
+              <div style={{padding:"0.75rem 1rem",background:"#f0f4f8",borderBottom:"1px solid #dde3e9",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555"}}>
+                FLUENCY LEVELS — {cls.className.toUpperCase()}
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr repeat(4,60px) 55px 60px 55px",gap:0,fontSize:"0.68rem"}}>
+                <div style={{padding:"0.5rem 0.75rem",fontWeight:700,color:"#555",borderBottom:"2px solid #dde3e9"}}>Student</div>
+                {["Add","Sub","Mul","Div"].map(op=>(
+                  <div key={op} style={{padding:"0.5rem 0.25rem",fontWeight:700,color:"#555",textAlign:"center",borderBottom:"2px solid #dde3e9"}}>{op}</div>
+                ))}
+                <div style={{padding:"0.5rem 0.25rem",fontWeight:700,color:"#555",textAlign:"center",borderBottom:"2px solid #dde3e9"}}>Drills</div>
+                <div style={{padding:"0.5rem 0.25rem",fontWeight:700,color:"#555",textAlign:"center",borderBottom:"2px solid #dde3e9"}}>Avg %</div>
+                <div style={{padding:"0.5rem 0.25rem",fontWeight:700,color:"#555",textAlign:"center",borderBottom:"2px solid #dde3e9"}}>Trend</div>
+                {cls.students.filter(s => s.sessionCount > 0).map(s => (
+                  <React.Fragment key={s.student.id}>
+                    <div style={{padding:"0.45rem 0.75rem",borderBottom:"1px solid #f0f4f8",fontWeight:600,color:"#1a1a1a"}}>{s.student.name}</div>
+                    {["add","sub","mul","div"].map(op=>(
+                      <div key={op} style={{padding:"0.45rem 0.25rem",textAlign:"center",borderBottom:"1px solid #f0f4f8",fontWeight:700,
+                        color:s.levels[op]>=8?"#1a6e2e":s.levels[op]>=5?"#7a4e00":"#888"}}>{s.levels[op]}</div>
+                    ))}
+                    <div style={{padding:"0.45rem 0.25rem",textAlign:"center",borderBottom:"1px solid #f0f4f8",color:"#888"}}>{s.sessionCount}</div>
+                    <div style={{padding:"0.45rem 0.25rem",textAlign:"center",borderBottom:"1px solid #f0f4f8",fontWeight:700,
+                      color:s.avgAccuracy>=80?"#1a6e2e":s.avgAccuracy>=60?"#7a4e00":"#8b1a1a"}}>{s.avgAccuracy}%</div>
+                    <div style={{padding:"0.45rem 0.25rem",textAlign:"center",borderBottom:"1px solid #f0f4f8",fontSize:"0.85rem"}}>
+                      {s.trend === "improving" ? "📈" : s.trend === "declining" ? "📉" : "➡️"}
+                    </div>
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       );
     }

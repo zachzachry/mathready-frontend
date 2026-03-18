@@ -842,6 +842,31 @@ export default function RosterManager({ teacher, readOnly }) {
                   {activeClassData.students.length} student{activeClassData.students.length!==1?"s":""}
                 </div>
               </div>
+              {!readOnly && (
+                <label style={{display:"flex",alignItems:"center",gap:"0.5rem",fontSize:"0.78rem",color:"#555",cursor:"pointer",userSelect:"none"}}>
+                  <span>Hide drill timer</span>
+                  <div onClick={async () => {
+                    const newVal = !(activeClassData.hideTimer ?? true);
+                    try {
+                      await fetch(`${API}/roster/class/${activeClassData.id}`, {
+                        method:"PUT", headers:{"Content-Type":"application/json"},
+                        body: JSON.stringify({ hideTimer: newVal })
+                      });
+                      load();
+                    } catch (e) { console.warn("Failed to update hideTimer:", e); }
+                  }} style={{
+                    width:36,height:20,borderRadius:10,
+                    background:(activeClassData.hideTimer ?? true) ? "#003865" : "#ccc",
+                    position:"relative",cursor:"pointer",transition:"background 0.2s"
+                  }}>
+                    <div style={{
+                      width:16,height:16,borderRadius:8,background:"#fff",position:"absolute",top:2,
+                      left:(activeClassData.hideTimer ?? true) ? 18 : 2,transition:"left 0.2s",
+                      boxShadow:"0 1px 3px rgba(0,0,0,0.3)"
+                    }}/>
+                  </div>
+                </label>
+              )}
             </div>
 
             {/* Add students */}

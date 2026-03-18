@@ -266,7 +266,7 @@ function AssignClassesModal({ test, onSave, onClose, teacher }) {
   const [saving,   setSaving]   = useState(false);
 
   useEffect(() => {
-    const classFilter = teacher?.classIds !== null && teacher?.classIds?.length
+    const classFilter = teacher?.classIds !== null
       ? `?classIds=${teacher.classIds.join(",")}`
       : "";
     fetch(`${API}/roster${classFilter}`).then(r=>r.json()).then(d=>setClasses(Array.isArray(d)?d:[])).catch(()=>{});
@@ -382,7 +382,7 @@ export default function TestBuilder({ teacher, readOnly }) {
 
   useEffect(()=>{
     loadBank(); loadActive(); loadSavedTests();
-    const classFilter = teacher?.classIds !== null && teacher?.classIds?.length
+    const classFilter = teacher?.classIds !== null
       ? `?classIds=${teacher.classIds.join(",")}`
       : "";
     fetch(`${API}/roster${classFilter}`).then(r=>r.json()).then(d=>setAllClasses(Array.isArray(d)?d:[])).catch(()=>{});
