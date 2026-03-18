@@ -3,7 +3,7 @@ import { useRive } from "@rive-app/react-canvas";
 import { AreaChart, Area, LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import MathText from "./shared/MathText";
 import TopBar from "./shared/TopBar";
-import { QUESTIONS as FALLBACK_QUESTIONS, START_SECS, LETTERS, S, pct, lvl, lvlC, lvlBg, lvlBd, fmtTime, now, saveSession, sendHeartbeat, API } from "./shared/constants";
+import { QUESTIONS as FALLBACK_QUESTIONS, START_SECS, LETTERS, S, T, pct, lvl, lvlC, lvlBg, lvlBd, fmtTime, now, saveSession, sendHeartbeat, API } from "./shared/constants";
 import { buildWeightMap, updateSessionWeights, pickAdaptiveQuestion, ALL_STANDARDS, generateDrill } from "./adaptive";
 import PlotGrid from "./shared/PlotGrid";
 
@@ -88,9 +88,9 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
   // ── Google Sign-In screen ──
   if (step === "google") return (
     <div style={S.page}>
-      <div style={{background:"#003865",width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
-        {onBack && <button onClick={onBack} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"6px 14px",cursor:"pointer",fontSize:"0.8rem"}}>← Back</button>}
-        <div style={{color:"#fff",fontSize:"0.95rem",fontWeight:700}}>Georgia Milestones Readiness Trainer</div>
+      <div style={{background:T.midnight,width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
+        {onBack && <button onClick={onBack} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:T.white,borderRadius:T.xs,padding:"6px 14px",cursor:"pointer",fontSize:"0.8rem"}}>← Back</button>}
+        <div style={{color:T.white,fontSize:"0.95rem",fontWeight:700}}>Georgia Milestones Readiness Trainer</div>
       </div>
       <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem 1rem",width:"100%"}}>
         <div style={S.card}>
@@ -99,11 +99,11 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
             <div style={S.hdrTitle}>Sign in with Google</div>
           </div>
           <div style={{padding:"1.75rem 2rem",display:"flex",flexDirection:"column",alignItems:"center",gap:"1.25rem"}}>
-            <div style={{fontSize:"0.85rem",color:"#555",textAlign:"center",lineHeight:1.6}}>
+            <div style={{fontSize:"0.85rem",color:T.textSecondary,textAlign:"center",lineHeight:1.6}}>
               Use your <strong>school Google account</strong> to get started.
             </div>
             {googleReady ? <div ref={googleBtnRef}></div> : (
-              <div style={{color:"#888",fontSize:"0.85rem",textAlign:"center",padding:"0.5rem",lineHeight:1.6}}>
+              <div style={{color:T.textSecondary,fontSize:"0.85rem",textAlign:"center",padding:"0.5rem",lineHeight:1.6}}>
                 {window.google ? "Loading…" : "Google Sign-In could not load. Please check your internet connection and refresh the page."}
               </div>
             )}
@@ -117,13 +117,13 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
   // ── Choice screen ──
   if (step === "choice") return (
     <div style={S.page}>
-      <div style={{background:"#003865",width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
-        <button onClick={()=>{setStep("google");setErr("");}} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"6px 14px",cursor:"pointer",fontSize:"0.8rem"}}>← Back</button>
-        <div style={{color:"#fff",fontSize:"0.95rem",fontWeight:700}}>Georgia Milestones Readiness Trainer</div>
+      <div style={{background:T.midnight,width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
+        <button onClick={()=>{setStep("google");setErr("");}} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:T.white,borderRadius:T.xs,padding:"6px 14px",cursor:"pointer",fontSize:"0.8rem"}}>← Back</button>
+        <div style={{color:T.white,fontSize:"0.95rem",fontWeight:700}}>Georgia Milestones Readiness Trainer</div>
       </div>
       <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem 1rem",width:"100%"}}>
         <div style={{display:"flex",flexDirection:"column",gap:"1rem",width:"100%",maxWidth:"360px"}}>
-          <div style={{textAlign:"center",fontSize:"0.85rem",color:"#666",marginBottom:"0.25rem"}}>Signed in. What would you like to do?</div>
+          <div style={{textAlign:"center",fontSize:"0.85rem",color:T.textSecondary,marginBottom:"0.25rem"}}>Signed in. What would you like to do?</div>
           <button onClick={async () => {
             setChecking(true); setErr("");
             try {
@@ -137,19 +137,19 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
             } catch { setErr("Could not connect. Try again."); }
             setChecking(false);
           }} disabled={checking}
-            style={{background:"#fff",border:"2px solid #7a4500",borderRadius:"8px",padding:"1.5rem 2rem",cursor:"pointer",display:"flex",alignItems:"center",gap:"1.25rem",boxShadow:"0 2px 8px rgba(0,0,0,.06)",textAlign:"left",opacity:checking?0.6:1}}>
+            style={{background:T.white,border:`2px solid ${T.warning}`,borderRadius:T.r,padding:"1.5rem 2rem",cursor:"pointer",display:"flex",alignItems:"center",gap:"1.25rem",boxShadow:"0 2px 8px rgba(0,0,0,.06)",textAlign:"left",opacity:checking?0.6:1}}>
             <div style={{width:"52px",height:"52px",borderRadius:"50%",background:"#fff8f0",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.6rem",flexShrink:0}}>⚡</div>
             <div>
-              <div style={{fontSize:"1.1rem",fontWeight:700,color:"#7a4500",marginBottom:"3px"}}>Fluency Drill</div>
-              <div style={{fontSize:"0.8rem",color:"#888"}}>3-min adaptive fact practice</div>
+              <div style={{fontSize:"1.1rem",fontWeight:700,color:T.warning,marginBottom:"3px"}}>Fluency Drill</div>
+              <div style={{fontSize:"0.8rem",color:T.textSecondary}}>3-min adaptive fact practice</div>
             </div>
           </button>
           <button onClick={()=>{setErr(""); setStep("code");}} disabled={checking}
-            style={{background:"#fff",border:"2px solid #003865",borderRadius:"8px",padding:"1.5rem 2rem",cursor:"pointer",display:"flex",alignItems:"center",gap:"1.25rem",boxShadow:"0 2px 8px rgba(0,0,0,.06)",textAlign:"left",opacity:checking?0.6:1}}>
-            <div style={{width:"52px",height:"52px",borderRadius:"50%",background:"#f0f4f8",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.6rem",flexShrink:0}}>📝</div>
+            style={{background:T.white,border:`2px solid ${T.midnight}`,borderRadius:T.r,padding:"1.5rem 2rem",cursor:"pointer",display:"flex",alignItems:"center",gap:"1.25rem",boxShadow:"0 2px 8px rgba(0,0,0,.06)",textAlign:"left",opacity:checking?0.6:1}}>
+            <div style={{width:"52px",height:"52px",borderRadius:"50%",background:T.surfaceAlt,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.6rem",flexShrink:0}}>📝</div>
             <div>
-              <div style={{fontSize:"1.1rem",fontWeight:700,color:"#003865",marginBottom:"3px"}}>Take a Test</div>
-              <div style={{fontSize:"0.8rem",color:"#888"}}>Enter the code from your teacher</div>
+              <div style={{fontSize:"1.1rem",fontWeight:700,color:T.midnight,marginBottom:"3px"}}>Take a Test</div>
+              <div style={{fontSize:"0.8rem",color:T.textSecondary}}>Enter the code from your teacher</div>
             </div>
           </button>
           {err && <div style={{...S.errBox}}>⚠ {err}</div>}
@@ -161,9 +161,9 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
   // ── Code entry screen ──
   if (step === "code") return (
     <div style={S.page}>
-      <div style={{background:"#003865",width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
-        <button onClick={()=>{setStep("choice");setErr("");}} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"6px 14px",cursor:"pointer",fontSize:"0.8rem"}}>← Back</button>
-        <div style={{color:"#fff",fontSize:"0.95rem",fontWeight:700}}>Georgia Milestones Readiness Trainer</div>
+      <div style={{background:T.midnight,width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
+        <button onClick={()=>{setStep("choice");setErr("");}} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:T.white,borderRadius:T.xs,padding:"6px 14px",cursor:"pointer",fontSize:"0.8rem"}}>← Back</button>
+        <div style={{color:T.white,fontSize:"0.95rem",fontWeight:700}}>Georgia Milestones Readiness Trainer</div>
       </div>
       <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem 1rem",width:"100%"}}>
         <div style={S.card}>
@@ -229,13 +229,13 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
               </div>
             ))}
           </div>
-          <div style={{background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"3px",padding:"0.65rem 1rem",marginBottom:"0.75rem",fontSize:"0.8rem",color:"#7a4e00"}}>
+          <div style={{background:T.warningBg,border:`1px solid ${T.warningBd}`,borderRadius:T.xs,padding:"0.65rem 1rem",marginBottom:"0.75rem",fontSize:"0.8rem",color:T.warning}}>
             {testInfo.type === "drill"
               ? "⚡ Once you click Begin, your 3-minute drill starts immediately. Answer as many problems as you can!"
               : "⚠ Once you click Begin Test, your timer starts immediately."}
           </div>
           {testInfo.oneAttempt && (
-            <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"3px",padding:"0.65rem 1rem",marginBottom:"1.25rem",fontSize:"0.8rem",color:"#8b1a1a",display:"flex",alignItems:"center",gap:"0.5rem"}}>
+            <div style={{background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:T.xs,padding:"0.65rem 1rem",marginBottom:"1.25rem",fontSize:"0.8rem",color:T.dangerText,display:"flex",alignItems:"center",gap:"0.5rem"}}>
               🚫 <span><strong>One attempt only.</strong> Once you submit, you cannot retake this test.</span>
             </div>
           )}
@@ -364,8 +364,8 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
   }
 
   if (loading) return (
-    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#e8edf2",fontFamily:"sans-serif"}}>
-      <div style={{textAlign:"center",color:"#777"}}>
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#e8edf2",fontFamily:T.font}}>
+      <div style={{textAlign:"center",color:T.textSecondary}}>
         <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>🎯</div>
         <div>Building your practice session…</div>
       </div>
@@ -386,9 +386,9 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
   const questionNum  = history.length + 1;
 
   return (
-    <div style={{display:"flex",flexDirection:"column",minHeight:"100vh",fontFamily:"sans-serif",background:"#e8edf2"}}>
+    <div style={{display:"flex",flexDirection:"column",minHeight:"100vh",fontFamily:T.font,background:"#e8edf2"}}>
       {/* Header */}
-      <div style={{background:"#1a6e2e",color:"#fff",padding:"0.75rem 1.5rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
+      <div style={{background:T.success,color:T.white,padding:"0.75rem 1.5rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
         <div style={{fontSize:"1rem",fontWeight:700}}>🎯 Practice Mode</div>
         <div style={{marginLeft:"auto",display:"flex",gap:"1.25rem",alignItems:"center"}}>
           {streak >= 3 && <div style={{fontSize:"0.75rem",background:"rgba(255,255,255,.2)",padding:"3px 10px",borderRadius:"12px",fontWeight:700}}>🔥 {streak} streak!</div>}
@@ -405,7 +405,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
             <div style={{fontSize:"0.82rem",fontWeight:600}}>{student?.name}</div>
           </div>
           <button onClick={handleQuit}
-            style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"5px 12px",cursor:"pointer",fontSize:"0.75rem",fontWeight:600}}>
+            style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:T.white,borderRadius:T.xs,padding:"5px 12px",cursor:"pointer",fontSize:"0.75rem",fontWeight:600}}>
             Quit
           </button>
         </div>
@@ -415,9 +415,9 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
       <div style={{background:"#155a27",color:"#a8e6b8",padding:"0.4rem 1.5rem",fontSize:"0.8rem",display:"flex",gap:"1rem",alignItems:"center"}}>
         <span>Question {questionNum} of {LIMIT}</span>
         <span style={{opacity:.6}}>·</span>
-        <span style={{color:"#fff",fontWeight:700}}>{q.standard}</span>
+        <span style={{color:T.white,fontWeight:700}}>{q.standard}</span>
         {q.dok && <><span style={{opacity:.6}}>·</span><span>DOK {q.dok}</span></>}
-        {q.parametric && <span style={{background:"rgba(255,255,255,.2)",borderRadius:"8px",padding:"1px 7px",fontSize:"0.65rem",fontWeight:700}}>⚡ Generated</span>}
+        {q.parametric && <span style={{background:"rgba(255,255,255,.2)",borderRadius:T.r,padding:"1px 7px",fontSize:"0.65rem",fontWeight:700}}>⚡ Generated</span>}
       </div>
 
       {/* Question area */}
@@ -425,7 +425,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
         <div style={{width:"100%",maxWidth:"680px",display:"flex",flexDirection:"column",gap:"1rem"}}>
 
           {/* Question card */}
-          <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"6px",padding:"1.5rem 1.75rem",boxShadow:"0 2px 8px rgba(0,0,0,.05)"}}>
+          <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:"6px",padding:"1.5rem 1.75rem",boxShadow:"0 2px 8px rgba(0,0,0,.05)"}}>
             <p style={{fontSize:"1.08rem",fontFamily:"Georgia,serif",color:"#0f0f0f",lineHeight:1.75,margin:0}}>
               <MathText text={q.question}/>
             </p>
@@ -450,29 +450,29 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
                 onChange={e => !revealed && handleChoose(e.target.value)}
                 disabled={revealed}
                 placeholder="Type your answer…"
-                style={{width:"100%",maxWidth:"260px",padding:"0.8rem 1rem",fontSize:"1.3rem",fontFamily:"monospace",fontWeight:700,border:`2px solid ${revealed?(String(selected??"").trim().toLowerCase()===correct?"#1a6e2e":"#8b1a1a"):"#003865"}`,borderRadius:"4px",outline:"none",background:"#fafbfc",color:"#0f0f0f"}}
+                style={{width:"100%",maxWidth:"260px",padding:"0.8rem 1rem",fontSize:"1.3rem",fontFamily:"monospace",fontWeight:700,border:`2px solid ${revealed?(String(selected??"").trim().toLowerCase()===correct?T.success:T.dangerText):T.midnight}`,borderRadius:"4px",outline:"none",background:T.surface,color:"#0f0f0f"}}
               />
               {!revealed && selected && (
                 <button onClick={() => handleChoose(selected)}
-                  style={{background:"#003865",color:"#fff",border:"none",borderRadius:"4px",padding:"0.65rem 1.25rem",fontSize:"0.9rem",fontWeight:700,cursor:"pointer"}}>
+                  style={{background:T.midnight,color:T.white,border:"none",borderRadius:"4px",padding:"0.65rem 1.25rem",fontSize:"0.9rem",fontWeight:700,cursor:"pointer"}}>
                   Submit →
                 </button>
               )}
             </div>
           ) : q.type === "multiselect" ? (
             <div style={{display:"flex",flexDirection:"column",gap:"0.6rem"}}>
-              <div style={{fontSize:"0.7rem",color:"#888",marginBottom:"4px"}}>Select all that apply.</div>
+              <div style={{fontSize:"0.7rem",color:T.textSecondary,marginBottom:"4px"}}>Select all that apply.</div>
               {q.choices.map((choice, i) => {
                 const selArr = (() => { try { return selected ? JSON.parse(selected) : []; } catch { return []; } })();
                 const isChosen = selArr.includes(choice);
                 const correctArr = Array.isArray(q.answer) ? q.answer : [];
                 const isInCorrect = correctArr.includes(choice);
-                let bg = "#fff", border = "2px solid #c8d3dd";
+                let bg = T.white, border = `2px solid ${T.border}`;
                 if (revealed) {
-                  if (isInCorrect)    { bg="#f0faf2"; border="2px solid #1a6e2e"; }
-                  else if (isChosen)  { bg="#fdf2f2"; border="2px solid #8b1a1a"; }
-                  else                { bg="#fafbfc"; border="2px solid #e0e0e0"; }
-                } else if (isChosen) { bg="#ddeaf7"; border="2px solid #003865"; }
+                  if (isInCorrect)    { bg=T.successBg; border=`2px solid ${T.success}`; }
+                  else if (isChosen)  { bg=T.dangerBg; border=`2px solid ${T.dangerText}`; }
+                  else                { bg=T.surface; border="2px solid #e0e0e0"; }
+                } else if (isChosen) { bg="#ddeaf7"; border=`2px solid ${T.midnight}`; }
                 return (
                   <button key={i}
                     onClick={() => {
@@ -482,8 +482,8 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
                     }}
                     disabled={revealed}
                     style={{background:bg,border,borderRadius:"6px",padding:"0.9rem 1.25rem",textAlign:"left",cursor:revealed?"default":"pointer",display:"flex",alignItems:"center",gap:"1rem",transition:"all .15s"}}>
-                    <div style={{width:"22px",height:"22px",borderRadius:"3px",border:`2px solid ${revealed?(isInCorrect?"#1a6e2e":isChosen?"#8b1a1a":"#ddd"):"#9aabba"}`,background:revealed?(isInCorrect?"#1a6e2e":isChosen?"#8b1a1a":"#f0f0f0"):(isChosen?"#003865":"#fff"),display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                      {(isChosen || (revealed && isInCorrect)) && <span style={{color:"#fff",fontSize:"0.8rem",fontWeight:900}}>✓</span>}
+                    <div style={{width:"22px",height:"22px",borderRadius:T.xs,border:`2px solid ${revealed?(isInCorrect?T.success:isChosen?T.dangerText:"#ddd"):"#9aabba"}`,background:revealed?(isInCorrect?T.success:isChosen?T.dangerText:"#f0f0f0"):(isChosen?T.midnight:T.white),display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      {(isChosen || (revealed && isInCorrect)) && <span style={{color:T.white,fontSize:"0.8rem",fontWeight:900}}>✓</span>}
                     </div>
                     <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",flex:1}}><MathText text={choice}/></span>
                   </button>
@@ -491,7 +491,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
               })}
               {!revealed && (
                 <button onClick={() => handleChoose(selected || "[]")}
-                  style={{background:"#003865",color:"#fff",border:"none",borderRadius:"4px",padding:"0.65rem 1.25rem",fontSize:"0.9rem",fontWeight:700,cursor:"pointer",marginTop:"0.25rem"}}>
+                  style={{background:T.midnight,color:T.white,border:"none",borderRadius:"4px",padding:"0.65rem 1.25rem",fontSize:"0.9rem",fontWeight:700,cursor:"pointer",marginTop:"0.25rem"}}>
                   Submit Selections →
                 </button>
               )}
@@ -501,18 +501,18 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
             {q.choices.map((choice, i) => {
               const isChosen  = selected === choice;
               const isCorrect = choice === correct;
-              let bg = "#fff", border = "2px solid #c8d3dd", color = "#1a1a1a";
+              let bg = T.white, border = `2px solid ${T.border}`, color = T.text;
               if (revealed) {
-                if (isCorrect)       { bg="#f0faf2"; border="2px solid #1a6e2e"; color="#1a6e2e"; }
-                else if (isChosen)   { bg="#fdf2f2"; border="2px solid #8b1a1a"; color="#8b1a1a"; }
-                else                 { bg="#fafbfc"; border="2px solid #e0e0e0"; color="#777"; }
-              } else if (isChosen)   { bg="#ddeaf7"; border="2px solid #003865"; }
+                if (isCorrect)       { bg=T.successBg; border=`2px solid ${T.success}`; color=T.success; }
+                else if (isChosen)   { bg=T.dangerBg; border=`2px solid ${T.dangerText}`; color=T.dangerText; }
+                else                 { bg=T.surface; border="2px solid #e0e0e0"; color=T.textSecondary; }
+              } else if (isChosen)   { bg="#ddeaf7"; border=`2px solid ${T.midnight}`; }
 
               return (
                 <button key={i} onClick={() => handleChoose(choice)} disabled={revealed}
                   style={{background:bg,border,borderRadius:"6px",padding:"0.9rem 1.25rem",textAlign:"left",cursor:revealed?"default":"pointer",display:"flex",alignItems:"center",gap:"1rem",transition:"all .15s"}}>
-                  <div style={{width:"30px",height:"30px",borderRadius:"50%",border:`2px solid ${revealed?(isCorrect?"#1a6e2e":isChosen?"#8b1a1a":"#ddd"):"#9aabba"}`,background:revealed?(isCorrect?"#1a6e2e":isChosen?"#8b1a1a":"#f0f0f0"):(isChosen?"#003865":"#fff"),display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    <span style={{fontSize:"0.75rem",fontWeight:700,color:revealed?(isCorrect||isChosen?"#fff":"#777"):(isChosen?"#fff":"#667")}}>
+                  <div style={{width:"30px",height:"30px",borderRadius:"50%",border:`2px solid ${revealed?(isCorrect?T.success:isChosen?T.dangerText:"#ddd"):"#9aabba"}`,background:revealed?(isCorrect?T.success:isChosen?T.dangerText:"#f0f0f0"):(isChosen?T.midnight:T.white),display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <span style={{fontSize:"0.75rem",fontWeight:700,color:revealed?(isCorrect||isChosen?T.white:T.textSecondary):(isChosen?T.white:"#667")}}>
                       {revealed && isCorrect ? "✓" : revealed && isChosen ? "✗" : LETTERS[i]}
                     </span>
                   </div>
@@ -540,8 +540,8 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
                 : q.type==="keypad" ? String(q.answer??"")
                 : correct;
               return (
-            <div style={{borderRadius:"6px",padding:"1rem 1.25rem",background:isOk?"#f0faf2":"#fdf2f2",border:`1px solid ${isOk?"#b3dfc0":"#f0b8b8"}`}}>
-              <div style={{fontSize:"1rem",fontWeight:700,color:isOk?"#1a6e2e":"#8b1a1a",marginBottom:q.explanation?"6px":0}}>
+            <div style={{borderRadius:"6px",padding:"1rem 1.25rem",background:isOk?T.successBg:T.dangerBg,border:`1px solid ${isOk?T.successBd:T.dangerBd}`}}>
+              <div style={{fontSize:"1rem",fontWeight:700,color:isOk?T.success:T.dangerText,marginBottom:q.explanation?"6px":0}}>
                 {isOk ? "✓ Correct!" : <span>✗ The correct answer is: <MathText text={correctLabel}/></span>}
               </div>
               {q.explanation && (
@@ -556,11 +556,11 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
           {(revealed || (q.type==="plotpoint" && selected)) && (
             <div style={{display:"flex",gap:"0.75rem"}}>
               <button onClick={handleNext}
-                style={{flex:1,background:"#003865",border:"none",borderRadius:"6px",padding:"0.85rem",fontSize:"0.95rem",cursor:"pointer",color:"#fff",fontWeight:700}}>
+                style={{flex:1,background:T.midnight,border:"none",borderRadius:"6px",padding:"0.85rem",fontSize:"0.95rem",cursor:"pointer",color:T.white,fontWeight:700}}>
                 {(q.type==="plotpoint"||q.type==="keypad"||q.type==="multiselect") && !revealed ? "Submit Answer →" : "Next Question →"}
               </button>
               <button onClick={handleQuit}
-                style={{background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"6px",padding:"0.85rem 1.25rem",fontSize:"0.85rem",cursor:"pointer",color:"#555",fontWeight:600}}>
+                style={{background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:"6px",padding:"0.85rem 1.25rem",fontSize:"0.85rem",cursor:"pointer",color:T.textSecondary,fontWeight:600}}>
                 Finish
               </button>
             </div>
@@ -575,39 +575,39 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
 function PracticeResults({ session, history, onReset }) {
   const p = session.pct;
   return (
-    <div style={{minHeight:"100vh",background:"#e8edf2",fontFamily:"sans-serif",display:"flex",flexDirection:"column"}}>
-      <div style={{background:"#1a6e2e",color:"#fff",padding:"0.85rem 1.5rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+    <div style={{minHeight:"100vh",background:"#e8edf2",fontFamily:T.font,display:"flex",flexDirection:"column"}}>
+      <div style={{background:T.success,color:T.white,padding:"0.85rem 1.5rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
         <div style={{fontSize:"1rem",fontWeight:700}}>🎯 Practice Session Complete</div>
       </div>
       <div style={{flex:1,display:"flex",justifyContent:"center",padding:"2rem 1rem"}}>
-        <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"6px",width:"100%",maxWidth:"640px",boxShadow:"0 2px 12px rgba(0,0,0,.07)",overflow:"hidden"}}>
+        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:"6px",width:"100%",maxWidth:"640px",boxShadow:"0 2px 12px rgba(0,0,0,.07)",overflow:"hidden"}}>
           {/* Score header */}
-          <div style={{background:"#f0faf2",borderBottom:"1px solid #c8d3dd",padding:"1.5rem 1.75rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{background:T.successBg,borderBottom:`1px solid ${T.border}`,padding:"1.5rem 1.75rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div>
-              <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#888",marginBottom:"4px"}}>PRACTICE SCORE</div>
-              <div style={{fontSize:"1rem",fontWeight:700,color:"#1a1a1a"}}>{session.studentName}</div>
+              <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"4px"}}>PRACTICE SCORE</div>
+              <div style={{fontSize:"1rem",fontWeight:700,color:T.text}}>{session.studentName}</div>
               <div style={{fontSize:"2rem",fontWeight:700,color:lvlC(p),fontFamily:"Georgia,serif",marginTop:"4px"}}>{session.score}/{session.total} <span style={{fontSize:"1rem",opacity:.6}}>({p}%)</span></div>
             </div>
             <div style={{textAlign:"right"}}>
-              <div style={{fontSize:"0.62rem",color:"#888",marginBottom:"4px"}}>TIME</div>
-              <div style={{fontSize:"1.1rem",fontWeight:700,color:"#003865",fontFamily:"monospace"}}>{session.timeUsed}</div>
-              <div style={{marginTop:"8px",fontSize:"0.75rem",background:"#ddeaf7",color:"#003865",border:"1px solid #9dbfe0",borderRadius:"3px",padding:"3px 10px",fontWeight:700}}>📝 PRACTICE</div>
+              <div style={{fontSize:"0.62rem",color:T.textSecondary,marginBottom:"4px"}}>TIME</div>
+              <div style={{fontSize:"1.1rem",fontWeight:700,color:T.midnight,fontFamily:"monospace"}}>{session.timeUsed}</div>
+              <div style={{marginTop:"8px",fontSize:"0.75rem",background:"#ddeaf7",color:T.midnight,border:"1px solid #9dbfe0",borderRadius:T.xs,padding:"3px 10px",fontWeight:700}}>📝 PRACTICE</div>
             </div>
           </div>
 
           {/* Per-question review */}
           <div style={{padding:"1.25rem 1.5rem"}}>
-            <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"0.75rem"}}>QUESTION REVIEW</div>
+            <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"0.75rem"}}>QUESTION REVIEW</div>
             {history.map((item, i) => {
               const { q, chosen, correct: isCorrect } = item;
               return (
-                <div key={q.id} style={{display:"flex",gap:"0.75rem",marginBottom:"0.6rem",padding:"0.75rem 0.9rem",background:isCorrect?"#f0faf2":"#fdf2f2",border:`1px solid ${isCorrect?"#b3dfc0":"#f0b8b8"}`,borderRadius:"4px"}}>
-                  <div style={{width:"22px",height:"22px",borderRadius:"50%",background:isCorrect?"#1a6e2e":"#8b1a1a",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:"2px"}}>
-                    <span style={{color:"#fff",fontSize:"0.7rem",fontWeight:700}}>{i+1}</span>
+                <div key={q.id} style={{display:"flex",gap:"0.75rem",marginBottom:"0.6rem",padding:"0.75rem 0.9rem",background:isCorrect?T.successBg:T.dangerBg,border:`1px solid ${isCorrect?T.successBd:T.dangerBd}`,borderRadius:"4px"}}>
+                  <div style={{width:"22px",height:"22px",borderRadius:"50%",background:isCorrect?T.success:T.dangerText,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:"2px"}}>
+                    <span style={{color:T.white,fontSize:"0.7rem",fontWeight:700}}>{i+1}</span>
                   </div>
                   <div style={{flex:1,fontSize:"0.82rem"}}>
-                    <div style={{color:"#777",fontSize:"0.63rem",letterSpacing:"0.08em",marginBottom:"2px"}}>{q.standard}{item.timeSecs ? ` · ${item.timeSecs}s` : ""}</div>
-                    <div style={{color:"#1a1a1a",fontFamily:"Georgia,serif",marginBottom:isCorrect?0:"4px"}}><MathText text={q.question}/></div>
+                    <div style={{color:T.textSecondary,fontSize:"0.63rem",letterSpacing:"0.08em",marginBottom:"2px"}}>{q.standard}{item.timeSecs ? ` · ${item.timeSecs}s` : ""}</div>
+                    <div style={{color:T.text,fontFamily:"Georgia,serif",marginBottom:isCorrect?0:"4px"}}><MathText text={q.question}/></div>
                     {q.type==="plotpoint" && !isCorrect && (
                       <div style={{margin:"6px 0"}}>
                         <PlotGrid answer={q.answer} placed={chosen?(()=>{try{return JSON.parse(chosen);}catch{return null;}})():null} revealed readOnly size={180}/>
@@ -615,22 +615,22 @@ function PracticeResults({ session, history, onReset }) {
                     )}
                     {!isCorrect && q.type!=="plotpoint" && (
                       <div style={{fontSize:"0.78rem"}}>
-                        <span style={{color:"#1a6e2e"}}>Correct: <strong><MathText text={q.correct}/></strong></span>
-                        {chosen && <span style={{color:"#8b1a1a"}}> · Your answer: <MathText text={chosen}/></span>}
+                        <span style={{color:T.success}}>Correct: <strong><MathText text={q.correct}/></strong></span>
+                        {chosen && <span style={{color:T.dangerText}}> · Your answer: <MathText text={chosen}/></span>}
                       </div>
                     )}
                     {q.explanation && !isCorrect && (
-                      <div style={{fontSize:"0.75rem",color:"#555",marginTop:"4px",fontStyle:"italic"}}><MathText text={q.explanation}/></div>
+                      <div style={{fontSize:"0.75rem",color:T.textSecondary,marginTop:"4px",fontStyle:"italic"}}><MathText text={q.explanation}/></div>
                     )}
                   </div>
-                  <span style={{fontWeight:700,fontSize:"0.9rem",color:isCorrect?"#1a6e2e":"#8b1a1a"}}>{isCorrect?"✓":"✗"}</span>
+                  <span style={{fontWeight:700,fontSize:"0.9rem",color:isCorrect?T.success:T.dangerText}}>{isCorrect?"✓":"✗"}</span>
                 </div>
               );
             })}
           </div>
 
-          <div style={{padding:"1rem 1.5rem",borderTop:"1px solid #dde3e9",display:"flex",gap:"0.75rem",justifyContent:"flex-end"}}>
-            <button onClick={onReset} style={{background:"#1a6e2e",color:"#fff",border:"none",borderRadius:"3px",padding:"0.65rem 1.75rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600}}>Practice Again</button>
+          <div style={{padding:"1rem 1.5rem",borderTop:`1px solid ${T.border}`,display:"flex",gap:"0.75rem",justifyContent:"flex-end"}}>
+            <button onClick={onReset} style={{background:T.success,color:T.white,border:"none",borderRadius:T.xs,padding:"0.65rem 1.75rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600}}>Practice Again</button>
           </div>
         </div>
       </div>
@@ -961,7 +961,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
   }
 
   const q = questions[cur];
-  if (!q) return <div style={{padding:"3rem",textAlign:"center",color:"#777"}}>Loading…</div>;
+  if (!q) return <div style={{padding:"3rem",textAlign:"center",color:T.textSecondary}}>Loading…</div>;
 
   const sel  = ans[q.id] ?? null;
   const isFl = flg[q.id] ?? false;
@@ -1002,20 +1002,20 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
   }
 
   return (
-    <div ref={containerRef} style={{display:"flex",flexDirection:"column",height:"100vh",fontFamily:"sans-serif",background:"#e8edf2",overflow:"hidden",userSelect:"none",WebkitUserSelect:"none"}}>
+    <div ref={containerRef} style={{display:"flex",flexDirection:"column",height:"100vh",fontFamily:T.font,background:"#e8edf2",overflow:"hidden",userSelect:"none",WebkitUserSelect:"none"}}>
 
       {/* Teacher stopped the test */}
       {stopped && (
         <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.92)",display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem"}}>
-          <div style={{background:"#fff",borderRadius:"8px",maxWidth:"420px",width:"100%",overflow:"hidden",textAlign:"center",boxShadow:"0 8px 40px rgba(0,0,0,.5)"}}>
-            <div style={{background:"#8b1a1a",color:"#fff",padding:"1.25rem"}}>
+          <div style={{background:T.white,borderRadius:T.r,maxWidth:"420px",width:"100%",overflow:"hidden",textAlign:"center",boxShadow:"0 8px 40px rgba(0,0,0,.5)"}}>
+            <div style={{background:T.dangerText,color:T.white,padding:"1.25rem"}}>
               <div style={{fontSize:"1.5rem",marginBottom:"4px"}}>🛑</div>
               <div style={{fontWeight:700,fontSize:"1.1rem"}}>Test Stopped by Teacher</div>
             </div>
             <div style={{padding:"1.5rem"}}>
               <p style={{fontSize:"0.92rem",color:"#333",marginBottom:"1.25rem"}}>Your teacher has ended the test. Please submit your answers now.</p>
               <button onClick={()=>{ setStopped(false); setModal(true); }}
-                style={{width:"100%",background:"#003865",color:"#fff",border:"none",borderRadius:"4px",padding:"0.85rem",fontSize:"0.95rem",fontWeight:700,cursor:"pointer"}}>
+                style={{width:"100%",background:T.midnight,color:T.white,border:"none",borderRadius:"4px",padding:"0.85rem",fontSize:"0.95rem",fontWeight:700,cursor:"pointer"}}>
                 Submit My Answers →
               </button>
             </div>
@@ -1026,10 +1026,10 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
       {/* Teacher paused the test */}
       {paused && !stopped && (
         <div style={{position:"fixed",inset:0,zIndex:9998,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-          <div style={{background:"#fff",borderRadius:"8px",maxWidth:"360px",width:"100%",padding:"2rem",textAlign:"center",boxShadow:"0 8px 40px rgba(0,0,0,.4)"}}>
+          <div style={{background:T.white,borderRadius:T.r,maxWidth:"360px",width:"100%",padding:"2rem",textAlign:"center",boxShadow:"0 8px 40px rgba(0,0,0,.4)"}}>
             <div style={{fontSize:"2.5rem",marginBottom:"0.5rem"}}>⏸</div>
-            <div style={{fontWeight:700,fontSize:"1.1rem",color:"#003865",marginBottom:"0.5rem"}}>Test Paused</div>
-            <div style={{fontSize:"0.85rem",color:"#666"}}>Your teacher has paused the test. Please wait.</div>
+            <div style={{fontWeight:700,fontSize:"1.1rem",color:T.midnight,marginBottom:"0.5rem"}}>Test Paused</div>
+            <div style={{fontSize:"0.85rem",color:T.textSecondary}}>Your teacher has paused the test. Please wait.</div>
           </div>
         </div>
       )}
@@ -1037,17 +1037,17 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
       {/* Grace period gentle prompt — shown immediately when fullscreen is exited, before counting a violation */}
       {graceWarning && !lockWarning && (
         <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem"}}>
-          <div style={{background:"#fff",borderRadius:"8px",maxWidth:"400px",width:"100%",overflow:"hidden",boxShadow:"0 8px 40px rgba(0,0,0,.3)"}}>
-            <div style={{background:"#003865",color:"#fff",padding:"1rem 1.5rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+          <div style={{background:T.white,borderRadius:T.r,maxWidth:"400px",width:"100%",overflow:"hidden",boxShadow:"0 8px 40px rgba(0,0,0,.3)"}}>
+            <div style={{background:T.midnight,color:T.white,padding:"1rem 1.5rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
               <span style={{fontSize:"1.3rem"}}>&#x1F4CB;</span>
               <div style={{fontWeight:700,fontSize:"1rem"}}>Please return to fullscreen to continue your test.</div>
             </div>
             <div style={{padding:"1.5rem"}}>
-              <div style={{fontSize:"0.85rem",color:"#555",marginBottom:"1.25rem",lineHeight:1.5}}>
+              <div style={{fontSize:"0.85rem",color:T.textSecondary,marginBottom:"1.25rem",lineHeight:1.5}}>
                 It looks like you left fullscreen. Click below to go back — no worries!
               </div>
               <button onClick={reEnterFullscreen}
-                style={{width:"100%",background:"#003865",color:"#fff",border:"none",borderRadius:"4px",padding:"0.75rem",fontSize:"0.9rem",fontWeight:700,cursor:"pointer"}}>
+                style={{width:"100%",background:T.midnight,color:T.white,border:"none",borderRadius:"4px",padding:"0.75rem",fontSize:"0.9rem",fontWeight:700,cursor:"pointer"}}>
                 Return to Fullscreen
               </button>
             </div>
@@ -1058,8 +1058,8 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
       {/* Lockdown warning overlay — shown after grace period expires or for non-fullscreen violations */}
       {lockWarning && (
         <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem"}}>
-          <div style={{background:"#fff",borderRadius:"8px",maxWidth:"420px",width:"100%",overflow:"hidden",boxShadow:"0 8px 40px rgba(0,0,0,.4)"}}>
-            <div style={{background:"#d97706",color:"#fff",padding:"1rem 1.5rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+          <div style={{background:T.white,borderRadius:T.r,maxWidth:"420px",width:"100%",overflow:"hidden",boxShadow:"0 8px 40px rgba(0,0,0,.4)"}}>
+            <div style={{background:"#d97706",color:T.white,padding:"1rem 1.5rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
               <span style={{fontSize:"1.3rem"}}>&#x1F514;</span>
               <div>
                 <div style={{fontWeight:700,fontSize:"1rem"}}>Heads Up</div>
@@ -1074,7 +1074,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
                 Times left fullscreen: {violations}
               </div>
               <button onClick={reEnterFullscreen}
-                style={{width:"100%",background:"#003865",color:"#fff",border:"none",borderRadius:"4px",padding:"0.75rem",fontSize:"0.9rem",fontWeight:700,cursor:"pointer"}}>
+                style={{width:"100%",background:T.midnight,color:T.white,border:"none",borderRadius:"4px",padding:"0.75rem",fontSize:"0.9rem",fontWeight:700,cursor:"pointer"}}>
                 Continue My Test
               </button>
             </div>
@@ -1087,23 +1087,23 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
           {devToolsOpen && (
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:"1.5rem"}}>
             <div style={{fontSize:"3rem"}}>🚫</div>
-            <div style={{color:"#fff",fontSize:"1.3rem",fontWeight:700,textAlign:"center",maxWidth:"380px"}}>
+            <div style={{color:T.white,fontSize:"1.3rem",fontWeight:700,textAlign:"center",maxWidth:"380px"}}>
               Please Close Developer Tools
             </div>
             <div style={{color:"#ffb3b3",fontSize:"0.95rem",textAlign:"center",maxWidth:"340px",lineHeight:1.5}}>
               Developer tools need to be closed before you can continue your test.
             </div>
-            <div style={{color:"#888",fontSize:"0.75rem"}}>Press F12 or close the DevTools panel to dismiss this screen.</div>
+            <div style={{color:T.textSecondary,fontSize:"0.75rem"}}>Press F12 or close the DevTools panel to dismiss this screen.</div>
           </div>
         )}
         {violations > 0 && (
-            <div style={{background:"rgba(255,255,255,0.15)",borderRadius:"3px",padding:"2px 8px",fontSize:"0.6rem",fontWeight:600,color:"rgba(255,255,255,0.7)"}}>
+            <div style={{background:"rgba(255,255,255,0.15)",borderRadius:T.xs,padding:"2px 8px",fontSize:"0.6rem",fontWeight:600,color:"rgba(255,255,255,0.7)"}}>
               {violations}x left fullscreen
             </div>
           )}
           <div style={{textAlign:"right"}}>
             <div style={{fontSize:"0.75rem",opacity:.6,letterSpacing:"0.08em"}}>TIME</div>
-            <div style={{fontSize:"1rem",fontWeight:"bold",fontFamily:"monospace",color:(!untimed&&secs<warnSecs)?"#ffaaaa":"#fff"}}>
+            <div style={{fontSize:"1rem",fontWeight:"bold",fontFamily:"monospace",color:(!untimed&&secs<warnSecs)?"#ffaaaa":T.white}}>
               {untimed ? "∞" : fmtTime(secs)}
             </div>
           </div>
@@ -1119,36 +1119,36 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
           <button onClick={()=>setNav(o=>!o)} style={{background:"none",border:"none",color:"#cce0f5",cursor:"pointer",fontSize:"0.7rem",padding:0}}>{nav?"◀ Hide":"▶ Nav"}</button>
           <span style={{opacity:.5}}>|</span>
           <span>{ansCount}/{TOTAL} answered</span>
-          {flgCount>0&&<><span style={{opacity:.5}}>|</span><span style={{color:"#ffd166"}}>🚩{flgCount}</span></>}
+          {flgCount>0&&<><span style={{opacity:.5}}>|</span><span style={{color:T.warningBd}}>🚩{flgCount}</span></>}
         </div>
         <span style={{opacity:.65,fontSize:"0.78rem"}}>No Calculator</span>
       </div>
 
       <div style={{display:"flex",flex:1,overflow:"hidden"}}>
         {nav&&(
-          <div style={{width:"156px",background:"#fff",borderRight:"1px solid #c8d3dd",display:"flex",flexDirection:"column",flexShrink:0,overflowY:"auto"}}>
-            <div style={{padding:"0.65rem 0.9rem",background:"#f0f4f8",borderBottom:"1px solid #dde3e9",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.14em",color:"#555"}}>QUESTIONS</div>
+          <div style={{width:"156px",background:T.white,borderRight:`1px solid ${T.border}`,display:"flex",flexDirection:"column",flexShrink:0,overflowY:"auto"}}>
+            <div style={{padding:"0.65rem 0.9rem",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.14em",color:T.textSecondary}}>QUESTIONS</div>
             <div style={{padding:"0.5rem",display:"flex",flexWrap:"wrap",gap:"4px"}}>
               {questions.map((item,i)=>{
                 const isAns=!!ans[item.id]; const isCur=i===cur; const isFg=!!flg[item.id];
-                let bg="#fafbfc", border="#bcc8d4", color="#445";
-                if (isCur)       { bg="#003865"; border="#003865"; color="#fff"; }
-                else if (isFg)   { bg="#fff8e1"; border="#ffc107"; color="#7a4e00"; }
-                else if (isAns)  { bg="#d4edda"; border="#1a6e2e"; color="#1a5c28"; }
+                let bg=T.surface, border="#bcc8d4", color="#445";
+                if (isCur)       { bg=T.midnight; border=T.midnight; color=T.white; }
+                else if (isFg)   { bg=T.warningBg; border="#ffc107"; color=T.warning; }
+                else if (isAns)  { bg="#d4edda"; border=T.success; color="#1a5c28"; }
                 return <button key={item.id} onClick={()=>setCur(i)}
-                  style={{width:"44px",height:"44px",borderRadius:"3px",border:`2px solid ${border}`,background:bg,color,fontSize:"0.75rem",fontWeight:700,cursor:"pointer",position:"relative",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  style={{width:"44px",height:"44px",borderRadius:T.xs,border:`2px solid ${border}`,background:bg,color,fontSize:"0.75rem",fontWeight:700,cursor:"pointer",position:"relative",display:"flex",alignItems:"center",justifyContent:"center"}}>
                   {isFg && !isCur ? <span style={{position:"absolute",top:"-4px",right:"-4px",fontSize:"0.55rem",lineHeight:1}}>🚩</span> : null}
                   {i+1}
                 </button>;
               })}
             </div>
-            <div style={{padding:"0.65rem 0.9rem",borderTop:"1px solid #dde3e9",marginTop:"auto"}}>
+            <div style={{padding:"0.65rem 0.9rem",borderTop:`1px solid ${T.border}`,marginTop:"auto"}}>
               {[
-                ["#d4edda","#1a6e2e","Answered"],
-                ["#fff8e1","#ffc107","Flagged for Review"],
-                ["#fafbfc","#bcc8d4","Not Answered"],
+                ["#d4edda",T.success,"Answered"],
+                [T.warningBg,"#ffc107","Flagged for Review"],
+                [T.surface,"#bcc8d4","Not Answered"],
               ].map(([bg,bd,lbl])=>(
-                <div key={lbl} style={{display:"flex",alignItems:"center",gap:"6px",marginBottom:"4px",fontSize:"0.75rem",color:"#555"}}>
+                <div key={lbl} style={{display:"flex",alignItems:"center",gap:"6px",marginBottom:"4px",fontSize:"0.75rem",color:T.textSecondary}}>
                   <div style={{width:"13px",height:"13px",background:bg,border:`2px solid ${bd}`,borderRadius:"2px",flexShrink:0}}/>{lbl}
                 </div>
               ))}
@@ -1159,24 +1159,24 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
         <div style={{flex:1,overflowY:"auto",padding:window.innerWidth>640?"1.25rem 1.75rem":"0.75rem",display:"flex",flexDirection:"column",gap:"0.75rem"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <div style={{display:"flex",alignItems:"center",gap:"0.75rem"}}>
-              <span style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#003865",background:"#ddeaf7",padding:"3px 8px",borderRadius:"2px",border:"1px solid #b3cde8"}}>{q.standard}</span>
-              <span style={{fontSize:"0.78rem",color:"#666"}}>Question {cur+1} of {TOTAL}</span>
+              <span style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.midnight,background:"#ddeaf7",padding:"3px 8px",borderRadius:"2px",border:"1px solid #b3cde8"}}>{q.standard}</span>
+              <span style={{fontSize:"0.78rem",color:T.textSecondary}}>Question {cur+1} of {TOTAL}</span>
             </div>
             <button onClick={()=>setFlg(p=>({...p,[q.id]:!p[q.id]}))}
-              style={{display:"flex",alignItems:"center",gap:"5px",background:isFl?"#fff8e1":"#f8f9fa",border:`1px solid ${isFl?"#ffc107":"#bcc8d4"}`,borderRadius:"3px",padding:"5px 12px",cursor:"pointer",fontSize:"0.73rem",color:isFl?"#7a4e00":"#555",fontWeight:isFl?700:400}}>
+              style={{display:"flex",alignItems:"center",gap:"5px",background:isFl?T.warningBg:"#f8f9fa",border:`1px solid ${isFl?"#ffc107":"#bcc8d4"}`,borderRadius:T.xs,padding:"5px 12px",cursor:"pointer",fontSize:"0.73rem",color:isFl?T.warning:T.textSecondary,fontWeight:isFl?700:400}}>
               🚩 {isFl?"Flagged":"Flag for Review"}
             </button>
           </div>
-          <div style={{height:"1px",background:"#dde3e9"}}/>
-          <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"1.25rem 1.5rem"}}>
-            <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"0.65rem"}}>QUESTION</div>
+          <div style={{height:"1px",background:T.border}}/>
+          <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"1.25rem 1.5rem"}}>
+            <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"0.65rem"}}>QUESTION</div>
             <p style={{fontSize:"1.05rem",fontFamily:"Georgia,serif",color:"#0f0f0f",lineHeight:1.72,margin:0}}><MathText text={q.question}/></p>
-            {q.questionImage&&<img src={q.questionImage} alt="diagram" style={{maxWidth:"100%",maxHeight:"200px",marginTop:"0.75rem",borderRadius:"3px",display:"block"}}/>}
+            {q.questionImage&&<img src={q.questionImage} alt="diagram" style={{maxWidth:"100%",maxHeight:"200px",marginTop:"0.75rem",borderRadius:T.xs,display:"block"}}/>}
           </div>
-          <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"1.1rem 1.5rem"}}>
+          <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"1.1rem 1.5rem"}}>
             {q.type === "plotpoint" ? (
               <>
-                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"0.9rem"}}>PLOT YOUR ANSWER</div>
+                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"0.9rem"}}>PLOT YOUR ANSWER</div>
                 <div style={{display:"flex",justifyContent:"center"}}>
                   <PlotGrid
                     placed={sel ? (() => { try { return JSON.parse(sel); } catch { return null; } })() : null}
@@ -1191,22 +1191,22 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
               </>
             ) : q.type === "keypad" ? (
               <>
-                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"0.9rem"}}>TYPE YOUR ANSWER</div>
+                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"0.9rem"}}>TYPE YOUR ANSWER</div>
                 <div style={{display:"flex",flexDirection:"column",gap:"0.65rem",alignItems:"flex-start"}}>
                   <input
                     type="text" inputMode="decimal"
                     value={sel ?? ""}
                     onChange={e => { setAns(p=>({...p,[q.id]:e.target.value})); handleAdaptiveAnswer(q.id, e.target.value); }}
                     placeholder="Enter your answer…"
-                    style={{width:"100%",maxWidth:"260px",padding:"0.8rem 1rem",fontSize:"1.3rem",fontFamily:"monospace",fontWeight:700,border:"2px solid #003865",borderRadius:"4px",outline:"none",background:"#fafbfc",color:"#0f0f0f",letterSpacing:"0.05em"}}
+                    style={{width:"100%",maxWidth:"260px",padding:"0.8rem 1rem",fontSize:"1.3rem",fontFamily:"monospace",fontWeight:700,border:`2px solid ${T.midnight}`,borderRadius:"4px",outline:"none",background:T.surface,color:"#0f0f0f",letterSpacing:"0.05em"}}
                   />
-                  {sel && <div style={{fontSize:"0.72rem",color:"#555"}}>Your answer: <strong>{sel}</strong></div>}
+                  {sel && <div style={{fontSize:"0.72rem",color:T.textSecondary}}>Your answer: <strong>{sel}</strong></div>}
                 </div>
               </>
             ) : q.type === "multiselect" ? (
               <>
-                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"4px"}}>SELECT ALL CORRECT ANSWERS</div>
-                <div style={{fontSize:"0.7rem",color:"#888",marginBottom:"0.75rem"}}>Choose all that apply — there may be more than one correct answer.</div>
+                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"4px"}}>SELECT ALL CORRECT ANSWERS</div>
+                <div style={{fontSize:"0.7rem",color:T.textSecondary,marginBottom:"0.75rem"}}>Choose all that apply — there may be more than one correct answer.</div>
                 <div style={{display:"flex",flexDirection:"column",gap:"0.55rem"}}>
                   {(q.choices||[]).filter(c=>c).map((choice,i)=>{
                     const selArr = (() => { try { return sel ? JSON.parse(sel) : []; } catch { return []; } })();
@@ -1218,9 +1218,9 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
                       handleAdaptiveAnswer(q.id, next.length ? v : null);
                     }
                     return <label key={i} onClick={toggleChoice}
-                      style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.8rem 1rem",border:`2px solid ${chosen?"#003865":"#c8d3dd"}`,borderRadius:"3px",background:chosen?"#ddeaf7":"#fafbfc",cursor:"pointer"}}>
-                      <div style={{width:"22px",height:"22px",borderRadius:"3px",border:`2px solid ${chosen?"#003865":"#9aabba"}`,background:chosen?"#003865":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                        {chosen && <span style={{color:"#fff",fontSize:"0.8rem",fontWeight:900}}>✓</span>}
+                      style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.8rem 1rem",border:`2px solid ${chosen?T.midnight:T.border}`,borderRadius:T.xs,background:chosen?"#ddeaf7":T.surface,cursor:"pointer"}}>
+                      <div style={{width:"22px",height:"22px",borderRadius:T.xs,border:`2px solid ${chosen?T.midnight:"#9aabba"}`,background:chosen?T.midnight:T.white,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        {chosen && <span style={{color:T.white,fontSize:"0.8rem",fontWeight:900}}>✓</span>}
                       </div>
                       <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color:"#0f0f0f"}}><MathText text={choice}/></span>
                     </label>;
@@ -1229,18 +1229,18 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
               </>
             ) : (
               <>
-                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#888",marginBottom:"0.9rem"}}>SELECT ONE ANSWER</div>
+                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"0.9rem"}}>SELECT ONE ANSWER</div>
                 <div style={{display:"flex",flexDirection:"column",gap:"0.55rem"}}>
                   {(q.choices||[]).filter(c=>c).length === 0 ? (
-                    <div style={{color:"#777",fontSize:"0.85rem",padding:"1rem",textAlign:"center",border:"1px dashed #c8d3dd",borderRadius:"4px"}}>
+                    <div style={{color:T.textSecondary,fontSize:"0.85rem",padding:"1rem",textAlign:"center",border:`1px dashed ${T.border}`,borderRadius:"4px"}}>
                       ⚠ This question has no answer choices. Contact your teacher.
                     </div>
                   ) : (q.choices||[]).map((choice,i)=>{
                     const chosen = sel===choice;
                     return <label key={i} onClick={()=>{ setAns(p=>({...p,[q.id]:choice})); handleAdaptiveAnswer(q.id, choice); }}
-                      style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.8rem 1rem",border:`2px solid ${chosen?"#003865":"#c8d3dd"}`,borderRadius:"3px",background:chosen?"#ddeaf7":"#fafbfc",cursor:"pointer"}}>
-                      <div style={{width:"26px",height:"26px",borderRadius:"50%",border:`2px solid ${chosen?"#003865":"#9aabba"}`,background:chosen?"#003865":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                        <span style={{fontSize:"0.7rem",fontWeight:700,color:chosen?"#fff":"#667"}}>{LETTERS[i]}</span>
+                      style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.8rem 1rem",border:`2px solid ${chosen?T.midnight:T.border}`,borderRadius:T.xs,background:chosen?"#ddeaf7":T.surface,cursor:"pointer"}}>
+                      <div style={{width:"26px",height:"26px",borderRadius:"50%",border:`2px solid ${chosen?T.midnight:"#9aabba"}`,background:chosen?T.midnight:T.white,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <span style={{fontSize:"0.7rem",fontWeight:700,color:chosen?T.white:"#667"}}>{LETTERS[i]}</span>
                       </div>
                       <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color:"#0f0f0f"}}><MathText text={choice}/></span>
                     </label>;
@@ -1252,57 +1252,57 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
         </div>
       </div>
 
-      <div style={{background:"#fff",borderTop:"2px solid #c8d3dd",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0.65rem 1.5rem",flexShrink:0}}>
+      <div style={{background:T.white,borderTop:`2px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0.65rem 1.5rem",flexShrink:0}}>
         <button onClick={()=>setCur(c=>Math.max(0,c-1))} disabled={cur===0}
-          style={{background:cur===0?"#e8edf2":"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"7px 20px",fontSize:"0.83rem",cursor:cur===0?"not-allowed":"pointer",color:cur===0?"#777":"#333",fontWeight:600}}>◀ Back</button>
+          style={{background:cur===0?"#e8edf2":T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"7px 20px",fontSize:"0.83rem",cursor:cur===0?"not-allowed":"pointer",color:cur===0?T.textSecondary:"#333",fontWeight:600}}>◀ Back</button>
         <div style={{display:"flex",gap:"0.75rem",alignItems:"center",fontSize:"0.75rem"}}>
-          <span style={{color:"#1a6e2e",fontWeight:700}}>✓ {ansCount} answered</span>
-          {flgCount>0&&<span style={{color:"#7a4e00",fontWeight:700}}>🚩 {flgCount} flagged</span>}
-          {TOTAL-ansCount>0&&<span style={{color:"#888"}}>{TOTAL-ansCount} left</span>}
+          <span style={{color:T.success,fontWeight:700}}>✓ {ansCount} answered</span>
+          {flgCount>0&&<span style={{color:T.warning,fontWeight:700}}>🚩 {flgCount} flagged</span>}
+          {TOTAL-ansCount>0&&<span style={{color:T.textSecondary}}>{TOTAL-ansCount} left</span>}
         </div>
         {cur<TOTAL-1
-          ?<button onClick={()=>setCur(c=>c+1)} style={{background:"#003865",border:"none",borderRadius:"3px",padding:"7px 20px",fontSize:"0.83rem",cursor:"pointer",color:"#fff",fontWeight:600}}>Next ▶</button>
-          :<button onClick={()=>setModal(true)} style={{background:"#1a6e2e",border:"none",borderRadius:"3px",padding:"7px 20px",fontSize:"0.83rem",cursor:"pointer",color:"#fff",fontWeight:700}}>Submit Test ✓</button>
+          ?<button onClick={()=>setCur(c=>c+1)} style={{background:T.midnight,border:"none",borderRadius:T.xs,padding:"7px 20px",fontSize:"0.83rem",cursor:"pointer",color:T.white,fontWeight:600}}>Next ▶</button>
+          :<button onClick={()=>setModal(true)} style={{background:T.success,border:"none",borderRadius:T.xs,padding:"7px 20px",fontSize:"0.83rem",cursor:"pointer",color:T.white,fontWeight:700}}>Submit Test ✓</button>
         }
       </div>
 
       {modal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999}}>
-          <div style={{background:"#fff",borderRadius:"4px",width:"100%",maxWidth:"400px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.22)"}}>
-            <div style={{background:"#003865",color:"#fff",padding:"0.9rem 1.25rem"}}>
+          <div style={{background:T.white,borderRadius:"4px",width:"100%",maxWidth:"400px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.22)"}}>
+            <div style={{background:T.midnight,color:T.white,padding:"0.9rem 1.25rem"}}>
               <div style={{fontSize:"0.65rem",letterSpacing:"0.12em",opacity:.7,marginBottom:"2px"}}>CONFIRMATION</div>
               <div style={{fontSize:"1rem",fontWeight:700}}>Submit Test?</div>
             </div>
             <div style={{padding:"1.25rem"}}>
               <div style={{display:"flex",gap:"1rem",marginBottom:"0.85rem",flexWrap:"wrap"}}>
-                <div style={{flex:1,background:"#f0faf2",border:"1px solid #b3dfc0",borderRadius:"4px",padding:"0.65rem 0.85rem",textAlign:"center"}}>
-                  <div style={{fontSize:"1.4rem",fontWeight:700,color:"#1a6e2e"}}>{ansCount}</div>
-                  <div style={{fontSize:"0.65rem",color:"#555"}}>Answered</div>
+                <div style={{flex:1,background:T.successBg,border:`1px solid ${T.successBd}`,borderRadius:"4px",padding:"0.65rem 0.85rem",textAlign:"center"}}>
+                  <div style={{fontSize:"1.4rem",fontWeight:700,color:T.success}}>{ansCount}</div>
+                  <div style={{fontSize:"0.65rem",color:T.textSecondary}}>Answered</div>
                 </div>
-                <div style={{flex:1,background:flgCount?"#fff8e1":"#f8fafc",border:`1px solid ${flgCount?"#ffc107":"#dde3e9"}`,borderRadius:"4px",padding:"0.65rem 0.85rem",textAlign:"center"}}>
-                  <div style={{fontSize:"1.4rem",fontWeight:700,color:flgCount?"#7a4e00":"#777"}}>{flgCount}</div>
-                  <div style={{fontSize:"0.65rem",color:"#555"}}>Flagged</div>
+                <div style={{flex:1,background:flgCount?T.warningBg:T.surface,border:`1px solid ${flgCount?"#ffc107":T.border}`,borderRadius:"4px",padding:"0.65rem 0.85rem",textAlign:"center"}}>
+                  <div style={{fontSize:"1.4rem",fontWeight:700,color:flgCount?T.warning:T.textSecondary}}>{flgCount}</div>
+                  <div style={{fontSize:"0.65rem",color:T.textSecondary}}>Flagged</div>
                 </div>
-                <div style={{flex:1,background:TOTAL-ansCount?"#fdf2f2":"#f8fafc",border:`1px solid ${TOTAL-ansCount?"#f0b8b8":"#dde3e9"}`,borderRadius:"4px",padding:"0.65rem 0.85rem",textAlign:"center"}}>
-                  <div style={{fontSize:"1.4rem",fontWeight:700,color:TOTAL-ansCount?"#8b1a1a":"#777"}}>{TOTAL-ansCount}</div>
-                  <div style={{fontSize:"0.65rem",color:"#555"}}>Unanswered</div>
+                <div style={{flex:1,background:TOTAL-ansCount?T.dangerBg:T.surface,border:`1px solid ${TOTAL-ansCount?T.dangerBd:T.border}`,borderRadius:"4px",padding:"0.65rem 0.85rem",textAlign:"center"}}>
+                  <div style={{fontSize:"1.4rem",fontWeight:700,color:TOTAL-ansCount?T.dangerText:T.textSecondary}}>{TOTAL-ansCount}</div>
+                  <div style={{fontSize:"0.65rem",color:T.textSecondary}}>Unanswered</div>
                 </div>
               </div>
               {flgCount>0&&(
-                <div style={{background:"#fff8e1",border:"1px solid #ffc107",borderRadius:"3px",padding:"0.6rem 0.85rem",marginBottom:"0.65rem",fontSize:"0.82rem",color:"#7a4e00",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"0.5rem"}}>
+                <div style={{background:T.warningBg,border:"1px solid #ffc107",borderRadius:T.xs,padding:"0.6rem 0.85rem",marginBottom:"0.65rem",fontSize:"0.82rem",color:T.warning,display:"flex",alignItems:"center",justifyContent:"space-between",gap:"0.5rem"}}>
                   <span>🚩 You have <strong>{flgCount}</strong> question{flgCount>1?"s":""}  flagged for review.</span>
                   <button onClick={()=>{ setModal(false); const firstFlagged=questions.findIndex((_,i)=>flg[questions[i].id]); if(firstFlagged>=0)setCur(firstFlagged); }}
-                    style={{background:"#ffc107",border:"none",borderRadius:"3px",padding:"4px 10px",fontSize:"0.75rem",fontWeight:700,cursor:"pointer",color:"#7a4e00",whiteSpace:"nowrap"}}>
+                    style={{background:"#ffc107",border:"none",borderRadius:T.xs,padding:"4px 10px",fontSize:"0.75rem",fontWeight:700,cursor:"pointer",color:T.warning,whiteSpace:"nowrap"}}>
                     Review →
                   </button>
                 </div>
               )}
-              {TOTAL-ansCount>0&&<div style={{fontSize:"0.82rem",color:"#8b1a1a",background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"3px",padding:"0.55rem 0.85rem",marginBottom:"0.65rem"}}>⚠ {TOTAL-ansCount} question{TOTAL-ansCount>1?"s are":" is"} unanswered — these will be marked incorrect.</div>}
-              <p style={{fontSize:"0.78rem",color:"#888",margin:0}}>Once submitted you cannot return to change your answers.</p>
+              {TOTAL-ansCount>0&&<div style={{fontSize:"0.82rem",color:T.dangerText,background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:T.xs,padding:"0.55rem 0.85rem",marginBottom:"0.65rem"}}>⚠ {TOTAL-ansCount} question{TOTAL-ansCount>1?"s are":" is"} unanswered — these will be marked incorrect.</div>}
+              <p style={{fontSize:"0.78rem",color:T.textSecondary,margin:0}}>Once submitted you cannot return to change your answers.</p>
             </div>
-            <div style={{display:"flex",gap:"0.65rem",padding:"0.9rem 1.25rem",borderTop:"1px solid #dde3e9"}}>
-              <button onClick={()=>setModal(false)} style={{flex:1,background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600,color:"#333"}}>← Keep Working</button>
-              <button onClick={doSubmit} style={{flex:1,background:"#1a6e2e",border:"none",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",color:"#fff",fontWeight:700}}>Submit Final ✓</button>
+            <div style={{display:"flex",gap:"0.65rem",padding:"0.9rem 1.25rem",borderTop:`1px solid ${T.border}`}}>
+              <button onClick={()=>setModal(false)} style={{flex:1,background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600,color:"#333"}}>← Keep Working</button>
+              <button onClick={doSubmit} style={{flex:1,background:T.success,border:"none",borderRadius:T.xs,padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",color:T.white,fontWeight:700}}>Submit Final ✓</button>
             </div>
           </div>
         </div>
@@ -1345,9 +1345,9 @@ function DrillLogin({ onSuccess, onBack }) {
 
   return (
     <div style={S.page}>
-      <div style={{background:"#7a4500",width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
-        {onBack && <button onClick={onBack} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"6px 14px",cursor:"pointer",fontSize:"0.8rem"}}>← Back</button>}
-        <div style={{color:"#fff",fontSize:"0.95rem",fontWeight:700}}>⚡ Fact Fluency Practice</div>
+      <div style={{background:T.warning,width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
+        {onBack && <button onClick={onBack} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:T.white,borderRadius:T.xs,padding:"6px 14px",cursor:"pointer",fontSize:"0.8rem"}}>← Back</button>}
+        <div style={{color:T.white,fontSize:"0.95rem",fontWeight:700}}>⚡ Fact Fluency Practice</div>
       </div>
       <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem 1rem",width:"100%"}}>
         <div style={S.card}>
@@ -1356,12 +1356,12 @@ function DrillLogin({ onSuccess, onBack }) {
             <div style={S.hdrTitle}>Sign in to Start Drilling</div>
           </div>
           <div style={{padding:"1.75rem 2rem",display:"flex",flexDirection:"column",alignItems:"center",gap:"1.25rem"}}>
-            <div style={{fontSize:"0.85rem",color:"#555",textAlign:"center",lineHeight:1.6}}>
+            <div style={{fontSize:"0.85rem",color:T.textSecondary,textAlign:"center",lineHeight:1.6}}>
               Sign in with your <strong>school Google account</strong>.<br/>
               You must be on a class roster to access drills.
             </div>
             {loading ? (
-              <div style={{color:"#888",fontSize:"0.9rem"}}>Starting your drill…</div>
+              <div style={{color:T.textSecondary,fontSize:"0.9rem"}}>Starting your drill…</div>
             ) : (
               <div ref={btnRef}></div>
             )}
@@ -1442,7 +1442,7 @@ const LEVEL_DEFS = {
 };
 
 const OP_LABEL = { add: "Addition", sub: "Subtraction", mul: "Multiplication", div: "Division" };
-const OP_COLOR = { add: "#003865", sub: "#1a6e2e", mul: "#7a4500", div: "#5b1a8b" };
+const OP_COLOR = { add: T.midnight, sub: T.success, mul: T.warning, div: "#5b1a8b" };
 const OP_ICON  = { add: "+", sub: "−", mul: "×", div: "÷" };
 
 function riD(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
@@ -1762,8 +1762,8 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
 
   // Loading
   if (phase === "loading") return (
-    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#e8edf2",fontFamily:"sans-serif"}}>
-      <div style={{textAlign:"center",color:"#888"}}>
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#e8edf2",fontFamily:T.font}}>
+      <div style={{textAlign:"center",color:T.textSecondary}}>
         <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>⚡</div>
         <div>Loading your drill…</div>
       </div>
@@ -1794,10 +1794,10 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
     return (
       <div style={{minHeight:"100vh",
         background:"linear-gradient(155deg,#0d1b2a 0%,#0f2d4a 55%,#133a5e 100%)",
-        fontFamily:"sans-serif",display:"flex",flexDirection:"column"}}>
+        fontFamily:T.font,display:"flex",flexDirection:"column"}}>
 
         {/* ── Header ── */}
-        <div style={{background:"rgba(0,0,0,0.35)",color:"#fff",
+        <div style={{background:"rgba(0,0,0,0.35)",color:T.white,
           padding:"0.8rem 1.5rem",display:"flex",alignItems:"center",gap:"0.75rem",
           backdropFilter:"blur(8px)",borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
           <div style={{fontSize:"1rem",fontWeight:800,letterSpacing:"0.04em"}}>⚡ Drill Complete</div>
@@ -1819,7 +1819,7 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
               }}>
                 <span style={{fontSize:"1.8rem"}}>🏆</span>
                 <div>
-                  <div style={{fontWeight:800,fontSize:"1rem",color:"#1a1a1a"}}>Personal Best!</div>
+                  <div style={{fontWeight:800,fontSize:"1rem",color:T.text}}>Personal Best!</div>
                   <div style={{fontSize:"0.78rem",color:"#5a4500"}}>
                     {newBest.accuracy && newBest.ppm ? "New accuracy & speed record!" :
                      newBest.accuracy ? "New accuracy record!" : "New speed record!"}
@@ -1846,7 +1846,7 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                   <div>
                     <div style={sectionLabel}>3-MIN FACT FLUENCY</div>
-                    <div style={{color:"#fff",fontWeight:900,fontSize:"3.8rem",
+                    <div style={{color:T.white,fontWeight:900,fontSize:"3.8rem",
                       lineHeight:1,fontFamily:"Georgia,serif",letterSpacing:"-2px"}}>
                       {accuracy}<span style={{fontSize:"2rem",letterSpacing:0}}>%</span>
                     </div>
@@ -1881,12 +1881,12 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
                         <YAxis domain={[0,100]} hide/>
                         <Tooltip
                           contentStyle={{background:"#0f2d4a",border:"1px solid rgba(255,255,255,0.15)",
-                            borderRadius:"8px",fontSize:"0.72rem",color:"#fff"}}
+                            borderRadius:T.r,fontSize:"0.72rem",color:T.white}}
                           formatter={v=>[`${v}%`,"Accuracy"]}/>
                         <Area type="monotone" dataKey="Accuracy"
                           stroke="#4ecdc4" strokeWidth={2} fill="url(#accGrad)"
                           dot={{fill:"#4ecdc4",r:3,strokeWidth:0}}
-                          activeDot={{r:5,fill:"#fff",stroke:"#4ecdc4"}}/>
+                          activeDot={{r:5,fill:T.white,stroke:"#4ecdc4"}}/>
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
@@ -1920,11 +1920,11 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
                         axisLine={false} tickLine={false} label={{value:"Session",position:"insideBottomRight",fill:"rgba(255,255,255,0.25)",fontSize:9,offset:-2}}/>
                       <YAxis domain={[1,10]} tick={{fill:"rgba(255,255,255,0.35)",fontSize:9}}
                         axisLine={false} tickLine={false}/>
-                      <Tooltip contentStyle={{background:"#0f2d4a",border:"1px solid rgba(255,255,255,0.15)",borderRadius:"8px",fontSize:"0.72rem",color:"#fff"}}/>
+                      <Tooltip contentStyle={{background:"#0f2d4a",border:"1px solid rgba(255,255,255,0.15)",borderRadius:T.r,fontSize:"0.72rem",color:T.white}}/>
                       <Legend wrapperStyle={{fontSize:"0.68rem",color:"rgba(255,255,255,0.6)"}}/>
                       <Line type="monotone" dataKey="Addition" stroke="#4ecdc4" strokeWidth={2} dot={{r:2}} />
                       <Line type="monotone" dataKey="Subtraction" stroke="#ff6b6b" strokeWidth={2} dot={{r:2}} />
-                      <Line type="monotone" dataKey="Multiplication" stroke="#ffd166" strokeWidth={2} dot={{r:2}} />
+                      <Line type="monotone" dataKey="Multiplication" stroke={T.warningBd} strokeWidth={2} dot={{r:2}} />
                       <Line type="monotone" dataKey="Division" stroke="#a78bfa" strokeWidth={2} dot={{r:2}} />
                     </LineChart>
                   </ResponsiveContainer>
@@ -1958,11 +1958,11 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
                       <div style={{width:"36px",height:"36px",borderRadius:"50%",flexShrink:0,
                         background:locked?"rgba(255,255,255,0.15)":OP_COLOR[op],
                         display:"flex",alignItems:"center",justifyContent:"center",
-                        fontSize:"1rem",color:"#fff",fontWeight:700}}>
+                        fontSize:"1rem",color:T.white,fontWeight:700}}>
                         {locked ? "🔒" : OP_ICON[op]}
                       </div>
                       <div style={{flex:1}}>
-                        <div style={{fontWeight:700,fontSize:"0.88rem",color:"#fff"}}>
+                        <div style={{fontWeight:700,fontSize:"0.88rem",color:T.white}}>
                           {OP_LABEL[op]}{locked ? " — Locked" : ` — Level ${lv}/10`}
                         </div>
                         <div style={{fontSize:"0.72rem",color:"rgba(255,255,255,0.5)",marginTop:"1px"}}>
@@ -2013,7 +2013,7 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
             <div style={{display:"flex",gap:"0.75rem",justifyContent:"center",flexWrap:"wrap",
               padding:"0.25rem 0 0.5rem"}}>
               <button onClick={() => handleDone("again")}
-                style={{background:"linear-gradient(135deg,#2ecc71,#27ae60)",color:"#fff",
+                style={{background:"linear-gradient(135deg,#2ecc71,#27ae60)",color:T.white,
                   border:"none",borderRadius:"12px",padding:"0.9rem 1.75rem",
                   fontSize:"1rem",fontWeight:800,cursor:"pointer",
                   boxShadow:"0 4px 16px rgba(46,204,113,0.35)",
@@ -2037,13 +2037,13 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
 
   // Active drill
   if (!problem) return null;
-  const timeColor = timeLeft <= 30 ? "#ff6b6b" : timeLeft <= 60 ? "#ffd166" : "#fff";
+  const timeColor = timeLeft <= 30 ? "#ff6b6b" : timeLeft <= 60 ? T.warningBd : T.white;
   const opColor   = OP_COLOR[problem.op];
 
   return (
-    <div style={{display:"flex",flexDirection:"column",height:"100vh",fontFamily:"sans-serif",background:"#e8edf2"}}>
+    <div style={{display:"flex",flexDirection:"column",height:"100vh",fontFamily:T.font,background:"#e8edf2"}}>
       {/* Header */}
-      <div style={{background:opColor,color:"#fff",padding:"0.75rem 1.25rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0,width:"100%",boxSizing:"border-box"}}>
+      <div style={{background:opColor,color:T.white,padding:"0.75rem 1.25rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0,width:"100%",boxSizing:"border-box"}}>
         {!(cls?.hideTimer ?? true) && (
         <div style={{fontFamily:"monospace",fontWeight:700,fontSize:"1.4rem",background:"rgba(0,0,0,0.25)",padding:"3px 12px",borderRadius:"4px",color:timeColor,minWidth:"68px",textAlign:"center",flexShrink:0}}>
           {String(Math.floor(timeLeft/60)).padStart(2,"0")}:{String(timeLeft%60).padStart(2,"0")}
@@ -2059,7 +2059,7 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
             const gates  = drillGates(levels);
             const locked = op === "mul" ? !gates.mul : op === "div" ? !gates.div : false;
             return (
-              <div key={op} style={{background:"rgba(0,0,0,0.2)",borderRadius:"3px",padding:"2px 6px",fontSize:"0.68rem",fontWeight:op===problem.op?700:400,border:op===problem.op?"1px solid rgba(255,255,255,.4)":"1px solid transparent",opacity:locked?0.45:1}}>
+              <div key={op} style={{background:"rgba(0,0,0,0.2)",borderRadius:T.xs,padding:"2px 6px",fontSize:"0.68rem",fontWeight:op===problem.op?700:400,border:op===problem.op?"1px solid rgba(255,255,255,.4)":"1px solid transparent",opacity:locked?0.45:1}}>
                 {locked ? "🔒" : OP_ICON[op]}{!locked && levels[op]}
               </div>
             );
@@ -2072,8 +2072,8 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
 
         {/* Problem card */}
         <div style={{
-          background: feedback ? (feedback.correct ? "#e8f5e9" : "#fce4e4") : "#fff",
-          border: `3px solid ${feedback ? (feedback.correct ? "#1a6e2e" : "#8b1a1a") : "#c8d3dd"}`,
+          background: feedback ? (feedback.correct ? "#e8f5e9" : "#fce4e4") : T.white,
+          border: `3px solid ${feedback ? (feedback.correct ? T.success : T.dangerText) : T.border}`,
           borderRadius:"12px",
           padding:"1.75rem 2.5rem",
           textAlign:"center",
@@ -2085,16 +2085,16 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
         }}>
           {feedback ? (
             feedback.correct ? (
-              <div style={{fontSize:"3.5rem",color:"#1a6e2e"}}>✓</div>
+              <div style={{fontSize:"3.5rem",color:T.success}}>✓</div>
             ) : (
               <>
-                <div style={{fontSize:"1.6rem",fontFamily:"monospace",color:"#1a1a1a",fontWeight:700}}>{problem.display}</div>
-                <div style={{fontSize:"1rem",color:"#8b1a1a",marginTop:"6px"}}>✗ You answered: <strong>{lastInput}</strong></div>
-                <div style={{fontSize:"1.2rem",color:"#1a6e2e",fontWeight:700,marginTop:"6px"}}>✓ Correct: {problem.answer}</div>
+                <div style={{fontSize:"1.6rem",fontFamily:"monospace",color:T.text,fontWeight:700}}>{problem.display}</div>
+                <div style={{fontSize:"1rem",color:T.dangerText,marginTop:"6px"}}>✗ You answered: <strong>{lastInput}</strong></div>
+                <div style={{fontSize:"1.2rem",color:T.success,fontWeight:700,marginTop:"6px"}}>✓ Correct: {problem.answer}</div>
               </>
             )
           ) : (
-            <div style={{fontSize:"2.5rem",fontFamily:"monospace",fontWeight:700,color:"#1a1a1a",letterSpacing:"0.04em"}}>
+            <div style={{fontSize:"2.5rem",fontFamily:"monospace",fontWeight:700,color:T.text,letterSpacing:"0.04em"}}>
               {problem.display} = <span style={{color:opColor}}>?</span>
             </div>
           )}
@@ -2115,8 +2115,8 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
               style={{
                 fontSize:"2rem",fontFamily:"monospace",fontWeight:700,textAlign:"center",
                 width:"140px",padding:"0.5rem 0.75rem",
-                border:`3px solid ${opColor}`,borderRadius:"8px",
-                outline:"none",background:"#fafbfc",color:opColor,
+                border:`3px solid ${opColor}`,borderRadius:T.r,
+                outline:"none",background:T.surface,color:opColor,
               }}
             />
             <div style={{display:"flex",flexDirection:"column",gap:"8px",alignItems:"center"}}>
@@ -2133,11 +2133,11 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
                       style={{
                         width:"62px",height:"54px",
                         fontSize:"1.3rem",fontWeight:700,
-                        background:k===null?"transparent":"#fff",
-                        border:k===null?"none":"2px solid #c8d3dd",
-                        borderRadius:"8px",
+                        background:k===null?"transparent":T.white,
+                        border:k===null?"none":`2px solid ${T.border}`,
+                        borderRadius:T.r,
                         cursor:k===null?"default":"pointer",
-                        color:k==="⌫"?"#8b1a1a":"#1a1a1a",
+                        color:k==="⌫"?T.dangerText:T.text,
                         boxShadow:k===null?"none":"0 2px 4px rgba(0,0,0,.08)",
                       }}>
                       {k===null?"":k}
@@ -2149,7 +2149,7 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
                 style={{
                   width:"198px",height:"50px",fontSize:"1rem",fontWeight:700,
                   background:inputVal.trim()?opColor:"#ccc",
-                  color:"#fff",border:"none",borderRadius:"8px",
+                  color:T.white,border:"none",borderRadius:T.r,
                   cursor:inputVal.trim()?"pointer":"not-allowed",
                   marginTop:"2px",boxShadow:"0 2px 8px rgba(0,0,0,.12)",
                 }}>
@@ -2167,23 +2167,23 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
 function StudentResults({ session, questions, onReset }) {
   const p = session.pct;
   return (
-    <div style={{minHeight:"100vh",background:"#e8edf2",fontFamily:"sans-serif",display:"flex",flexDirection:"column"}}>
+    <div style={{minHeight:"100vh",background:"#e8edf2",fontFamily:T.font,display:"flex",flexDirection:"column"}}>
       <TopBar title="Grade 5 Mathematics — Results"/>
       <div style={{flex:1,display:"flex",justifyContent:"center",padding:"2rem 1rem"}}>
-        <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",width:"100%",maxWidth:"640px",boxShadow:"0 2px 12px rgba(0,0,0,.07)",overflow:"hidden"}}>
-          <div style={{background:"#f0f4f8",borderBottom:"1px solid #c8d3dd",padding:"1.25rem 1.5rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:"4px",width:"100%",maxWidth:"640px",boxShadow:"0 2px 12px rgba(0,0,0,.07)",overflow:"hidden"}}>
+          <div style={{background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,padding:"1.25rem 1.5rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div>
-              <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#888",marginBottom:"4px"}}>STUDENT</div>
-              <div style={{fontSize:"1rem",fontWeight:700,color:"#1a1a1a"}}>{session.name}</div>
+              <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"4px"}}>STUDENT</div>
+              <div style={{fontSize:"1rem",fontWeight:700,color:T.text}}>{session.name}</div>
               <div style={{fontSize:"1.8rem",fontWeight:700,color:lvlC(p),fontFamily:"Georgia,serif",marginTop:"4px"}}>{session.score}/{session.total} <span style={{fontSize:"1rem",opacity:.6}}>({p}%)</span></div>
             </div>
             <div style={{textAlign:"right"}}>
-              <div style={{fontSize:"0.62rem",color:"#888",marginBottom:"4px"}}>PERFORMANCE LEVEL</div>
-              <div style={{fontSize:"1rem",fontWeight:700,color:lvlC(p),padding:"6px 16px",background:lvlBg(p),border:`1px solid ${lvlBd(p)}`,borderRadius:"3px"}}>{lvl(p)}</div>
+              <div style={{fontSize:"0.62rem",color:T.textSecondary,marginBottom:"4px"}}>PERFORMANCE LEVEL</div>
+              <div style={{fontSize:"1rem",fontWeight:700,color:lvlC(p),padding:"6px 16px",background:lvlBg(p),border:`1px solid ${lvlBd(p)}`,borderRadius:T.xs}}>{lvl(p)}</div>
             </div>
           </div>
           <div style={{padding:"1.25rem 1.5rem"}}>
-            <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"0.75rem"}}>ITEM REVIEW</div>
+            <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"0.75rem"}}>ITEM REVIEW</div>
             {questions.map((q,i)=>{
               const a = session.answers[q.id];
               // Grade using same logic as doSubmit
@@ -2215,25 +2215,25 @@ function StudentResults({ session, questions, onReset }) {
                 if (q.type === "multiselect") { try { return JSON.parse(a).join(", "); } catch { return a; } }
                 return a;
               })();
-              return <div key={q.id} style={{display:"flex",gap:"0.75rem",marginBottom:"0.6rem",padding:"0.7rem 0.85rem",background:ok?"#f0faf2":"#fdf2f2",border:`1px solid ${ok?"#b3dfc0":"#f0b8b8"}`,borderRadius:"3px"}}>
-                <div style={{width:"22px",height:"22px",borderRadius:"50%",background:ok?"#1a6e2e":"#8b1a1a",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:"1px"}}>
-                  <span style={{color:"#fff",fontSize:"0.7rem",fontWeight:700}}>{i+1}</span>
+              return <div key={q.id} style={{display:"flex",gap:"0.75rem",marginBottom:"0.6rem",padding:"0.7rem 0.85rem",background:ok?T.successBg:T.dangerBg,border:`1px solid ${ok?T.successBd:T.dangerBd}`,borderRadius:T.xs}}>
+                <div style={{width:"22px",height:"22px",borderRadius:"50%",background:ok?T.success:T.dangerText,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:"1px"}}>
+                  <span style={{color:T.white,fontSize:"0.7rem",fontWeight:700}}>{i+1}</span>
                 </div>
                 <div style={{flex:1,fontSize:"0.82rem"}}>
-                  <div style={{color:"#777",fontSize:"0.63rem",letterSpacing:"0.08em",marginBottom:"2px"}}>{q.standard}</div>
-                  <div style={{color:"#1a1a1a",fontFamily:"Georgia,serif",marginBottom:ok?0:"4px"}}><MathText text={q.question}/></div>
+                  <div style={{color:T.textSecondary,fontSize:"0.63rem",letterSpacing:"0.08em",marginBottom:"2px"}}>{q.standard}</div>
+                  <div style={{color:T.text,fontFamily:"Georgia,serif",marginBottom:ok?0:"4px"}}><MathText text={q.question}/></div>
                   {!ok&&<div style={{fontSize:"0.78rem"}}>
-                    <span style={{color:"#1a6e2e"}}>Correct: <strong>{correctDisplay}</strong></span>
-                    {studentDisplay&&<span style={{color:"#8b1a1a"}}> · Your answer: {studentDisplay}</span>}
-                    {!studentDisplay&&<span style={{color:"#8b1a1a"}}> · Not answered</span>}
+                    <span style={{color:T.success}}>Correct: <strong>{correctDisplay}</strong></span>
+                    {studentDisplay&&<span style={{color:T.dangerText}}> · Your answer: {studentDisplay}</span>}
+                    {!studentDisplay&&<span style={{color:T.dangerText}}> · Not answered</span>}
                   </div>}
                 </div>
-                <span style={{fontWeight:700,fontSize:"0.9rem",color:ok?"#1a6e2e":"#8b1a1a"}}>{ok?"✓":"✗"}</span>
+                <span style={{fontWeight:700,fontSize:"0.9rem",color:ok?T.success:T.dangerText}}>{ok?"✓":"✗"}</span>
               </div>;
             })}
           </div>
-          <div style={{padding:"1rem 1.5rem",borderTop:"1px solid #dde3e9",display:"flex",justifyContent:"flex-end"}}>
-            <button onClick={onReset} style={{background:"#003865",color:"#fff",border:"none",borderRadius:"3px",padding:"0.65rem 1.75rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600}}>Start New Session</button>
+          <div style={{padding:"1rem 1.5rem",borderTop:`1px solid ${T.border}`,display:"flex",justifyContent:"flex-end"}}>
+            <button onClick={onReset} style={{background:T.midnight,color:T.white,border:"none",borderRadius:T.xs,padding:"0.65rem 1.75rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600}}>Start New Session</button>
           </div>
         </div>
       </div>
@@ -2287,47 +2287,47 @@ function GoogleSignIn({ mode, codeOrClassId, onSuccess, onBack }) {
 
   return (
     <div style={{minHeight:"100vh",background:"#e8edf2",display:"flex",flexDirection:"column",
-      alignItems:"center",justifyContent:"center",fontFamily:"sans-serif",padding:"2rem 1rem",gap:"2rem"}}>
+      alignItems:"center",justifyContent:"center",fontFamily:T.font,padding:"2rem 1rem",gap:"2rem"}}>
       <div style={{textAlign:"center"}}>
-        <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.18em",color:"#888",marginBottom:"6px"}}>
+        <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.18em",color:T.textSecondary,marginBottom:"6px"}}>
           GEORGIA MILESTONES READINESS TRAINER
         </div>
-        <div style={{fontSize:"1.6rem",fontWeight:700,color:mode==="practice"?"#1a6e2e":"#003865",fontFamily:"Georgia,serif"}}>
+        <div style={{fontSize:"1.6rem",fontWeight:700,color:mode==="practice"?T.success:T.midnight,fontFamily:"Georgia,serif"}}>
           {mode === "practice" ? "🎯 Practice Mode" : "📝 Take a Test"}
         </div>
-        <div style={{fontSize:"0.85rem",color:"#888",marginTop:"4px"}}>
+        <div style={{fontSize:"0.85rem",color:T.textSecondary,marginTop:"4px"}}>
           Sign in with your school Google account to continue
         </div>
       </div>
 
-      <div style={{background:"#fff",borderRadius:"8px",boxShadow:"0 4px 24px rgba(0,0,0,.1)",
+      <div style={{background:T.white,borderRadius:T.r,boxShadow:"0 4px 24px rgba(0,0,0,.1)",
         padding:"2rem 2.5rem",display:"flex",flexDirection:"column",alignItems:"center",gap:"1.5rem",
         width:"100%",maxWidth:"360px"}}>
         {loading ? (
-          <div style={{color:"#888",fontSize:"0.9rem"}}>Verifying…</div>
+          <div style={{color:T.textSecondary,fontSize:"0.9rem"}}>Verifying…</div>
         ) : (
           <>
-            <div style={{fontSize:"0.82rem",color:"#555",textAlign:"center",lineHeight:1.6}}>
+            <div style={{fontSize:"0.82rem",color:T.textSecondary,textAlign:"center",lineHeight:1.6}}>
               Use the Google account you use for Google Classroom.
             </div>
             <div ref={btnRef}></div>
             {!CLIENT_ID && (
-              <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"4px",
-                padding:"0.5rem 1rem",fontSize:"0.78rem",color:"#8b1a1a",textAlign:"center"}}>
+              <div style={{background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:"4px",
+                padding:"0.5rem 1rem",fontSize:"0.78rem",color:T.dangerText,textAlign:"center"}}>
                 Google auth not configured. Contact your administrator.
               </div>
             )}
           </>
         )}
         {err && (
-          <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"4px",
-            padding:"0.55rem 1.25rem",fontSize:"0.82rem",color:"#8b1a1a",fontWeight:600,textAlign:"center",width:"100%",boxSizing:"border-box"}}>
+          <div style={{background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:"4px",
+            padding:"0.55rem 1.25rem",fontSize:"0.82rem",color:T.dangerText,fontWeight:600,textAlign:"center",width:"100%",boxSizing:"border-box"}}>
             ⚠ {err}
           </div>
         )}
       </div>
 
-      <button onClick={onBack} style={{fontSize:"0.72rem",color:"#888",background:"none",border:"none",cursor:"pointer",textDecoration:"underline"}}>
+      <button onClick={onBack} style={{fontSize:"0.72rem",color:T.textSecondary,background:"none",border:"none",cursor:"pointer",textDecoration:"underline"}}>
         ← Back
       </button>
     </div>

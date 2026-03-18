@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import MathTest from "./MathTest";
 import TeacherShell from "./TeacherShell";
-import { API } from "./shared/constants";
+import { API, T } from "./shared/constants";
 
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
 const SESSION_KEY = "mathready_session";
@@ -90,8 +90,8 @@ function UnifiedGoogleSignIn({ onTeacher, onStudent }) {
         <div ref={btnRef}/>
       )}
       {err && (
-        <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"4px",
-          padding:"0.55rem 1.25rem",fontSize:"0.82rem",color:"#8b1a1a",fontWeight:600,
+        <div style={{background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:T.xs,
+          padding:"0.55rem 1.25rem",fontSize:"0.82rem",color:T.dangerText,fontWeight:600,
           textAlign:"center",width:"100%",boxSizing:"border-box"}}>⚠ {err}</div>
       )}
     </div>
@@ -142,6 +142,13 @@ export default function App() {
     saveSession({ screen: "teacher", teacher });
   }
 
+  // Update teacher's classIds in state + sessionStorage (called when teacher creates/deletes a class)
+  function handleTeacherClassIdsUpdate(newClassIds) {
+    const updated = { ...teacherIdentity, classIds: newClassIds };
+    setTeacherIdentity(updated);
+    saveSession({ screen: "teacher", teacher: updated });
+  }
+
   // Super admin: view as a specific teacher
   function handleViewAsTeacher(impersonated) {
     setAdminIdentity(teacherIdentity); // stash the real admin
@@ -160,6 +167,7 @@ export default function App() {
     <TeacherShell
       teacher={teacherIdentity}
       onBack={reset}
+      onUpdateClassIds={handleTeacherClassIdsUpdate}
       onViewAsTeacher={teacherIdentity?.teacherRole === "super_admin" ? handleViewAsTeacher : undefined}
       onViewAsStudent={teacherIdentity?.teacherRole === "super_admin" ? handleViewAsStudent : undefined}
     />
@@ -169,21 +177,21 @@ export default function App() {
 
   // ── Home — single unified sign-in ──
   return (
-    <div style={{minHeight:"100vh",background:"#e8edf2",display:"flex",flexDirection:"column",
-      alignItems:"center",justifyContent:"center",fontFamily:"sans-serif",padding:"2rem 1rem",gap:"2rem"}}>
+    <div style={{minHeight:"100vh",background:T.midnight,display:"flex",flexDirection:"column",
+      alignItems:"center",justifyContent:"center",fontFamily:T.font,padding:"2rem 1rem",gap:"2.5rem"}}>
       <div style={{textAlign:"center"}}>
-        <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.18em",color:"#888",marginBottom:"8px"}}>
+        <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.2em",color:T.teal,marginBottom:"10px"}}>
           GEORGIA MILESTONES READINESS TRAINER
         </div>
-        <div style={{fontSize:"1.8rem",fontWeight:700,color:"#003865",fontFamily:"Georgia,serif",marginBottom:"6px"}}>
+        <div style={{fontSize:"2rem",fontWeight:800,color:T.white,marginBottom:"8px",lineHeight:1.2}}>
           Grade 5 Mathematics
         </div>
-        <div style={{fontSize:"0.85rem",color:"#888"}}>Sign in with your school Google account</div>
+        <div style={{fontSize:"0.88rem",color:T.textMuted}}>Sign in with your school Google account</div>
       </div>
 
-      <div style={{background:"#fff",borderRadius:"8px",boxShadow:"0 4px 24px rgba(0,0,0,.1)",
-        padding:"2rem 2.5rem",display:"flex",flexDirection:"column",alignItems:"center",gap:"1.25rem",
-        width:"100%",maxWidth:"340px"}}>
+      <div style={{background:T.white,borderRadius:T.rl,boxShadow:T.lg,
+        padding:"2.25rem 2.5rem",display:"flex",flexDirection:"column",alignItems:"center",gap:"1.25rem",
+        width:"100%",maxWidth:"360px"}}>
         <UnifiedGoogleSignIn
           onTeacher={handleTeacherSuccess}
           onStudent={(credential) => { setStudentCredential(credential); setScreen("student"); }}

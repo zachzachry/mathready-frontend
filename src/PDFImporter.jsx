@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { T } from "./shared/constants";
 
 const GRADE_OPTIONS = ["Grade 3", "Grade 4", "Grade 5", "Grade 6", "Grade 7", "Grade 8"];
 
@@ -46,12 +47,12 @@ function DropZone({ onFile, file }) {
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
       style={{
-        border: `2px dashed ${dragging ? "#003865" : file ? "#1a6e2e" : "#c8d3dd"}`,
+        border: `2px dashed ${dragging ? T.teal : file ? T.success : T.border}`,
         borderRadius: "6px",
         padding: "2.5rem",
         textAlign: "center",
         cursor: "pointer",
-        background: dragging ? "#f0f4ff" : file ? "#f0faf2" : "#fafbfc",
+        background: dragging ? "#f0f4ff" : file ? T.successBg : T.surface,
         transition: "all 0.2s",
       }}
     >
@@ -60,15 +61,15 @@ function DropZone({ onFile, file }) {
       <div style={{ fontSize: "2.5rem", marginBottom: "0.5rem" }}>{file ? "📄" : "📂"}</div>
       {file ? (
         <>
-          <div style={{ fontWeight: 700, color: "#1a6e2e", fontSize: "0.95rem" }}>{file.name}</div>
-          <div style={{ color: "#888", fontSize: "0.75rem", marginTop: "4px" }}>
+          <div style={{ fontWeight: 700, color: T.success, fontSize: "0.95rem" }}>{file.name}</div>
+          <div style={{ color: T.textSecondary, fontSize: "0.75rem", marginTop: "4px" }}>
             {(file.size / 1024).toFixed(0)} KB · Click to change
           </div>
         </>
       ) : (
         <>
           <div style={{ fontWeight: 600, color: "#334", fontSize: "0.95rem" }}>Drop a PDF here or click to browse</div>
-          <div style={{ color: "#aaa", fontSize: "0.75rem", marginTop: "4px" }}>Supports typed PDFs · Max 10MB</div>
+          <div style={{ color: T.textMuted, fontSize: "0.75rem", marginTop: "4px" }}>Supports typed PDFs · Max 10MB</div>
         </>
       )}
     </div>
@@ -84,22 +85,22 @@ function QuestionCard({ q, index, onEdit, onRemove, onToggleCorrect }) {
 
   return (
     <div style={{
-      background: "#fff",
-      border: `1px solid ${needsReview ? "#ffc107" : "#c8d3dd"}`,
-      borderLeft: `4px solid ${needsReview ? "#ffc107" : "#1a6e2e"}`,
+      background: T.white,
+      border: `1px solid ${needsReview ? T.warningBd : T.border}`,
+      borderLeft: `4px solid ${needsReview ? T.warningBd : T.success}`,
       borderRadius: "4px",
       overflow: "hidden",
       marginBottom: "0.75rem",
     }}>
       <div style={{ padding: "0.85rem 1.1rem", display: "flex", alignItems: "flex-start", gap: "0.85rem" }}>
         {/* Number */}
-        <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: needsReview ? "#fff3cd" : "#d4edda", border: `2px solid ${needsReview ? "#ffc107" : "#1a6e2e"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: "1px" }}>
-          <span style={{ fontSize: "0.72rem", fontWeight: 700, color: needsReview ? "#7a4e00" : "#1a6e2e" }}>{index + 1}</span>
+        <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: needsReview ? T.warningBg : T.successBg, border: `2px solid ${needsReview ? T.warningBd : T.success}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: "1px" }}>
+          <span style={{ fontSize: "0.72rem", fontWeight: 700, color: needsReview ? T.warning : T.success }}>{index + 1}</span>
         </div>
 
         <div style={{ flex: 1 }}>
           {needsReview && (
-            <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#7a4e00", background: "#fff3cd", border: "1px solid #ffc107", borderRadius: "3px", padding: "2px 8px", display: "inline-block", marginBottom: "0.4rem" }}>
+            <div style={{ fontSize: "0.7rem", fontWeight: 700, color: T.warning, background: T.warningBg, border: `1px solid ${T.warningBd}`, borderRadius: T.xs, padding: "2px 8px", display: "inline-block", marginBottom: "0.4rem" }}>
               ⚠ Needs Review
             </div>
           )}
@@ -125,25 +126,25 @@ function QuestionCard({ q, index, onEdit, onRemove, onToggleCorrect }) {
                 <input style={inp} value={draft.correct} onChange={e => setDraft(d => ({ ...d, correct: e.target.value }))} />
               </div>
               <div style={{ display: "flex", gap: "0.5rem" }}>
-                <button onClick={save} style={{ ...btn, background: "#003865", color: "#fff", border: "none" }}>Save</button>
-                <button onClick={() => { setDraft(q); setEditing(false); }} style={{ ...btn, background: "#f0f4f8", border: "1px solid #c8d3dd" }}>Cancel</button>
+                <button onClick={save} style={{ ...btn, background: T.teal, color: T.white, border: "none" }}>Save</button>
+                <button onClick={() => { setDraft(q); setEditing(false); }} style={{ ...btn, background: T.surfaceAlt, border: `1px solid ${T.border}` }}>Cancel</button>
               </div>
             </div>
           ) : (
             <>
               <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.4rem", flexWrap: "wrap" }}>
-                <span style={{ fontSize: "0.62rem", fontWeight: 700, color: "#003865", background: "#ddeaf7", padding: "2px 7px", borderRadius: "2px", border: "1px solid #b3cde8" }}>{q.standard}</span>
-                <span style={{ fontSize: "0.62rem", color: "#888", padding: "2px 7px" }}>{q.short}</span>
+                <span style={{ fontSize: "0.62rem", fontWeight: 700, color: T.teal, background: "#ddeaf7", padding: "2px 7px", borderRadius: "2px", border: "1px solid #b3cde8" }}>{q.standard}</span>
+                <span style={{ fontSize: "0.62rem", color: T.textSecondary, padding: "2px 7px" }}>{q.short}</span>
               </div>
-              <p style={{ fontSize: "0.9rem", fontFamily: "Georgia, serif", color: "#1a1a1a", lineHeight: 1.6, margin: "0 0 0.6rem" }}>{q.question}</p>
+              <p style={{ fontSize: "0.9rem", fontFamily: "Georgia, serif", color: T.text, lineHeight: 1.6, margin: "0 0 0.6rem" }}>{q.question}</p>
               <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
                 {q.choices.map((c, i) => (
-                  <div key={i} style={{ fontSize: "0.8rem", color: c === q.correct?.replace(" [REVIEW]", "") ? "#1a6e2e" : "#555", fontWeight: c === q.correct?.replace(" [REVIEW]", "") ? 700 : 400, display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span style={{ width: "16px", height: "16px", borderRadius: "50%", border: `1px solid ${c === q.correct?.replace(" [REVIEW]", "") ? "#1a6e2e" : "#c8d3dd"}`, background: c === q.correct?.replace(" [REVIEW]", "") ? "#d4edda" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.6rem", flexShrink: 0 }}>
+                  <div key={i} style={{ fontSize: "0.8rem", color: c === q.correct?.replace(" [REVIEW]", "") ? T.success : T.textSecondary, fontWeight: c === q.correct?.replace(" [REVIEW]", "") ? 700 : 400, display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ width: "16px", height: "16px", borderRadius: "50%", border: `1px solid ${c === q.correct?.replace(" [REVIEW]", "") ? T.success : T.border}`, background: c === q.correct?.replace(" [REVIEW]", "") ? T.successBg : T.white, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.6rem", flexShrink: 0 }}>
                       {["A","B","C","D"][i]}
                     </span>
                     {c}
-                    {c === q.correct?.replace(" [REVIEW]","") && <span style={{ fontSize: "0.65rem", color: "#1a6e2e" }}>✓ correct</span>}
+                    {c === q.correct?.replace(" [REVIEW]","") && <span style={{ fontSize: "0.65rem", color: T.success }}>✓ correct</span>}
                   </div>
                 ))}
               </div>
@@ -154,7 +155,7 @@ function QuestionCard({ q, index, onEdit, onRemove, onToggleCorrect }) {
         {!editing && (
           <div style={{ display: "flex", flexDirection: "column", gap: "4px", flexShrink: 0 }}>
             <button onClick={() => setEditing(true)} style={{ ...btn, fontSize: "0.68rem", padding: "4px 8px" }}>✏ Edit</button>
-            <button onClick={() => onRemove(index)} style={{ ...btn, fontSize: "0.68rem", padding: "4px 8px", color: "#8b1a1a", borderColor: "#f0b8b8" }}>✕ Remove</button>
+            <button onClick={() => onRemove(index)} style={{ ...btn, fontSize: "0.68rem", padding: "4px 8px", color: T.dangerText, borderColor: T.dangerBd }}>✕ Remove</button>
           </div>
         )}
       </div>
@@ -248,10 +249,10 @@ export default function PDFImporter() {
   const reviewCount = questions.filter(q => q.correct?.includes("[REVIEW]") || q.question?.includes("diagram")).length;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#e8edf2", fontFamily: "sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#e8edf2", fontFamily: T.font }}>
 
       {/* Header */}
-      <div style={{ background: "#003865", color: "#fff", padding: "0 1.5rem", height: "52px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 2px 6px rgba(0,0,0,0.3)" }}>
+      <div style={{ background: T.midnight, color: T.white, padding: "0 1.5rem", height: "52px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 2px 6px rgba(0,0,0,0.3)" }}>
         <div>
           <div style={{ fontSize: "0.58rem", opacity: 0.65, letterSpacing: "0.14em" }}>GEORGIA MILESTONES READINESS TRAINER</div>
           <div style={{ fontSize: "0.9rem", fontWeight: 600 }}>PDF Question Importer</div>
@@ -264,8 +265,8 @@ export default function PDFImporter() {
       <div style={{ maxWidth: "760px", margin: "0 auto", padding: "1.75rem 1rem" }}>
 
         {/* Upload card */}
-        <div style={{ background: "#fff", border: "1px solid #c8d3dd", borderRadius: "4px", padding: "1.5rem", marginBottom: "1.25rem", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
-          <div style={{ fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.12em", color: "#555", marginBottom: "1rem" }}>STEP 1 — UPLOAD YOUR PDF</div>
+        <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "1.5rem", marginBottom: "1.25rem", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
+          <div style={{ fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.12em", color: T.textSecondary, marginBottom: "1rem" }}>STEP 1 — UPLOAD YOUR PDF</div>
           <DropZone file={file} onFile={setFile} />
 
           <div style={{ marginTop: "1rem", display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
@@ -280,9 +281,9 @@ export default function PDFImporter() {
                 onClick={handleExtract}
                 disabled={!file || status === "extracting" || status === "reading"}
                 style={{
-                  background: !file ? "#e8edf2" : "#003865",
-                  color: !file ? "#aaa" : "#fff",
-                  border: "none", borderRadius: "3px",
+                  background: !file ? "#e8edf2" : T.teal,
+                  color: !file ? T.textMuted : T.white,
+                  border: "none", borderRadius: T.xs,
                   padding: "0.7rem 1.5rem",
                   fontSize: "0.88rem", fontWeight: 700,
                   cursor: !file ? "not-allowed" : "pointer",
@@ -298,14 +299,14 @@ export default function PDFImporter() {
 
           {/* Progress indicator */}
           {(status === "reading" || status === "extracting") && (
-            <div style={{ marginTop: "1rem", background: "#f0f4f8", borderRadius: "3px", padding: "0.75rem 1rem", fontSize: "0.82rem", color: "#555", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <div style={{ marginTop: "1rem", background: T.surfaceAlt, borderRadius: T.xs, padding: "0.75rem 1rem", fontSize: "0.82rem", color: T.textSecondary, display: "flex", alignItems: "center", gap: "0.5rem" }}>
               <span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⏳</span>
               {status === "reading" ? "Reading your PDF…" : "Claude is extracting questions — this takes 10–20 seconds…"}
             </div>
           )}
 
           {status === "error" && (
-            <div style={{ marginTop: "1rem", background: "#fdf2f2", border: "1px solid #f0b8b8", borderRadius: "3px", padding: "0.75rem 1rem", fontSize: "0.82rem", color: "#8b1a1a" }}>
+            <div style={{ marginTop: "1rem", background: T.dangerBg, border: `1px solid ${T.dangerBd}`, borderRadius: T.xs, padding: "0.75rem 1rem", fontSize: "0.82rem", color: T.dangerText }}>
               ⚠ {errMsg}
             </div>
           )}
@@ -315,25 +316,25 @@ export default function PDFImporter() {
         {status === "done" && questions.length > 0 && (
           <>
             {/* Summary bar */}
-            <div style={{ background: "#fff", border: "1px solid #c8d3dd", borderRadius: "4px", padding: "1rem 1.5rem", marginBottom: "1.25rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem" }}>
+            <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "1rem 1.5rem", marginBottom: "1.25rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem" }}>
               <div style={{ display: "flex", gap: "1.5rem" }}>
                 <div>
-                  <div style={{ fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.1em", color: "#888" }}>EXTRACTED</div>
-                  <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#1a6e2e" }}>{questions.length}</div>
+                  <div style={{ fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.1em", color: T.textSecondary }}>EXTRACTED</div>
+                  <div style={{ fontSize: "1.5rem", fontWeight: 700, color: T.success }}>{questions.length}</div>
                 </div>
                 {reviewCount > 0 && (
                   <div>
-                    <div style={{ fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.1em", color: "#888" }}>NEEDS REVIEW</div>
-                    <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#7a4e00" }}>{reviewCount}</div>
+                    <div style={{ fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.1em", color: T.textSecondary }}>NEEDS REVIEW</div>
+                    <div style={{ fontSize: "1.5rem", fontWeight: 700, color: T.warning }}>{reviewCount}</div>
                   </div>
                 )}
                 <div>
-                  <div style={{ fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.1em", color: "#888" }}>READY</div>
-                  <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#003865" }}>{questions.length - reviewCount}</div>
+                  <div style={{ fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.1em", color: T.textSecondary }}>READY</div>
+                  <div style={{ fontSize: "1.5rem", fontWeight: 700, color: T.teal }}>{questions.length - reviewCount}</div>
                 </div>
               </div>
               <div style={{ display: "flex", gap: "0.65rem" }}>
-                <button onClick={handleCopyJSON} style={{ ...btn, background: copied ? "#d4edda" : "#003865", color: copied ? "#1a6e2e" : "#fff", border: "none", padding: "0.6rem 1.25rem", fontWeight: 700, fontSize: "0.82rem" }}>
+                <button onClick={handleCopyJSON} style={{ ...btn, background: copied ? T.successBg : T.teal, color: copied ? T.success : T.white, border: "none", padding: "0.6rem 1.25rem", fontWeight: 700, fontSize: "0.82rem" }}>
                   {copied ? "✓ Copied!" : "📋 Copy JSON"}
                 </button>
                 <button onClick={() => { setFile(null); setStatus("idle"); setQuestions([]); }}
@@ -344,12 +345,12 @@ export default function PDFImporter() {
             </div>
 
             {reviewCount > 0 && (
-              <div style={{ background: "#fff8e1", border: "1px solid #ffd166", borderRadius: "3px", padding: "0.75rem 1rem", marginBottom: "1rem", fontSize: "0.82rem", color: "#7a4e00" }}>
+              <div style={{ background: T.warningBg, border: `1px solid ${T.warningBd}`, borderRadius: T.xs, padding: "0.75rem 1rem", marginBottom: "1rem", fontSize: "0.82rem", color: T.warning }}>
                 ⚠ <strong>{reviewCount} question{reviewCount > 1 ? "s" : ""}</strong> need your attention — either the correct answer was unclear or the question contained a diagram. Review and edit them before adding to your bank.
               </div>
             )}
 
-            <div style={{ fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.12em", color: "#555", marginBottom: "0.75rem" }}>
+            <div style={{ fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.12em", color: T.textSecondary, marginBottom: "0.75rem" }}>
               STEP 2 — REVIEW & EDIT
             </div>
 
@@ -357,16 +358,16 @@ export default function PDFImporter() {
               <QuestionCard key={i} q={q} index={i} onEdit={handleEdit} onRemove={handleRemove} />
             ))}
 
-            <div style={{ background: "#f0f4f8", border: "1px solid #dde3e9", borderRadius: "3px", padding: "1rem 1.25rem", fontSize: "0.82rem", color: "#555", marginTop: "0.5rem" }}>
+            <div style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, borderRadius: T.xs, padding: "1rem 1.25rem", fontSize: "0.82rem", color: T.textSecondary, marginTop: "0.5rem" }}>
               <strong>Step 3 — Add to your question bank:</strong> Click <strong>Copy JSON</strong> above, then paste into your <code>questions.json</code> file alongside your existing questions. Make sure to renumber the IDs so they don't conflict.
             </div>
           </>
         )}
 
         {status === "done" && questions.length === 0 && (
-          <div style={{ background: "#fff", border: "1px solid #c8d3dd", borderRadius: "4px", padding: "2rem", textAlign: "center", color: "#888" }}>
+          <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "2rem", textAlign: "center", color: T.textSecondary }}>
             <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🤔</div>
-            <div style={{ fontWeight: 600, color: "#555" }}>No multiple choice questions found</div>
+            <div style={{ fontWeight: 600, color: T.textSecondary }}>No multiple choice questions found</div>
             <div style={{ fontSize: "0.82rem", marginTop: "4px" }}>This PDF may be scanned, image-based, or contain only open-ended questions.</div>
           </div>
         )}
@@ -377,6 +378,6 @@ export default function PDFImporter() {
   );
 }
 
-const lbl = { display: "block", fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.12em", color: "#555", marginBottom: "5px" };
-const inp = { width: "100%", padding: "0.6rem 0.85rem", border: "1px solid #c8d3dd", borderRadius: "3px", fontSize: "0.9rem", color: "#1a1a1a", background: "#fafbfc", boxSizing: "border-box" };
-const btn = { background: "#f0f4f8", border: "1px solid #c8d3dd", borderRadius: "3px", padding: "5px 10px", cursor: "pointer", fontSize: "0.75rem", color: "#333", fontWeight: 600 };
+const lbl = { display: "block", fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.12em", color: T.textSecondary, marginBottom: "5px" };
+const inp = { width: "100%", padding: "0.6rem 0.85rem", border: `1px solid ${T.border}`, borderRadius: T.xs, fontSize: "0.9rem", color: T.text, background: T.surface, boxSizing: "border-box" };
+const btn = { background: T.surfaceAlt, border: `1px solid ${T.border}`, borderRadius: T.xs, padding: "5px 10px", cursor: "pointer", fontSize: "0.75rem", color: "#333", fontWeight: 600 };

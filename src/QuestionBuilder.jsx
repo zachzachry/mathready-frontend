@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import MathText from "./shared/MathText";
 import PlotGrid from "./shared/PlotGrid";
-import { API, QUESTIONS as BUILTIN_QUESTIONS } from "./shared/constants";
+import { API, QUESTIONS as BUILTIN_QUESTIONS, T } from "./shared/constants";
 
 
 // ── Math snippet toolbar ───────────────────────────────────
@@ -31,14 +31,14 @@ function MathToolbar({ onInsert }) {
           type="button"
           onClick={() => onInsert(s.insert)}
           title={s.tip}
-          style={{ background: "#f0f4f8", border: "1px solid #c8d3dd", borderRadius: "3px", padding: "3px 8px", fontSize: "0.82rem", cursor: "pointer", fontFamily: "serif", color: "#1a1a1a", lineHeight: 1.4 }}
+          style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, borderRadius: T.xs, padding: "3px 8px", fontSize: "0.82rem", cursor: "pointer", fontFamily: "serif", color: T.text, lineHeight: 1.4 }}
           onMouseEnter={e => e.currentTarget.style.background="#ddeaf7"}
-          onMouseLeave={e => e.currentTarget.style.background="#f0f4f8"}
+          onMouseLeave={e => e.currentTarget.style.background=T.surfaceAlt}
         >
           {s.label}
         </button>
       ))}
-      <span style={{ fontSize: "0.62rem", color: "#aaa", alignSelf: "center", marginLeft: "4px" }}>
+      <span style={{ fontSize: "0.62rem", color: T.textMuted, alignSelf: "center", marginLeft: "4px" }}>
         Wrap custom LaTeX in $…$ e.g. <code>$\frac{2}{3}$</code>
       </span>
     </div>
@@ -172,16 +172,16 @@ function PasteImageZone({ image, onImage, onClear, placeholder }) {
 
   if (image) return (
     <div style={{ position: "relative", display: "inline-block" }}>
-      <img src={image} alt="diagram" style={{ maxWidth: "100%", maxHeight: "180px", borderRadius: "3px", border: "1px solid #c8d3dd", display: "block" }} />
+      <img src={image} alt="diagram" style={{ maxWidth: "100%", maxHeight: "180px", borderRadius: T.xs, border: `1px solid ${T.border}`, display: "block" }} />
       <button onClick={onClear} style={{ position: "absolute", top: "4px", right: "4px", background: "rgba(0,0,0,.6)", color: "#fff", border: "none", borderRadius: "50%", width: "20px", height: "20px", cursor: "pointer", fontSize: "0.65rem" }}>✕</button>
     </div>
   );
 
   return (
     <div ref={ref} tabIndex={0} onPaste={handlePaste} onClick={() => ref.current?.focus()}
-      style={{ border: "2px dashed #c8d3dd", borderRadius: "3px", padding: "0.5rem 0.85rem", fontSize: "0.74rem", color: "#bbb", cursor: "pointer", background: "#fafbfc", outline: "none" }}
-      onFocus={e => e.currentTarget.style.borderColor="#003865"}
-      onBlur={e  => e.currentTarget.style.borderColor="#c8d3dd"}>
+      style={{ border: `2px dashed ${T.border}`, borderRadius: T.xs, padding: "0.5rem 0.85rem", fontSize: "0.74rem", color: T.textMuted, cursor: "pointer", background: T.surface, outline: "none" }}
+      onFocus={e => e.currentTarget.style.borderColor=T.teal}
+      onBlur={e  => e.currentTarget.style.borderColor=T.border}>
       📋 {placeholder || "Click here, then Ctrl+V / ⌘V to paste image"}
     </div>
   );
@@ -228,29 +228,29 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
   }
 
   return (
-    <div style={{ background: "#fff", border: `1px solid ${isComplete ? "#b3dfc0" : "#c8d3dd"}`, borderLeft: `4px solid ${isComplete ? "#1a6e2e" : "#bcc8d4"}`, borderRadius: "4px", marginBottom: "0.7rem", overflow: "hidden" }}>
+    <div style={{ background: T.white, border: `1px solid ${isComplete ? T.successBd : T.border}`, borderLeft: `4px solid ${isComplete ? T.success : "#bcc8d4"}`, borderRadius: T.xs, marginBottom: "0.7rem", overflow: "hidden" }}>
 
       {/* Header */}
-      <div onClick={() => setOpen(o=>!o)} style={{ padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: "0.7rem", cursor: "pointer", background: open ? "#f8fafc" : "#fff", borderBottom: open ? "1px solid #e8edf2" : "none" }}>
-        <div style={{ width: "26px", height: "26px", borderRadius: "50%", background: isComplete ? "#d4edda" : "#e8edf2", border: `2px solid ${isComplete ? "#1a6e2e" : "#bcc8d4"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <span style={{ fontSize: "0.68rem", fontWeight: 700, color: isComplete ? "#1a6e2e" : "#667" }}>{index+1}</span>
+      <div onClick={() => setOpen(o=>!o)} style={{ padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: "0.7rem", cursor: "pointer", background: open ? T.surface : T.white, borderBottom: open ? "1px solid #e8edf2" : "none" }}>
+        <div style={{ width: "26px", height: "26px", borderRadius: "50%", background: isComplete ? "#d4edda" : "#e8edf2", border: `2px solid ${isComplete ? T.success : "#bcc8d4"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <span style={{ fontSize: "0.68rem", fontWeight: 700, color: isComplete ? T.success : "#667" }}>{index+1}</span>
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", gap: "0.4rem", marginBottom: "2px", flexWrap: "wrap", alignItems: "center" }}>
-            {q.id && <span style={{ fontSize: "0.65rem", fontWeight: 700, fontFamily: "monospace", color: "#fff", background: "#003865", padding: "1px 7px", borderRadius: "3px", letterSpacing:"0.05em" }}>{q.id}</span>}
-            {q.standard && <span style={{ fontSize: "0.6rem", fontWeight: 700, color: "#003865", background: "#ddeaf7", padding: "1px 6px", borderRadius: "2px", border: "1px solid #b3cde8" }}>{q.standard}</span>}
-            {q.short    && <span style={{ fontSize: "0.6rem", color: "#666", padding: "1px 6px" }}>{q.short}</span>}
-            {q.dok      && <span style={{ fontSize: "0.6rem", fontWeight: 700, color: "#7a4e00", background: "#fff3cd", padding: "1px 6px", borderRadius: "2px", border: "1px solid #ffc107" }}>DOK {q.dok}</span>}
+            {q.id && <span style={{ fontSize: "0.65rem", fontWeight: 700, fontFamily: "monospace", color: T.white, background: T.teal, padding: "1px 7px", borderRadius: T.xs, letterSpacing:"0.05em" }}>{q.id}</span>}
+            {q.standard && <span style={{ fontSize: "0.6rem", fontWeight: 700, color: T.teal, background: "#ddeaf7", padding: "1px 6px", borderRadius: "2px", border: "1px solid #b3cde8" }}>{q.standard}</span>}
+            {q.short    && <span style={{ fontSize: "0.6rem", color: T.textSecondary, padding: "1px 6px" }}>{q.short}</span>}
+            {q.dok      && <span style={{ fontSize: "0.6rem", fontWeight: 700, color: T.warning, background: "#fff3cd", padding: "1px 6px", borderRadius: "2px", border: `1px solid ${T.warningBd}` }}>DOK {q.dok}</span>}
           </div>
-          <div style={{ fontSize: "0.83rem", color: q.question ? "#1a1a1a" : "#bbb", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ fontSize: "0.83rem", color: q.question ? T.text : T.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {q.question || (q.questionImage ? "[diagram question]" : "Empty — click to edit")}
           </div>
         </div>
         <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>
           {!isFirst && <button onClick={e=>{e.stopPropagation();onMoveUp();}} style={smBtn}>↑</button>}
           {!isLast  && <button onClick={e=>{e.stopPropagation();onMoveDown();}} style={smBtn}>↓</button>}
-          <button onClick={e=>{e.stopPropagation();onRemove();}} style={{...smBtn,color:"#8b1a1a",borderColor:"#f0b8b8"}}>✕</button>
-          <span style={{ color: "#bbb", fontSize: "0.8rem", paddingLeft: "4px" }}>{open?"▲":"▼"}</span>
+          <button onClick={e=>{e.stopPropagation();onRemove();}} style={{...smBtn,color:T.dangerText,borderColor:T.dangerBd}}>✕</button>
+          <span style={{ color: T.textMuted, fontSize: "0.8rem", paddingLeft: "4px" }}>{open?"▲":"▼"}</span>
         </div>
       </div>
 
@@ -260,22 +260,22 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
           {/* Standard + skill + DOK */}
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
             <div style={{ flex: 2, minWidth: "200px" }}>
-              <label style={lbl}>GSE STANDARD <span style={{ fontWeight: 400, color: "#aaa" }}>— auto-suggests as you type</span></label>
-              <select style={{ ...inp, fontFamily: "monospace", borderColor: suggestion ? "#ffc107" : "#c8d3dd" }} value={q.standard} onChange={e => handleStandardChange(e.target.value)}>
+              <label style={lbl}>GSE STANDARD <span style={{ fontWeight: 400, color: T.textMuted }}>— auto-suggests as you type</span></label>
+              <select style={{ ...inp, fontFamily: "monospace", borderColor: suggestion ? T.warningBd : T.border }} value={q.standard} onChange={e => handleStandardChange(e.target.value)}>
                 {Object.keys(STANDARD_MAP).map(s => <option key={s} value={s}>{s} — {STANDARD_MAP[s].short}</option>)}
               </select>
               {suggestion && (
                 <div style={{ marginTop: "5px", display: "flex", alignItems: "center", gap: "6px", fontSize: "0.73rem" }}>
-                  <span style={{ color: "#7a4e00" }}>💡 Suggested:</span>
-                  <button onClick={() => handleStandardChange(suggestion)} style={{ background: "#fff3cd", border: "1px solid #ffc107", borderRadius: "3px", padding: "2px 8px", cursor: "pointer", fontSize: "0.72rem", fontWeight: 700, color: "#7a4e00" }}>
+                  <span style={{ color: T.warning }}>💡 Suggested:</span>
+                  <button onClick={() => handleStandardChange(suggestion)} style={{ background: "#fff3cd", border: `1px solid ${T.warningBd}`, borderRadius: T.xs, padding: "2px 8px", cursor: "pointer", fontSize: "0.72rem", fontWeight: 700, color: T.warning }}>
                     Use {suggestion} — {STANDARD_MAP[suggestion]?.short}
                   </button>
-                  <button onClick={() => setSuggestion(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: "0.72rem" }}>dismiss</button>
+                  <button onClick={() => setSuggestion(null)} style={{ background: "none", border: "none", cursor: "pointer", color: T.textMuted, fontSize: "0.72rem" }}>dismiss</button>
                 </div>
               )}
             </div>
             <div style={{ flex: 1, minWidth: "140px" }}>
-              <label style={lbl}>SKILL LABEL <span style={{ fontWeight: 400, color: "#aaa" }}>— auto-filled</span></label>
+              <label style={lbl}>SKILL LABEL <span style={{ fontWeight: 400, color: T.textMuted }}>— auto-filled</span></label>
               <input style={inp} value={q.short} onChange={e => update("short",e.target.value)} placeholder="e.g. Place Value" />
             </div>
             <div style={{ flex: 1, minWidth: "140px" }}>
@@ -283,21 +283,21 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
               <div style={{ display: "flex", gap: "4px" }}>
                 {DOK_OPTIONS.map(d => (
                   <button key={d.level} onClick={() => update("dok",d.level)} title={`DOK ${d.level} — ${d.label}: ${d.desc}`}
-                    style={{ flex: 1, padding: "6px 0", border: `2px solid ${q.dok===d.level?"#003865":"#c8d3dd"}`, borderRadius: "3px", background: q.dok===d.level?"#003865":"#fafbfc", color: q.dok===d.level?"#fff":"#555", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}>
+                    style={{ flex: 1, padding: "6px 0", border: `2px solid ${q.dok===d.level?T.teal:T.border}`, borderRadius: T.xs, background: q.dok===d.level?T.teal:T.surface, color: q.dok===d.level?T.white:T.textSecondary, fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}>
                     {d.level}
                   </button>
                 ))}
               </div>
-              {q.dok && <div style={{ fontSize: "0.67rem", color: "#888", marginTop: "4px" }}><strong>DOK {q.dok} — {DOK_OPTIONS[q.dok-1].label}</strong></div>}
+              {q.dok && <div style={{ fontSize: "0.67rem", color: T.textSecondary, marginTop: "4px" }}><strong>DOK {q.dok} — {DOK_OPTIONS[q.dok-1].label}</strong></div>}
             </div>
           </div>
 
           {/* Question type toggle */}
           <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
-            <span style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#555"}}>QUESTION TYPE</span>
+            <span style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary}}>QUESTION TYPE</span>
             {[["mcq","📝 Multiple Choice"],["multiselect","☑ Multi-Select"],["keypad","🔢 Numeric Answer"],["plotpoint","📍 Plot a Point"]].map(([t,lbl2])=>(
               <button key={t} onClick={()=>update("type",t)}
-                style={{padding:"5px 12px",borderRadius:"4px",border:`2px solid ${q.type===t?"#003865":"#c8d3dd"}`,background:q.type===t?"#003865":"#fafbfc",color:q.type===t?"#fff":"#555",fontSize:"0.78rem",fontWeight:700,cursor:"pointer"}}>
+                style={{padding:"5px 12px",borderRadius:T.xs,border:`2px solid ${q.type===t?T.teal:T.border}`,background:q.type===t?T.teal:T.surface,color:q.type===t?T.white:T.textSecondary,fontSize:"0.78rem",fontWeight:700,cursor:"pointer"}}>
                 {lbl2}
               </button>
             ))}
@@ -305,20 +305,20 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
 
           {/* Question text with math toolbar */}
           <div>
-            <label style={lbl}>QUESTION TEXT <span style={{ fontWeight: 400, color: "#aaa" }}>— press Enter for new line · wrap math in $…$</span></label>
+            <label style={lbl}>QUESTION TEXT <span style={{ fontWeight: 400, color: T.textMuted }}>— press Enter for new line · wrap math in $…$</span></label>
             <MathTextarea value={q.question} onChange={text => handleQuestionChange(text)} placeholder={"Type the question here…\nPress Enter to start a new line.\nUse toolbar buttons or $\\frac{1}{2}$ for fractions."} height="90px" />
           </div>
 
           {/* Question image */}
           <div>
-            <label style={lbl}>QUESTION DIAGRAM <span style={{ fontWeight: 400, color: "#aaa" }}>— optional</span></label>
+            <label style={lbl}>QUESTION DIAGRAM <span style={{ fontWeight: 400, color: T.textMuted }}>— optional</span></label>
             <PasteImageZone image={q.questionImage} onImage={img=>update("questionImage",img)} onClear={()=>update("questionImage",null)} placeholder="Click here then Ctrl+V / ⌘V to paste a screenshot" />
           </div>
 
           {/* Answer choices — MCQ and Multi-Select */}
           {(isMCQ || isMulti) && (
           <div>
-            <label style={lbl}>ANSWER CHOICES <span style={{ fontWeight: 400, color: "#aaa" }}>— text, math, and/or diagram per choice</span></label>
+            <label style={lbl}>ANSWER CHOICES <span style={{ fontWeight: 400, color: T.textMuted }}>— text, math, and/or diagram per choice</span></label>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
               {q.choices.map((choice, i) => {
                 const isCorrect = isMulti
@@ -326,20 +326,20 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
                   : (q.correct === choice && !!choice);
                 const ci = q.choiceImages?.[i] ?? null;
                 return (
-                  <div key={i} style={{ border: `1px solid ${isCorrect ? "#b3dfc0" : "#dde3e9"}`, borderRadius: "4px", background: isCorrect ? "#f0faf2" : "#fafbfc", padding: "0.6rem 0.8rem" }}>
+                  <div key={i} style={{ border: `1px solid ${isCorrect ? T.successBd : T.border}`, borderRadius: T.xs, background: isCorrect ? T.successBg : T.surface, padding: "0.6rem 0.8rem" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.4rem" }}>
-                      <div style={{ width: "22px", height: "22px", borderRadius: "50%", border: `2px solid ${isCorrect ? "#1a6e2e" : "#bcc8d4"}`, background: isCorrect ? "#1a6e2e" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <span style={{ fontSize: "0.65rem", fontWeight: 700, color: isCorrect ? "#fff" : "#667" }}>{LETTERS[i]}</span>
+                      <div style={{ width: "22px", height: "22px", borderRadius: "50%", border: `2px solid ${isCorrect ? T.success : "#bcc8d4"}`, background: isCorrect ? T.success : T.white, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <span style={{ fontSize: "0.65rem", fontWeight: 700, color: isCorrect ? T.white : "#667" }}>{LETTERS[i]}</span>
                       </div>
                       <input style={{ ...inp, flex: 1, padding: "0.4rem 0.65rem", fontFamily: "monospace", fontSize: "0.85rem" }} value={choice} onChange={e => updateChoice(i, e.target.value)} placeholder={`Choice ${LETTERS[i]} — use $\frac{1}{2}$ for fractions`} />
                       {isMulti ? (
                         <button onClick={() => toggleCorrectMulti(choice)}
-                          style={{ ...smBtn, background: isCorrect?"#1a6e2e":"#f0f4f8", color: isCorrect?"#fff":"#555", borderColor: isCorrect?"#1a6e2e":"#c8d3dd", padding: "5px 10px", whiteSpace: "nowrap" }}>
+                          style={{ ...smBtn, background: isCorrect?T.success:T.surfaceAlt, color: isCorrect?T.white:T.textSecondary, borderColor: isCorrect?T.success:T.border, padding: "5px 10px", whiteSpace: "nowrap" }}>
                           {isCorrect ? "✓ Correct" : "+ Correct"}
                         </button>
                       ) : (
                         <button onClick={() => update("correct", choice || null)}
-                          style={{ ...smBtn, background: isCorrect?"#1a6e2e":"#f0f4f8", color: isCorrect?"#fff":"#555", borderColor: isCorrect?"#1a6e2e":"#c8d3dd", padding: "5px 10px", whiteSpace: "nowrap" }}>
+                          style={{ ...smBtn, background: isCorrect?T.success:T.surfaceAlt, color: isCorrect?T.white:T.textSecondary, borderColor: isCorrect?T.success:T.border, padding: "5px 10px", whiteSpace: "nowrap" }}>
                           {isCorrect ? "✓ Correct" : "Mark Correct"}
                         </button>
                       )}
@@ -356,18 +356,18 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
 
           {/* Multiselect helper */}
           {isMulti && (
-            <div style={{background:"#f0f4f8",borderRadius:"4px",padding:"0.6rem 0.9rem",fontSize:"0.75rem",color:"#555"}}>
+            <div style={{background:T.surfaceAlt,borderRadius:T.xs,padding:"0.6rem 0.9rem",fontSize:"0.75rem",color:T.textSecondary}}>
               <strong>Multi-Select:</strong> Click "+ Correct" on 2–3 choices above.
               Currently correct: {Array.isArray(q.answer) && q.answer.length > 0
-                ? q.answer.map((a,i) => <strong key={i} style={{color:"#1a6e2e"}}>{a}{i < q.answer.length-1 ? ", " : ""}</strong>)
-                : <span style={{color:"#8b1a1a"}}>None selected yet.</span>}
+                ? q.answer.map((a,i) => <strong key={i} style={{color:T.success}}>{a}{i < q.answer.length-1 ? ", " : ""}</strong>)
+                : <span style={{color:T.dangerText}}>None selected yet.</span>}
             </div>
           )}
 
           {/* Answer — Keypad / Numeric */}
           {isKeypad && (
           <div>
-            <label style={lbl}>CORRECT ANSWER <span style={{fontWeight:400,color:"#aaa"}}>— exact numeric value (decimals ok)</span></label>
+            <label style={lbl}>CORRECT ANSWER <span style={{fontWeight:400,color:T.textMuted}}>— exact numeric value (decimals ok)</span></label>
             <div style={{display:"flex",gap:"0.75rem",alignItems:"center"}}>
               <input
                 type="text"
@@ -377,9 +377,9 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
                 placeholder="e.g.  3.5  or  1/4  or  12"
                 style={{...inp, fontFamily:"monospace", fontSize:"1.1rem", fontWeight:700, maxWidth:"200px", letterSpacing:"0.05em"}}
               />
-              {q.answer && <span style={{fontSize:"0.78rem",color:"#1a6e2e",fontWeight:700}}>✓ Answer set: {q.answer}</span>}
+              {q.answer && <span style={{fontSize:"0.78rem",color:T.success,fontWeight:700}}>✓ Answer set: {q.answer}</span>}
             </div>
-            <div style={{fontSize:"0.7rem",color:"#888",marginTop:"4px"}}>
+            <div style={{fontSize:"0.7rem",color:T.textSecondary,marginTop:"4px"}}>
               Student types their answer — graded by exact match (trimmed, case-insensitive).
             </div>
           </div>
@@ -396,10 +396,10 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
                 onPlace={pt => update("answer", pt)}
                 size={260}
               />
-              <div style={{fontSize:"0.82rem",color:"#555",lineHeight:1.7,paddingTop:"0.5rem"}}>
+              <div style={{fontSize:"0.82rem",color:T.textSecondary,lineHeight:1.7,paddingTop:"0.5rem"}}>
                 {q.answer
-                  ? <><strong style={{color:"#1a6e2e",fontSize:"1rem"}}>✓ ({q.answer[0]}, {q.answer[1]})</strong><br/>Click a different point to change it.</>
-                  : <span style={{color:"#8b1a1a"}}>Click a point on the grid to set the correct answer.</span>}
+                  ? <><strong style={{color:T.success,fontSize:"1rem"}}>✓ ({q.answer[0]}, {q.answer[1]})</strong><br/>Click a different point to change it.</>
+                  : <span style={{color:T.dangerText}}>Click a point on the grid to set the correct answer.</span>}
               </div>
             </div>
           </div>
@@ -408,22 +408,22 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
           {/* Live preview */}
           {(q.question || q.questionImage) && (
             <div style={{ borderTop: "1px solid #eef1f4", paddingTop: "1rem" }}>
-              <div style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.12em", color: "#888", marginBottom: "0.65rem" }}>STUDENT PREVIEW — renders math & line breaks</div>
-              <div style={{ background: "#f8fafc", border: "1px solid #dde3e9", borderRadius: "4px", padding: "1rem 1.1rem" }}>
+              <div style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.12em", color: T.textSecondary, marginBottom: "0.65rem" }}>STUDENT PREVIEW — renders math & line breaks</div>
+              <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: T.xs, padding: "1rem 1.1rem" }}>
                 <div style={{ display: "flex", gap: "0.4rem", marginBottom: "0.5rem", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "0.6rem", fontWeight: 700, color: "#003865", background: "#ddeaf7", padding: "2px 7px", borderRadius: "2px", border: "1px solid #b3cde8" }}>{q.standard}</span>
-                  {q.dok && <span style={{ fontSize: "0.6rem", fontWeight: 700, color: "#7a4e00", background: "#fff3cd", padding: "2px 7px", borderRadius: "2px", border: "1px solid #ffc107" }}>DOK {q.dok}</span>}
+                  <span style={{ fontSize: "0.6rem", fontWeight: 700, color: T.teal, background: "#ddeaf7", padding: "2px 7px", borderRadius: "2px", border: "1px solid #b3cde8" }}>{q.standard}</span>
+                  {q.dok && <span style={{ fontSize: "0.6rem", fontWeight: 700, color: T.warning, background: "#fff3cd", padding: "2px 7px", borderRadius: "2px", border: `1px solid ${T.warningBd}` }}>DOK {q.dok}</span>}
                 </div>
                 {q.question && (
                   <p style={{ fontFamily: "Georgia,serif", fontSize: "0.95rem", color: "#0f0f0f", lineHeight: 1.7, margin: "0 0 0.5rem" }}>
                     <MathText text={q.question} />
                   </p>
                 )}
-                {q.questionImage && <img src={q.questionImage} alt="diagram" style={{ maxWidth: "100%", maxHeight: "160px", borderRadius: "3px", marginBottom: "0.5rem", display: "block" }} />}
+                {q.questionImage && <img src={q.questionImage} alt="diagram" style={{ maxWidth: "100%", maxHeight: "160px", borderRadius: T.xs, marginBottom: "0.5rem", display: "block" }} />}
                 {isPlot ? (
                   <div style={{marginTop:"0.5rem"}}>
                     <PlotGrid answer={q.answer} placed={q.answer} readOnly size={220}/>
-                    {q.answer && <div style={{fontSize:"0.78rem",color:"#1a6e2e",marginTop:"4px",fontWeight:700}}>Answer: ({q.answer[0]}, {q.answer[1]})</div>}
+                    {q.answer && <div style={{fontSize:"0.78rem",color:T.success,marginTop:"4px",fontWeight:700}}>Answer: ({q.answer[0]}, {q.answer[1]})</div>}
                   </div>
                 ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -432,9 +432,9 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
                     if (!c && !ci) return null;
                     const isC = q.correct === c && c;
                     return (
-                      <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.45rem 0.75rem", border: `1px solid ${isC?"#003865":"#dde3e9"}`, borderRadius: "3px", background: isC?"#ddeaf7":"#fff" }}>
-                        <div style={{ width: "20px", height: "20px", borderRadius: "50%", border: `2px solid ${isC?"#003865":"#9aabba"}`, background: isC?"#003865":"#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          <span style={{ fontSize: "0.6rem", fontWeight: 700, color: isC?"#fff":"#667" }}>{LETTERS[i]}</span>
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.45rem 0.75rem", border: `1px solid ${isC?T.teal:T.border}`, borderRadius: T.xs, background: isC?"#ddeaf7":T.white }}>
+                        <div style={{ width: "20px", height: "20px", borderRadius: "50%", border: `2px solid ${isC?T.teal:"#9aabba"}`, background: isC?T.teal:T.white, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <span style={{ fontSize: "0.6rem", fontWeight: 700, color: isC?T.white:"#667" }}>{LETTERS[i]}</span>
                         </div>
                         <div>
                           {c && <MathText text={c} style={{ fontSize: "0.9rem", fontFamily: "Georgia,serif", color: "#0f0f0f" }} />}
@@ -673,10 +673,10 @@ export default function QuestionBuilder() {
   }).length;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#e8edf2", fontFamily: "sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#e8edf2", fontFamily: T.font }}>
 
       {/* Header */}
-      <div style={{ background: "#003865", color: "#fff", padding: "0 1.5rem", height: "52px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 2px 6px rgba(0,0,0,.3)" }}>
+      <div style={{ background: T.midnight, color: T.white, padding: "0 1.5rem", height: "52px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 2px 6px rgba(0,0,0,.3)" }}>
         <div>
           <div style={{ fontSize: "0.58rem", opacity: .65, letterSpacing: "0.14em" }}>GEORGIA MILESTONES READINESS TRAINER</div>
           <div style={{ fontSize: "0.9rem", fontWeight: 600 }}>Question Builder</div>
@@ -684,20 +684,20 @@ export default function QuestionBuilder() {
         <div style={{ display: "flex", gap: "0.65rem", alignItems: "center" }}>
           <span style={{ fontSize: "0.75rem", opacity: .75 }}>{complete}/{questions.length} complete</span>
           <button onClick={()=>{setCsvPanel(p=>!p);setCsvPreview(null);setCsvErr("");setCsvResult(null);}}
-            style={{ background:"#4a7fa5", border:"none", borderRadius:"3px", padding:"6px 14px", fontSize:"0.78rem", fontWeight:700, color:"#fff", cursor:"pointer" }}>
+            style={{ background:"#4a7fa5", border:"none", borderRadius:T.xs, padding:"6px 14px", fontSize:"0.78rem", fontWeight:700, color:T.white, cursor:"pointer" }}>
             📥 Import CSV
           </button>
           <button onClick={seedBank} disabled={saving}
-            style={{ background:"#7a4e00", border:"none", borderRadius:"3px", padding:"6px 14px", fontSize:"0.78rem", fontWeight:700, color:"#fff", cursor:"pointer", opacity:saving?0.6:1 }}
+            style={{ background:T.warning, border:"none", borderRadius:T.xs, padding:"6px 14px", fontSize:"0.78rem", fontWeight:700, color:T.white, cursor:"pointer", opacity:saving?0.6:1 }}
             title="Re-load the 100 built-in questions into the bank">
             🔄 Restore Built-in Questions
           </button>
-          {savedCount>0&&<span style={{fontSize:"0.75rem",color:"#1a6e2e",fontWeight:700}}>+{savedCount} added</span>}
+          {savedCount>0&&<span style={{fontSize:"0.75rem",color:T.success,fontWeight:700}}>+{savedCount} added</span>}
           <button onClick={saveToBank} disabled={saving||complete===0}
-            style={{ background: savedCount>0?"#d4edda":complete===0?"#c8d3dd":"#1a6e2e", color: savedCount>0?"#1a6e2e":"#fff", border: "none", borderRadius: "3px", padding: "6px 14px", fontWeight: 700, fontSize: "0.8rem", cursor: complete===0?"not-allowed":"pointer" }}>
+            style={{ background: savedCount>0?"#d4edda":complete===0?T.border:T.success, color: savedCount>0?T.success:T.white, border: "none", borderRadius: T.xs, padding: "6px 14px", fontWeight: 700, fontSize: "0.8rem", cursor: complete===0?"not-allowed":"pointer" }}>
             {savedCount>0 ? `✓ Saved ${savedCount} to Bank!` : saving ? "Saving…" : `💾 Save to Bank (${complete})`}
           </button>
-          <button onClick={copyJSON} style={{ background: copied?"#d4edda":"#fff", color: copied?"#1a6e2e":"#003865", border: "none", borderRadius: "3px", padding: "6px 14px", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer" }}>
+          <button onClick={copyJSON} style={{ background: copied?"#d4edda":T.white, color: copied?T.success:T.teal, border: "none", borderRadius: T.xs, padding: "6px 14px", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer" }}>
             {copied ? "✓ Copied!" : "📋 Copy JSON"}
           </button>
         </div>
@@ -710,13 +710,13 @@ export default function QuestionBuilder() {
         <div style={{background:"#fff",border:"1px solid #b3cde8",borderRadius:"6px",padding:"1.25rem",marginBottom:"1rem",boxShadow:"0 2px 12px rgba(0,56,101,.08)"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1rem"}}>
             <div>
-              <div style={{fontSize:"0.95rem",fontWeight:700,color:"#003865"}}>Import Questions from CSV</div>
-              <div style={{fontSize:"0.75rem",color:"#888",marginTop:"2px"}}>
+              <div style={{fontSize:"0.95rem",fontWeight:700,color:T.teal}}>Import Questions from CSV</div>
+              <div style={{fontSize:"0.75rem",color:T.textSecondary,marginTop:"2px"}}>
                 One question per row. ID column optional — leave blank to auto-assign (Q00001 format). Columns: id, standard, short, dok, question, choiceA–D, correct
               </div>
             </div>
             <button onClick={downloadTemplate}
-              style={{background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"6px 14px",fontSize:"0.78rem",fontWeight:600,cursor:"pointer",color:"#003865"}}>
+              style={{background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"6px 14px",fontSize:"0.78rem",fontWeight:600,cursor:"pointer",color:T.teal}}>
               ⬇ Download Template
             </button>
           </div>
@@ -763,10 +763,10 @@ export default function QuestionBuilder() {
                 <div style={{maxHeight:"220px",overflowY:"auto"}}>
                   {csvPreview.rows.map((r,i)=>(
                     <div key={i} style={{display:"grid",gridTemplateColumns:"56px 110px 60px 30px 1fr 80px",padding:"0.45rem 0.75rem",gap:"0.5rem",fontSize:"0.78rem",borderTop:"1px solid #eef1f4",alignItems:"center"}}>
-                      <span style={{fontFamily:"monospace",fontSize:"0.72rem",color:r.id?"#003865":"#bbb"}}>{r.id||"auto"}</span>
-                      <span style={{color:"#003865",fontWeight:700,fontSize:"0.72rem"}}>{r.standard}</span>
+                      <span style={{fontFamily:"monospace",fontSize:"0.72rem",color:r.id?T.midnight:T.textMuted}}>{r.id||"auto"}</span>
+                      <span style={{color:T.midnight,fontWeight:700,fontSize:"0.72rem"}}>{r.standard}</span>
                       <span style={{color:"#555",fontSize:"0.72rem"}}>{r.short}</span>
-                      <span style={{color:"#888",textAlign:"center"}}>{r.dok}</span>
+                      <span style={{color:T.textSecondary,textAlign:"center"}}>{r.dok}</span>
                       <span style={{color:"#1a1a1a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.question}</span>
                       <span style={{color:"#1a6e2e",fontWeight:600,fontSize:"0.75rem",overflow:"hidden",textOverflow:"ellipsis"}}>{r.correct}</span>
                     </div>
@@ -788,7 +788,7 @@ export default function QuestionBuilder() {
                   <span style={{fontSize:"1.3rem"}}>✅</span>
                   <div>
                     <div style={{fontWeight:700,color:"#1a6e2e",fontSize:"0.9rem"}}>{csvResult.added} question{csvResult.added!==1?"s":""} added to bank</div>
-                    <div style={{fontSize:"0.72rem",color:"#888"}}>Bank now has {csvResult.total} total questions</div>
+                    <div style={{fontSize:"0.72rem",color:T.textSecondary}}>Bank now has {csvResult.total} total questions</div>
                   </div>
                 </div>
               )}
@@ -805,7 +805,7 @@ export default function QuestionBuilder() {
                   </div>
                   <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap"}}>
                     <button onClick={()=>importCSVQuestions(true)}
-                      style={{background:"#003865",color:"#fff",border:"none",borderRadius:"3px",padding:"6px 14px",cursor:"pointer",fontSize:"0.78rem",fontWeight:700}}>
+                      style={{background:T.teal,color:"#fff",border:"none",borderRadius:"3px",padding:"6px 14px",cursor:"pointer",fontSize:"0.78rem",fontWeight:700}}>
                       Auto-assign new IDs and import
                     </button>
                     <button onClick={()=>{ setCsvResult(null); setCsvPreview(null); setCsvPanel(false); }}
@@ -831,7 +831,7 @@ export default function QuestionBuilder() {
           <span style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.1em", color: "#555" }}>DOK:</span>
           {DOK_OPTIONS.map(d => (
             <span key={d.level} style={{ fontSize: "0.72rem", color: "#555" }}>
-              <strong style={{ color: "#003865" }}>{d.level} {d.label}</strong> — <span style={{ color: "#888" }}>{d.desc}</span>
+              <strong style={{ color: T.midnight }}>{d.level} {d.label}</strong> — <span style={{ color: T.textSecondary }}>{d.desc}</span>
             </span>
           ))}
         </div>
@@ -844,7 +844,7 @@ export default function QuestionBuilder() {
         ))}
 
         <button onClick={addQuestion}
-          style={{ width: "100%", background: "#fff", border: "2px dashed #003865", borderRadius: "4px", padding: "0.85rem", fontSize: "0.88rem", fontWeight: 700, color: "#003865", cursor: "pointer" }}
+          style={{ width: "100%", background: "#fff", border: `2px dashed ${T.teal}`, borderRadius: "4px", padding: "0.85rem", fontSize: "0.88rem", fontWeight: 700, color: T.teal, cursor: "pointer" }}
           onMouseEnter={e=>e.currentTarget.style.background="#f0f4f8"}
           onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
           + Add Question
@@ -858,6 +858,6 @@ export default function QuestionBuilder() {
   );
 }
 
-const lbl   = { display: "block", fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.12em", color: "#555", marginBottom: "5px" };
-const inp   = { width: "100%", padding: "0.6rem 0.85rem", border: "1px solid #c8d3dd", borderRadius: "3px", fontSize: "0.9rem", color: "#1a1a1a", background: "#fafbfc", boxSizing: "border-box" };
-const smBtn = { background: "#f0f4f8", border: "1px solid #c8d3dd", borderRadius: "3px", padding: "4px 7px", cursor: "pointer", fontSize: "0.7rem", color: "#333", fontWeight: 600 };
+const lbl   = { display: "block", fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.12em", color: T.textSecondary, marginBottom: "5px" };
+const inp   = { width: "100%", padding: "0.6rem 0.85rem", border: `1px solid ${T.border}`, borderRadius: T.xs, fontSize: "0.9rem", color: T.text, background: T.surface, boxSizing: "border-box" };
+const smBtn = { background: T.surfaceAlt, border: `1px solid ${T.border}`, borderRadius: T.xs, padding: "4px 7px", cursor: "pointer", fontSize: "0.7rem", color: "#333", fontWeight: 600 };

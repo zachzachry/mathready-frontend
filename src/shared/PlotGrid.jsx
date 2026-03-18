@@ -170,9 +170,9 @@ export default function PlotGrid({
         {/* Student's placed point */}
         {placed && (() => {
           const p = gridToSvg(placed[0], placed[1]);
-          const color = !revealed ? "#003865"
-                      : isCorrect ? "#1a6e2e"
-                      : "#8b1a1a";
+          const color = !revealed ? "#0d9488"
+                      : isCorrect ? "#10b981"
+                      : "#ef4444";
           return (
             <g>
               <circle cx={p.x} cy={p.y} r="10" fill={color} opacity="0.15"/>

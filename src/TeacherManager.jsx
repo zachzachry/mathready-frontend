@@ -1,13 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { API } from "./shared/constants";
-
-const NAVY = "#003865";
+import { API, T } from "./shared/constants";
 
 
 const S = {
-  inp:  { width:"100%", padding:"0.5rem 0.75rem", border:"1px solid #c8d3dd", borderRadius:"3px", fontSize:"0.85rem", background:"#fafbfc", boxSizing:"border-box" },
-  lbl:  { display:"block", fontSize:"0.62rem", fontWeight:700, letterSpacing:"0.12em", color:"#555", marginBottom:"4px" },
-  btn:  { border:"1px solid #c8d3dd", borderRadius:"3px", padding:"6px 14px", cursor:"pointer", fontSize:"0.78rem", fontWeight:600, background:"#f0f4f8", color:"#333" },
+  inp:  { width:"100%", padding:"0.5rem 0.75rem", border:`1px solid ${T.border}`, borderRadius:T.xs, fontSize:"0.85rem", background:T.surface, boxSizing:"border-box" },
+  lbl:  { display:"block", fontSize:"0.62rem", fontWeight:700, letterSpacing:"0.12em", color:T.textSecondary, marginBottom:"4px" },
+  btn:  { border:`1px solid ${T.border}`, borderRadius:T.xs, padding:"6px 14px", cursor:"pointer", fontSize:"0.78rem", fontWeight:600, background:T.surfaceAlt, color:"#333" },
 };
 
 function ClassPicker({ allClasses, selected, onChange, onClassCreated }) {
@@ -33,23 +31,23 @@ function ClassPicker({ allClasses, selected, onChange, onClassCreated }) {
   return (
     <div>
       <div style={{ display:"flex", flexDirection:"column", gap:"0.3rem", maxHeight:"180px", overflowY:"auto",
-        border:"1px solid #c8d3dd", borderRadius:"3px", padding:"0.5rem", background:"#fafbfc",
+        border:`1px solid ${T.border}`, borderRadius:T.xs, padding:"0.5rem", background:T.surface,
         marginBottom:"0.4rem" }}>
         {allClasses.length === 0 && !adding && (
-          <div style={{ color:"#aaa", fontSize:"0.8rem", padding:"0.25rem" }}>No classes yet — create one below.</div>
+          <div style={{ color:T.textMuted, fontSize:"0.8rem", padding:"0.25rem" }}>No classes yet — create one below.</div>
         )}
         {allClasses.map(cls => {
           const checked = selected.includes(cls.id);
           return (
             <label key={cls.id} style={{ display:"flex", alignItems:"center", gap:"0.5rem", cursor:"pointer",
-              padding:"0.35rem 0.5rem", borderRadius:"3px", background: checked ? "#ddeaf7" : "transparent" }}>
+              padding:"0.35rem 0.5rem", borderRadius:T.xs, background: checked ? "#ddeaf7" : "transparent" }}>
               <input type="checkbox" checked={checked}
                 onChange={() => onChange(checked ? selected.filter(id=>id!==cls.id) : [...selected, cls.id])}
-                style={{ accentColor: NAVY }}/>
-              <span style={{ fontSize:"0.85rem", fontWeight: checked ? 700 : 500, color: checked ? NAVY : "#333" }}>
+                style={{ accentColor: T.teal }}/>
+              <span style={{ fontSize:"0.85rem", fontWeight: checked ? 700 : 500, color: checked ? T.teal : "#333" }}>
                 {cls.name}
               </span>
-              <span style={{ fontSize:"0.68rem", color:"#aaa", marginLeft:"auto" }}>
+              <span style={{ fontSize:"0.68rem", color:T.textMuted, marginLeft:"auto" }}>
                 {cls.students?.length || 0} students
               </span>
             </label>
@@ -62,19 +60,19 @@ function ClassPicker({ allClasses, selected, onChange, onClassCreated }) {
           <input autoFocus value={newName} onChange={e=>setNewName(e.target.value)}
             onKeyDown={e=>{ if(e.key==="Enter") createClass(); if(e.key==="Escape") setAdding(false); }}
             placeholder="Class name, e.g. Ms. Johnson Pd 1"
-            style={{ flex:1, padding:"5px 8px", border:"1px solid #003865", borderRadius:"3px", fontSize:"0.82rem" }}/>
+            style={{ flex:1, padding:"5px 8px", border:`1px solid ${T.teal}`, borderRadius:T.xs, fontSize:"0.82rem" }}/>
           <button onClick={createClass} disabled={creating||!newName.trim()}
-            style={{ background:NAVY, color:"#fff", border:"none", borderRadius:"3px",
+            style={{ background:T.teal, color:T.white, border:"none", borderRadius:T.xs,
               padding:"5px 12px", cursor:"pointer", fontSize:"0.78rem", fontWeight:700 }}>
             {creating ? "…" : "Add"}
           </button>
           <button onClick={()=>setAdding(false)}
-            style={{ background:"#f0f4f8", border:"1px solid #c8d3dd", borderRadius:"3px",
+            style={{ background:T.surfaceAlt, border:`1px solid ${T.border}`, borderRadius:T.xs,
               padding:"5px 10px", cursor:"pointer", fontSize:"0.78rem" }}>✕</button>
         </div>
       ) : (
         <button onClick={()=>setAdding(true)}
-          style={{ background:"none", border:"1px dashed #b3cde8", borderRadius:"3px", padding:"5px 12px",
+          style={{ background:"none", border:"1px dashed #b3cde8", borderRadius:T.xs, padding:"5px 12px",
             cursor:"pointer", fontSize:"0.75rem", color:"#4a7fa5", width:"100%", textAlign:"left" }}>
           + Create new class
         </button>
@@ -108,9 +106,9 @@ function TeacherForm({ teacher, allClasses, onSave, onCancel, onClassCreated }) 
   }
 
   return (
-    <div style={{ background:"#fff", border:"1px solid #c8d3dd", borderRadius:"6px",
+    <div style={{ background:T.white, border:`1px solid ${T.border}`, borderRadius:"6px",
       padding:"1.25rem", boxShadow:"0 2px 12px rgba(0,0,0,.08)" }}>
-      <div style={{ fontSize:"0.9rem", fontWeight:700, color:NAVY, marginBottom:"1rem" }}>
+      <div style={{ fontSize:"0.9rem", fontWeight:700, color:T.midnight, marginBottom:"1rem" }}>
         {teacher ? `Edit — ${teacher.name}` : "New Teacher Account"}
       </div>
 
@@ -143,17 +141,17 @@ function TeacherForm({ teacher, allClasses, onSave, onCancel, onClassCreated }) 
         <label style={S.lbl}>ASSIGN CLASSES</label>
         <ClassPicker allClasses={allClasses} selected={classIds} onChange={setClassIds}
           onClassCreated={(newId) => { onClassCreated(newId); setClassIds(ids => [...ids, newId]); }}/>
-        <div style={{ fontSize:"0.68rem", color:"#888", marginTop:"4px" }}>
+        <div style={{ fontSize:"0.68rem", color:T.textSecondary, marginTop:"4px" }}>
           {classIds.length === 0 ? "No classes assigned — teacher will see no data." : `${classIds.length} class${classIds.length!==1?"es":""} assigned`}
         </div>
       </div>
 
-      {err && <div style={{ background:"#fdf2f2", border:"1px solid #f0b8b8", borderRadius:"3px",
-        padding:"0.5rem 0.75rem", fontSize:"0.78rem", color:"#8b1a1a", marginBottom:"0.75rem" }}>⚠ {err}</div>}
+      {err && <div style={{ background:T.dangerBg, border:`1px solid ${T.dangerBd}`, borderRadius:T.xs,
+        padding:"0.5rem 0.75rem", fontSize:"0.78rem", color:T.dangerText, marginBottom:"0.75rem" }}>⚠ {err}</div>}
 
       <div style={{ display:"flex", gap:"0.5rem" }}>
         <button onClick={submit} disabled={saving}
-          style={{...S.btn, background:NAVY, color:"#fff", border:"none", padding:"7px 20px", opacity:saving?0.7:1}}>
+          style={{...S.btn, background:T.teal, color:T.white, border:"none", padding:"7px 20px", opacity:saving?0.7:1}}>
           {saving ? "Saving…" : teacher ? "Save Changes" : "Create Account"}
         </button>
         <button onClick={onCancel} style={S.btn}>Cancel</button>
@@ -202,27 +200,27 @@ export default function TeacherManager() {
     return names.length ? names.join(", ") : <span style={{ color:"#bbb", fontStyle:"italic" }}>No classes</span>;
   }
 
-  if (loading) return <div style={{ padding:"3rem", textAlign:"center", color:"#aaa" }}>Loading…</div>;
+  if (loading) return <div style={{ padding:"3rem", textAlign:"center", color:T.textMuted }}>Loading…</div>;
 
   return (
-    <div style={{ padding:"1.25rem", maxWidth:"860px", fontFamily:"sans-serif" }}>
+    <div style={{ padding:"1.25rem", maxWidth:"860px", fontFamily:T.font }}>
 
       {/* Header */}
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"1.25rem" }}>
         <div>
-          <div style={{ fontSize:"1rem", fontWeight:700, color:NAVY }}>Teacher Accounts</div>
-          <div style={{ fontSize:"0.75rem", color:"#888", marginTop:"2px" }}>
+          <div style={{ fontSize:"1rem", fontWeight:700, color:T.midnight }}>Teacher Accounts</div>
+          <div style={{ fontSize:"0.75rem", color:T.textSecondary, marginTop:"2px" }}>
             Each teacher signs in with Google and sees only their assigned classes.
           </div>
         </div>
         <button onClick={() => setEditing("new")}
-          style={{...S.btn, background:NAVY, color:"#fff", border:"none", padding:"7px 16px"}}>
+          style={{...S.btn, background:T.teal, color:T.white, border:"none", padding:"7px 16px"}}>
           + New Teacher
         </button>
       </div>
 
-      {msg && <div style={{ background:"#f0faf2", border:"1px solid #b3dfc0", borderRadius:"3px",
-        padding:"0.55rem 0.9rem", fontSize:"0.8rem", color:"#1a6e2e", fontWeight:700, marginBottom:"1rem" }}>
+      {msg && <div style={{ background:T.successBg, border:`1px solid ${T.successBd}`, borderRadius:T.xs,
+        padding:"0.55rem 0.9rem", fontSize:"0.8rem", color:T.success, fontWeight:700, marginBottom:"1rem" }}>
         ✓ {msg}
       </div>}
 
@@ -241,10 +239,10 @@ export default function TeacherManager() {
 
       {/* Teacher list */}
       {teachers.length === 0 && !editing ? (
-        <div style={{ background:"#f8fafc", border:"1px solid #dde3e9", borderRadius:"6px",
-          padding:"2.5rem", textAlign:"center", color:"#aaa" }}>
+        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:"6px",
+          padding:"2.5rem", textAlign:"center", color:T.textMuted }}>
           <div style={{ fontSize:"1.5rem", marginBottom:"0.5rem" }}>👩‍🏫</div>
-          <div style={{ fontWeight:600, color:"#555" }}>No teacher accounts yet</div>
+          <div style={{ fontWeight:600, color:T.textSecondary }}>No teacher accounts yet</div>
           <div style={{ fontSize:"0.82rem", marginTop:"4px" }}>
             Create accounts so each teacher has their own Google login and class access.
           </div>
@@ -252,37 +250,37 @@ export default function TeacherManager() {
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:"0.5rem" }}>
           {teachers.map(t => (
-            <div key={t.id} style={{ background:"#fff", border:"1px solid #dde3e9", borderRadius:"5px",
+            <div key={t.id} style={{ background:T.white, border:`1px solid ${T.border}`, borderRadius:"5px",
               padding:"0.9rem 1.1rem", display:"flex", alignItems:"center", gap:"1rem",
               boxShadow:"0 1px 4px rgba(0,0,0,.04)" }}>
               {/* Avatar */}
-              <div style={{ width:"40px", height:"40px", borderRadius:"50%", background:NAVY, flexShrink:0,
+              <div style={{ width:"40px", height:"40px", borderRadius:"50%", background:T.teal, flexShrink:0,
                 display:"flex", alignItems:"center", justifyContent:"center",
-                fontSize:"1.1rem", color:"#fff", fontWeight:700 }}>
+                fontSize:"1.1rem", color:T.white, fontWeight:700 }}>
                 {t.name[0]?.toUpperCase()}
               </div>
               {/* Info */}
               <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontWeight:700, color:"#1a1a1a", fontSize:"0.95rem" }}>{t.name}</div>
-                <div style={{ fontSize:"0.72rem", color: t.email ? "#1a6e2e" : "#e67e00", marginTop:"1px", fontWeight:600 }}>
+                <div style={{ fontWeight:700, color:T.text, fontSize:"0.95rem" }}>{t.name}</div>
+                <div style={{ fontSize:"0.72rem", color: t.email ? T.success : "#e67e00", marginTop:"1px", fontWeight:600 }}>
                   {t.email ? `✉ ${t.email}` : "⚠ No Google email set"}
                 </div>
-                <div style={{ fontSize:"0.72rem", color:"#888", marginTop:"1px", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                <div style={{ fontSize:"0.72rem", color:T.textSecondary, marginTop:"1px", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                   {classNamesFor(t.classIds)}
                 </div>
               </div>
 
               {/* Class count */}
               <div style={{ textAlign:"center", minWidth:"60px", flexShrink:0 }}>
-                <div style={{ fontSize:"1.2rem", fontWeight:700, color:NAVY }}>{t.classIds?.length || 0}</div>
-                <div style={{ fontSize:"0.62rem", color:"#888" }}>class{t.classIds?.length!==1?"es":""}</div>
+                <div style={{ fontSize:"1.2rem", fontWeight:700, color:T.teal }}>{t.classIds?.length || 0}</div>
+                <div style={{ fontSize:"0.62rem", color:T.textSecondary }}>class{t.classIds?.length!==1?"es":""}</div>
               </div>
               {/* Actions */}
               <div style={{ display:"flex", gap:"0.4rem", flexShrink:0 }}>
                 <button onClick={() => setEditing(t)}
                   style={{...S.btn, padding:"4px 12px", fontSize:"0.75rem"}}>✏️ Edit</button>
                 <button onClick={() => deleteTeacher(t)}
-                  style={{...S.btn, padding:"4px 10px", color:"#8b1a1a", borderColor:"#f0b8b8", background:"#fdf2f2", fontSize:"0.75rem"}}>✕</button>
+                  style={{...S.btn, padding:"4px 10px", color:T.dangerText, borderColor:T.dangerBd, background:T.dangerBg, fontSize:"0.75rem"}}>✕</button>
               </div>
             </div>
           ))}

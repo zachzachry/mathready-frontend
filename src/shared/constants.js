@@ -52,27 +52,68 @@ export const pad     = n  => String(n).padStart(2,"0");
 export const fmtTime = s  => `${pad(Math.floor(s/60))}:${pad(s%60)}`;
 export const pct     = (s,t) => Math.round((s/t)*100);
 export const lvl     = p  => p>=80?"Proficient":p>=60?"Developing":"Beginning";
-export const lvlC    = p  => p>=80?"#1a6e2e":p>=60?"#7a4e00":"#8b1a1a";
-export const lvlBg   = p  => p>=80?"#d4edda":p>=60?"#fff3cd":"#fdf2f2";
-export const lvlBd   = p  => p>=80?"#b3dfc0":p>=60?"#ffc107":"#f0b8b8";
+export const lvlC    = p  => p>=80?"#10b981":p>=60?"#f59e0b":"#ef4444";
+export const lvlBg   = p  => p>=80?"#d1fae5":p>=60?"#fef3c7":"#fee2e2";
+export const lvlBd   = p  => p>=80?"#6ee7b7":p>=60?"#fcd34d":"#fca5a5";
 export const now     = () => new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
 
-// ── Shared style tokens ────────────────────────────────────
+// ── Bold Modern Design Tokens ────────────────────────────
+export const T = {
+  // Colors
+  midnight:    "#0f172a",
+  slate:       "#1e293b",
+  teal:        "#0d9488",
+  tealDark:    "#0f766e",
+  tealLight:   "#ccfbf1",
+  tealMuted:   "#99f6e4",
+  white:       "#ffffff",
+  surface:     "#f8fafc",
+  surfaceAlt:  "#f1f5f9",
+  border:      "#e2e8f0",
+  borderDark:  "#cbd5e1",
+  text:        "#0f172a",
+  textSecondary: "#64748b",
+  textMuted:   "#94a3b8",
+  success:     "#10b981",
+  successBg:   "#d1fae5",
+  successBd:   "#6ee7b7",
+  warning:     "#f59e0b",
+  warningBg:   "#fef3c7",
+  warningBd:   "#fcd34d",
+  danger:      "#ef4444",
+  dangerBg:    "#fee2e2",
+  dangerBd:    "#fca5a5",
+  dangerText:  "#dc2626",
+  // Shadows
+  sm:          "0 1px 2px rgba(0,0,0,.05)",
+  md:          "0 4px 12px rgba(0,0,0,.08)",
+  lg:          "0 8px 30px rgba(0,0,0,.12)",
+  // Radii
+  xs:          "4px",
+  r:           "8px",
+  rl:          "12px",
+  full:        "9999px",
+  // Font
+  font:        "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+};
+
+// ── Shared style tokens (Bold Modern) ────────────────────
 export const S = {
-  page:      {minHeight:"100vh",background:"#e8edf2",display:"flex",flexDirection:"column",alignItems:"center",fontFamily:"sans-serif"},
-  card:      {background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",width:"100%",maxWidth:"500px",overflow:"hidden",boxShadow:"0 4px 20px rgba(0,0,0,.09)"},
-  hdr:       {background:"#003865",color:"#fff",padding:"1.1rem 2rem"},
-  hdrSub:    {fontSize:"0.58rem",letterSpacing:"0.18em",opacity:.65,marginBottom:"3px"},
-  hdrTitle:  {fontSize:"1.15rem",fontWeight:700,fontFamily:"Georgia,serif"},
-  lbl:       {display:"block",fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"5px"},
-  inp:       {width:"100%",padding:"0.65rem 0.85rem",border:"1px solid #c8d3dd",borderRadius:"3px",fontSize:"0.95rem",color:"#1a1a1a",background:"#fafbfc",boxSizing:"border-box"},
-  errBox:    {background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"3px",padding:"0.6rem 0.9rem",fontSize:"0.82rem",color:"#8b1a1a"},
-  confirmBox:{background:"#f8fafc",border:"1px solid #dde3e9",borderRadius:"3px",marginBottom:"1.25rem",overflow:"hidden"},
+  page:      {minHeight:"100vh",background:T.surface,display:"flex",flexDirection:"column",alignItems:"center",fontFamily:T.font},
+  card:      {background:T.white,border:`1px solid ${T.border}`,borderRadius:T.r,width:"100%",maxWidth:"500px",overflow:"hidden",boxShadow:T.md},
+  hdr:       {background:T.midnight,color:T.white,padding:"1.1rem 2rem"},
+  hdrSub:    {fontSize:"0.62rem",letterSpacing:"0.18em",opacity:.55,marginBottom:"3px",fontWeight:600},
+  hdrTitle:  {fontSize:"1.15rem",fontWeight:700},
+  lbl:       {display:"block",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"5px",textTransform:"uppercase"},
+  inp:       {width:"100%",padding:"0.65rem 0.85rem",border:`1px solid ${T.border}`,borderRadius:T.xs,fontSize:"0.95rem",color:T.text,background:T.white,boxSizing:"border-box",transition:"border-color .15s",outline:"none"},
+  errBox:    {background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:T.xs,padding:"0.6rem 0.9rem",fontSize:"0.82rem",color:T.dangerText,fontWeight:600},
+  confirmBox:{background:T.surface,border:`1px solid ${T.border}`,borderRadius:T.xs,marginBottom:"1.25rem",overflow:"hidden"},
   confirmRow:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0.65rem 1rem"},
-  confirmK:  {fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#888"},
-  confirmV:  {fontSize:"0.88rem",color:"#1a1a1a",fontWeight:600},
-  btnPri:    {background:"#003865",border:"none",borderRadius:"3px",padding:"0.75rem",fontSize:"0.9rem",cursor:"pointer",color:"#fff",fontWeight:700},
-  btnSec:    {background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.7rem",fontSize:"0.88rem",cursor:"pointer",fontWeight:600,color:"#333"},
+  confirmK:  {fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:T.textMuted},
+  confirmV:  {fontSize:"0.88rem",color:T.text,fontWeight:600},
+  btnPri:    {background:T.teal,border:"none",borderRadius:T.xs,padding:"0.75rem 1.25rem",fontSize:"0.9rem",cursor:"pointer",color:T.white,fontWeight:700,transition:"background .15s, transform .1s"},
+  btnSec:    {background:T.surface,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"0.7rem 1.25rem",fontSize:"0.88rem",cursor:"pointer",fontWeight:600,color:T.text,transition:"background .15s"},
+  btnDanger: {background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:T.xs,padding:"0.65rem 1rem",fontSize:"0.82rem",cursor:"pointer",fontWeight:600,color:T.dangerText,transition:"background .15s"},
 };
 
 // ── API helpers ────────────────────────────────────────────

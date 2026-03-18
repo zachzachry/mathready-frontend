@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import MathText from "./shared/MathText";
-import { API } from "./shared/constants";
+import { API, T } from "./shared/constants";
 
 const STANDARDS = [
   "5.NR.1.1","5.NR.1.2","5.NR.2.1","5.NR.2.2",
@@ -13,11 +13,11 @@ const STANDARDS = [
 const DOK_LABELS = { 1:"Recall", 2:"Skill/Concept", 3:"Strategic", 4:"Extended" };
 
 const S = {
-  inp:   { width:"100%", padding:"0.5rem 0.75rem", border:"1px solid #c8d3dd", borderRadius:"3px", fontSize:"0.85rem", background:"#fafbfc", boxSizing:"border-box" },
-  lbl:   { display:"block", fontSize:"0.62rem", fontWeight:700, letterSpacing:"0.12em", color:"#555", marginBottom:"4px" },
-  smBtn: { border:"1px solid #c8d3dd", borderRadius:"3px", padding:"4px 10px", cursor:"pointer", fontSize:"0.75rem", fontWeight:600, background:"#f0f4f8", color:"#333" },
-  ta:    { width:"100%", padding:"0.5rem 0.75rem", border:"1px solid #c8d3dd", borderRadius:"3px", fontSize:"0.85rem", background:"#fafbfc", boxSizing:"border-box", resize:"vertical", minHeight:"80px", fontFamily:"sans-serif" },
-  code:  { fontFamily:"monospace", fontSize:"1.1rem", letterSpacing:"0.18em", textTransform:"uppercase", fontWeight:700, color:"#003865" },
+  inp:   { width:"100%", padding:"0.5rem 0.75rem", border:`1px solid ${T.border}`, borderRadius:T.xs, fontSize:"0.85rem", background:T.surface, boxSizing:"border-box" },
+  lbl:   { display:"block", fontSize:"0.62rem", fontWeight:700, letterSpacing:"0.12em", color:T.textSecondary, marginBottom:"4px" },
+  smBtn: { border:`1px solid ${T.border}`, borderRadius:T.xs, padding:"4px 10px", cursor:"pointer", fontSize:"0.75rem", fontWeight:600, background:T.surfaceAlt, color:T.text },
+  ta:    { width:"100%", padding:"0.5rem 0.75rem", border:`1px solid ${T.border}`, borderRadius:T.xs, fontSize:"0.85rem", background:T.surface, boxSizing:"border-box", resize:"vertical", minHeight:"80px", fontFamily:T.font },
+  code:  { fontFamily:"monospace", fontSize:"1.1rem", letterSpacing:"0.18em", textTransform:"uppercase", fontWeight:700, color:T.midnight },
 };
 
 function genCode() {
@@ -46,10 +46,10 @@ function EditModal({ question, onSave, onClose }) {
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"1rem"}}>
-      <div style={{background:"#fff",borderRadius:"6px",width:"100%",maxWidth:"600px",maxHeight:"90vh",overflow:"hidden",display:"flex",flexDirection:"column",boxShadow:"0 8px 32px rgba(0,0,0,.25)"}}>
-        <div style={{background:"#003865",color:"#fff",padding:"0.9rem 1.25rem",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+      <div style={{background:T.white,borderRadius:"6px",width:"100%",maxWidth:"600px",maxHeight:"90vh",overflow:"hidden",display:"flex",flexDirection:"column",boxShadow:"0 8px 32px rgba(0,0,0,.25)"}}>
+        <div style={{background:T.midnight,color:T.white,padding:"0.9rem 1.25rem",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
           <div><div style={{fontSize:"0.6rem",opacity:.65,letterSpacing:"0.14em"}}>QUESTION BANK</div><div style={{fontSize:"1rem",fontWeight:700}}>Edit Question</div></div>
-          <button onClick={onClose} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"3px",padding:"5px 12px",cursor:"pointer",fontSize:"0.8rem"}}>✕ Cancel</button>
+          <button onClick={onClose} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:T.white,borderRadius:T.xs,padding:"5px 12px",cursor:"pointer",fontSize:"0.8rem"}}>✕ Cancel</button>
         </div>
         <div style={{overflowY:"auto",padding:"1.25rem",display:"flex",flexDirection:"column",gap:"0.85rem"}}>
           <div style={{display:"flex",gap:"0.75rem"}}>
@@ -70,7 +70,7 @@ function EditModal({ question, onSave, onClose }) {
           </div>
           <div><label style={S.lbl}>QUESTION TEXT (use $...$ for math)</label>
             <textarea style={S.ta} value={q.question} onChange={e=>setQ(p=>({...p,question:e.target.value}))} rows={3}/>
-            {q.question&&<div style={{marginTop:"4px",padding:"0.5rem 0.75rem",background:"#f8fafc",border:"1px solid #dde3e9",borderRadius:"3px",fontSize:"0.85rem",fontFamily:"Georgia,serif"}}><MathText text={q.question}/></div>}
+            {q.question&&<div style={{marginTop:"4px",padding:"0.5rem 0.75rem",background:T.surface,border:`1px solid ${T.border}`,borderRadius:T.xs,fontSize:"0.85rem",fontFamily:"Georgia,serif"}}><MathText text={q.question}/></div>}
           </div>
           <div><label style={S.lbl}>ANSWER CHOICES — click letter to mark correct</label>
             <div style={{display:"flex",flexDirection:"column",gap:"0.4rem"}}>
@@ -79,10 +79,10 @@ function EditModal({ question, onSave, onClose }) {
                 return (
                   <div key={i} style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
                     <div onClick={()=>setQ(p=>({...p,correct:p.choices[i]}))}
-                      style={{width:"24px",height:"24px",borderRadius:"50%",background:isCorrect?"#1a6e2e":"#e8edf2",border:`2px solid ${isCorrect?"#1a6e2e":"#bcc8d4"}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,cursor:"pointer"}}>
-                      <span style={{fontSize:"0.65rem",fontWeight:700,color:isCorrect?"#fff":"#667"}}>{letter}</span>
+                      style={{width:"24px",height:"24px",borderRadius:"50%",background:isCorrect?T.success:"#e8edf2",border:`2px solid ${isCorrect?T.success:"#bcc8d4"}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,cursor:"pointer"}}>
+                      <span style={{fontSize:"0.65rem",fontWeight:700,color:isCorrect?T.white:"#667"}}>{letter}</span>
                     </div>
-                    <input style={{...S.inp,flex:1,border:`1px solid ${isCorrect?"#1a6e2e":"#c8d3dd"}`,background:isCorrect?"#f0faf2":"#fafbfc"}}
+                    <input style={{...S.inp,flex:1,border:`1px solid ${isCorrect?T.success:T.border}`,background:isCorrect?T.successBg:T.surface}}
                       value={q.choices[i]} onChange={e=>updateChoice(i,e.target.value)} placeholder={`Choice ${letter}`}/>
                   </div>
                 );
@@ -90,9 +90,9 @@ function EditModal({ question, onSave, onClose }) {
             </div>
           </div>
         </div>
-        <div style={{padding:"0.9rem 1.25rem",borderTop:"1px solid #dde3e9",display:"flex",gap:"0.65rem",justifyContent:"flex-end",flexShrink:0}}>
+        <div style={{padding:"0.9rem 1.25rem",borderTop:`1px solid ${T.border}`,display:"flex",gap:"0.65rem",justifyContent:"flex-end",flexShrink:0}}>
           <button onClick={onClose} style={{...S.smBtn,padding:"0.6rem 1.25rem"}}>Cancel</button>
-          <button onClick={handleSave} disabled={saving} style={{background:"#003865",border:"none",borderRadius:"3px",padding:"0.6rem 1.5rem",fontSize:"0.85rem",fontWeight:700,color:"#fff",cursor:"pointer"}}>
+          <button onClick={handleSave} disabled={saving} style={{background:T.teal,border:"none",borderRadius:T.xs,padding:"0.6rem 1.5rem",fontSize:"0.85rem",fontWeight:700,color:T.white,cursor:"pointer"}}>
             {saving?"Saving…":"💾 Save Changes"}
           </button>
         </div>
@@ -151,8 +151,8 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose }
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
-      <div style={{background:"#fff",borderRadius:"6px",width:"100%",maxWidth:"420px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.25)"}}>
-        <div style={{background:"#003865",color:"#fff",padding:"0.9rem 1.25rem"}}>
+      <div style={{background:T.white,borderRadius:"6px",width:"100%",maxWidth:"420px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.25)"}}>
+        <div style={{background:T.midnight,color:T.white,padding:"0.9rem 1.25rem"}}>
           <div style={{fontSize:"0.6rem",opacity:.65,letterSpacing:"0.14em"}}>TEST LIBRARY</div>
           <div style={{fontSize:"1rem",fontWeight:700}}>Save Test</div>
         </div>
@@ -167,48 +167,48 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose }
               <button onClick={()=>setCode(genCode())} style={{...S.smBtn,flexShrink:0,padding:"0.5rem 0.75rem"}}>🔀 New</button>
             </div>
             {codeErr
-              ? <div style={{fontSize:"0.7rem",color:"#8b1a1a",marginTop:"4px"}}>⚠ {codeErr}</div>
-              : <div style={{fontSize:"0.7rem",color:"#888",marginTop:"4px"}}>4–8 characters, letters and numbers only</div>
+              ? <div style={{fontSize:"0.7rem",color:T.dangerText,marginTop:"4px"}}>⚠ {codeErr}</div>
+              : <div style={{fontSize:"0.7rem",color:T.textSecondary,marginTop:"4px"}}>4–8 characters, letters and numbers only</div>
             }
           </div>
-          <div style={{background:"#f0f4f8",borderRadius:"3px",padding:"0.65rem 0.85rem",fontSize:"0.78rem",color:"#555"}}>
+          <div style={{background:T.surfaceAlt,borderRadius:T.xs,padding:"0.65rem 0.85rem",fontSize:"0.78rem",color:T.textSecondary}}>
             Students log in and enter <strong style={S.code}>{code||"—"}</strong> to take this {count}-question test.
           </div>
           <div>
-            <label style={{display:"flex",alignItems:"center",gap:"0.75rem",cursor:"pointer",padding:"0.65rem 0.85rem",background:adaptive?"#f0faf2":"#fafbfc",border:`1px solid ${adaptive?"#b3dfc0":"#dde3e9"}`,borderRadius:"3px"}}>
+            <label style={{display:"flex",alignItems:"center",gap:"0.75rem",cursor:"pointer",padding:"0.65rem 0.85rem",background:adaptive?T.successBg:T.surface,border:`1px solid ${adaptive?T.successBd:T.border}`,borderRadius:T.xs}}>
               <div onClick={()=>setAdaptive(a=>!a)}
-                style={{width:"36px",height:"20px",borderRadius:"10px",background:adaptive?"#1a6e2e":"#c8d3dd",position:"relative",flexShrink:0,transition:"background .2s"}}>
-                <div style={{position:"absolute",top:"2px",left:adaptive?"18px":"2px",width:"16px",height:"16px",borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+                style={{width:"36px",height:"20px",borderRadius:"10px",background:adaptive?T.success:T.border,position:"relative",flexShrink:0,transition:"background .2s"}}>
+                <div style={{position:"absolute",top:"2px",left:adaptive?"18px":"2px",width:"16px",height:"16px",borderRadius:"50%",background:T.white,transition:"left .2s"}}/>
               </div>
               <div>
-                <div style={{fontSize:"0.82rem",fontWeight:700,color:adaptive?"#1a6e2e":"#333"}}>Adaptive Mode {adaptive?"ON":"OFF"}</div>
-                <div style={{fontSize:"0.7rem",color:"#888",marginTop:"1px"}}>Questions adjust to each student's weak areas during the test</div>
+                <div style={{fontSize:"0.82rem",fontWeight:700,color:adaptive?T.success:T.text}}>Adaptive Mode {adaptive?"ON":"OFF"}</div>
+                <div style={{fontSize:"0.7rem",color:T.textSecondary,marginTop:"1px"}}>Questions adjust to each student's weak areas during the test</div>
               </div>
             </label>
           </div>
         <div style={{borderTop:"1px solid #eef1f4",paddingTop:"0.85rem"}}>
           <label style={{display:"flex",alignItems:"center",gap:"0.75rem",cursor:"pointer",marginBottom:"0.75rem",
-            padding:"0.65rem 0.85rem",background:untimed?"#fff3cd":"#fafbfc",
-            border:`1px solid ${untimed?"#ffc107":"#dde3e9"}`,borderRadius:"3px"}}
+            padding:"0.65rem 0.85rem",background:untimed?"#fff3cd":T.surface,
+            border:`1px solid ${untimed?T.warningBd:T.border}`,borderRadius:T.xs}}
             onClick={()=>setUntimed(u=>!u)}>
-            <div style={{width:"36px",height:"20px",borderRadius:"10px",background:untimed?"#b8860b":"#c8d3dd",position:"relative",flexShrink:0,transition:"background .2s"}}>
-              <div style={{position:"absolute",top:"2px",left:untimed?"18px":"2px",width:"16px",height:"16px",borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+            <div style={{width:"36px",height:"20px",borderRadius:"10px",background:untimed?"#b8860b":T.border,position:"relative",flexShrink:0,transition:"background .2s"}}>
+              <div style={{position:"absolute",top:"2px",left:untimed?"18px":"2px",width:"16px",height:"16px",borderRadius:"50%",background:T.white,transition:"left .2s"}}/>
             </div>
             <div>
-              <div style={{fontSize:"0.82rem",fontWeight:700,color:untimed?"#7a4e00":"#333"}}>Untimed {untimed?"ON":"OFF"}</div>
-              <div style={{fontSize:"0.7rem",color:"#888",marginTop:"1px"}}>No countdown — students work at their own pace</div>
+              <div style={{fontSize:"0.82rem",fontWeight:700,color:untimed?T.warning:T.text}}>Untimed {untimed?"ON":"OFF"}</div>
+              <div style={{fontSize:"0.7rem",color:T.textSecondary,marginTop:"1px"}}>No countdown — students work at their own pace</div>
             </div>
           </label>
           {!untimed && (
             <div style={{display:"flex",gap:"0.75rem"}}>
               <div style={{flex:1}}>
-                <label style={{display:"block",fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"4px"}}>TIME LIMIT (minutes)</label>
+                <label style={{display:"block",fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"4px"}}>TIME LIMIT (minutes)</label>
                 <input type="number" min="1" max="180" value={timeMins}
                   onChange={e=>setTimeMins(Math.max(1,Math.min(180,Number(e.target.value))))}
                   style={{...S.inp,fontFamily:"monospace",fontWeight:700,fontSize:"1rem"}}/>
               </div>
               <div style={{flex:1}}>
-                <label style={{display:"block",fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"4px"}}>WARN AT (minutes left)</label>
+                <label style={{display:"block",fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"4px"}}>WARN AT (minutes left)</label>
                 <input type="number" min="1" max={timeMins-1} value={warnMins}
                   onChange={e=>setWarnMins(Math.max(1,Math.min(timeMins-1,Number(e.target.value))))}
                   style={{...S.inp,fontFamily:"monospace",fontWeight:700,fontSize:"1rem"}}/>
@@ -219,17 +219,17 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose }
         {/* One Attempt toggle */}
         <div>
           <label style={{display:"flex",alignItems:"center",gap:"0.75rem",cursor:"pointer",padding:"0.65rem 0.85rem",
-            background:oneAttempt?"#fdf2f2":"#fafbfc",
-            border:`1px solid ${oneAttempt?"#f0b8b8":"#dde3e9"}`,borderRadius:"3px"}}
+            background:oneAttempt?T.dangerBg:T.surface,
+            border:`1px solid ${oneAttempt?T.dangerBd:T.border}`,borderRadius:T.xs}}
             onClick={()=>setOneAttempt(a=>!a)}>
-            <div style={{width:"36px",height:"20px",borderRadius:"10px",background:oneAttempt?"#8b1a1a":"#c8d3dd",position:"relative",flexShrink:0,transition:"background .2s"}}>
-              <div style={{position:"absolute",top:"2px",left:oneAttempt?"18px":"2px",width:"16px",height:"16px",borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+            <div style={{width:"36px",height:"20px",borderRadius:"10px",background:oneAttempt?T.dangerText:T.border,position:"relative",flexShrink:0,transition:"background .2s"}}>
+              <div style={{position:"absolute",top:"2px",left:oneAttempt?"18px":"2px",width:"16px",height:"16px",borderRadius:"50%",background:T.white,transition:"left .2s"}}/>
             </div>
             <div>
-              <div style={{fontSize:"0.82rem",fontWeight:700,color:oneAttempt?"#8b1a1a":"#333"}}>
+              <div style={{fontSize:"0.82rem",fontWeight:700,color:oneAttempt?T.dangerText:T.text}}>
                 One Attempt Only {oneAttempt?"ON":"OFF"}
               </div>
-              <div style={{fontSize:"0.7rem",color:"#888",marginTop:"1px"}}>
+              <div style={{fontSize:"0.7rem",color:T.textSecondary,marginTop:"1px"}}>
                 Students can only submit this test once. They cannot retake it.
               </div>
             </div>
@@ -237,19 +237,19 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose }
         </div>
         </div>
         {overwriteWarning && (
-          <div style={{padding:"0.75rem 1.25rem",background:"#fff8e1",borderTop:"1px solid #ffd166"}}>
-            <div style={{fontSize:"0.82rem",color:"#7a4e00",fontWeight:700,marginBottom:"4px"}}>
+          <div style={{padding:"0.75rem 1.25rem",background:T.warningBg,borderTop:`1px solid ${T.warningBd}`}}>
+            <div style={{fontSize:"0.82rem",color:T.warning,fontWeight:700,marginBottom:"4px"}}>
               ⚠ A test named "{name.trim()}" already exists.
             </div>
-            <div style={{fontSize:"0.75rem",color:"#7a4e00"}}>
+            <div style={{fontSize:"0.75rem",color:T.warning}}>
               This will save as a second copy with a different code. Click Save again to confirm.
             </div>
           </div>
         )}
-        <div style={{display:"flex",gap:"0.65rem",padding:"0.9rem 1.25rem",borderTop:"1px solid #dde3e9"}}>
-          <button onClick={()=>{ setOverwriteWarning(false); onClose(); }} style={{flex:1,background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600,color:"#333"}}>Cancel</button>
+        <div style={{display:"flex",gap:"0.65rem",padding:"0.9rem 1.25rem",borderTop:`1px solid ${T.border}`}}>
+          <button onClick={()=>{ setOverwriteWarning(false); onClose(); }} style={{flex:1,background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600,color:T.text}}>Cancel</button>
           <button onClick={handleSave} disabled={saving||!name.trim()||code.length<4}
-            style={{flex:1,background:(!name.trim()||code.length<4)?"#c8d3dd":overwriteWarning?"#b8860b":"#003865",border:"none",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:(!name.trim()||code.length<4)?"not-allowed":"pointer",color:"#fff",fontWeight:700}}>
+            style={{flex:1,background:(!name.trim()||code.length<4)?T.border:overwriteWarning?"#b8860b":T.teal,border:"none",borderRadius:T.xs,padding:"0.65rem",fontSize:"0.85rem",cursor:(!name.trim()||code.length<4)?"not-allowed":"pointer",color:T.white,fontWeight:700}}>
             {saving?"Saving…":overwriteWarning?"Save Anyway →":"💾 Save"}
           </button>
         </div>
@@ -284,17 +284,17 @@ function AssignClassesModal({ test, onSave, onClose, teacher }) {
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
-      <div style={{background:"#fff",borderRadius:"6px",width:"100%",maxWidth:"380px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.25)"}}>
-        <div style={{background:"#003865",color:"#fff",padding:"0.9rem 1.25rem"}}>
+      <div style={{background:T.white,borderRadius:"6px",width:"100%",maxWidth:"380px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.25)"}}>
+        <div style={{background:T.midnight,color:T.white,padding:"0.9rem 1.25rem"}}>
           <div style={{fontSize:"0.6rem",opacity:.65,letterSpacing:"0.14em"}}>ASSIGN TO CLASSES</div>
           <div style={{fontSize:"1rem",fontWeight:700}}>{test.name}</div>
         </div>
         <div style={{padding:"1.25rem"}}>
-          <div style={{fontSize:"0.75rem",color:"#555",marginBottom:"0.75rem"}}>
+          <div style={{fontSize:"0.75rem",color:T.textSecondary,marginBottom:"0.75rem"}}>
             Students entering code <strong style={{fontFamily:"monospace",letterSpacing:"0.15em"}}>{test.code}</strong> will see names from these classes:
           </div>
           {classes.length === 0 ? (
-            <div style={{color:"#aaa",fontSize:"0.82rem",padding:"1rem",textAlign:"center"}}>No classes found.</div>
+            <div style={{color:T.textMuted,fontSize:"0.82rem",padding:"1rem",textAlign:"center"}}>No classes found.</div>
           ) : (
             <div style={{display:"flex",flexDirection:"column",gap:"4px",maxHeight:"200px",overflowY:"auto",marginBottom:"0.75rem"}}>
               {classes.map(cls => {
@@ -302,14 +302,14 @@ function AssignClassesModal({ test, onSave, onClose, teacher }) {
                 return (
                   <label key={cls.id} onClick={()=>toggle(cls.id)}
                     style={{display:"flex",alignItems:"center",gap:"0.6rem",padding:"0.5rem 0.75rem",
-                      border:`1px solid ${on?"#003865":"#dde3e9"}`,borderRadius:"4px",
-                      background:on?"#ddeaf7":"#fafbfc",cursor:"pointer"}}>
-                    <div style={{width:"16px",height:"16px",borderRadius:"3px",border:`2px solid ${on?"#003865":"#c8d3dd"}`,
-                      background:on?"#003865":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                      {on&&<span style={{color:"#fff",fontSize:"0.65rem",fontWeight:900}}>✓</span>}
+                      border:`1px solid ${on?T.midnight:T.border}`,borderRadius:T.xs,
+                      background:on?T.tealLight:T.surface,cursor:"pointer"}}>
+                    <div style={{width:"16px",height:"16px",borderRadius:T.xs,border:`2px solid ${on?T.midnight:T.border}`,
+                      background:on?T.midnight:T.white,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      {on&&<span style={{color:T.white,fontSize:"0.65rem",fontWeight:900}}>✓</span>}
                     </div>
-                    <span style={{fontWeight:on?700:400,color:on?"#003865":"#333",fontSize:"0.85rem"}}>{cls.name}</span>
-                    <span style={{marginLeft:"auto",fontSize:"0.68rem",color:"#888"}}>{cls.students?.length||0} students</span>
+                    <span style={{fontWeight:on?700:400,color:on?T.midnight:T.text,fontSize:"0.85rem"}}>{cls.name}</span>
+                    <span style={{marginLeft:"auto",fontSize:"0.68rem",color:T.textSecondary}}>{cls.students?.length||0} students</span>
                   </label>
                 );
               })}
@@ -317,9 +317,9 @@ function AssignClassesModal({ test, onSave, onClose, teacher }) {
           )}
           {selected.length===0&&<div style={{fontSize:"0.72rem",color:"#e67e00",marginBottom:"0.75rem"}}>⚠ No class selected — students won't be able to find their name.</div>}
           <div style={{display:"flex",gap:"0.65rem"}}>
-            <button onClick={onClose} style={{flex:1,background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600}}>Cancel</button>
+            <button onClick={onClose} style={{flex:1,background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600}}>Cancel</button>
             <button onClick={handleSave} disabled={saving}
-              style={{flex:1,background:"#003865",border:"none",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",color:"#fff",fontWeight:700,opacity:saving?0.7:1}}>
+              style={{flex:1,background:T.teal,border:"none",borderRadius:T.xs,padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",color:T.white,fontWeight:700,opacity:saving?0.7:1}}>
               {saving?"Saving…":"Save →"}
             </button>
           </div>
@@ -489,17 +489,17 @@ export default function TestBuilder({ teacher, readOnly }) {
     catch {}
   }
 
-  if (loading) return <div style={{padding:"3rem",textAlign:"center",color:"#aaa"}}>Loading question bank…</div>;
+  if (loading) return <div style={{padding:"3rem",textAlign:"center",color:T.textMuted}}>Loading question bank…</div>;
 
   return (
-    <div style={{display:"flex",height:"100%",fontFamily:"sans-serif",background:"#e8edf2",overflow:"hidden"}}>
+    <div style={{display:"flex",height:"100%",fontFamily:T.font,background:"#e8edf2",overflow:"hidden"}}>
 
       {/* ── Left: Bank browser ── */}
-      <div style={{width:"55%",display:"flex",flexDirection:"column",borderRight:"2px solid #c8d3dd",overflow:"hidden"}}>
-        <div style={{background:"#fff",borderBottom:"1px solid #c8d3dd",padding:"0.75rem 1rem",display:"flex",flexDirection:"column",gap:"0.5rem",flexShrink:0}}>
+      <div style={{width:"55%",display:"flex",flexDirection:"column",borderRight:`2px solid ${T.border}`,overflow:"hidden"}}>
+        <div style={{background:T.white,borderBottom:`1px solid ${T.border}`,padding:"0.75rem 1rem",display:"flex",flexDirection:"column",gap:"0.5rem",flexShrink:0}}>
           <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
-            <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#003865"}}>QUESTION BANK</div>
-            <span style={{fontSize:"0.7rem",color:"#aaa"}}>{bank.length} questions · {filtered.length} shown</span>
+            <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.midnight}}>QUESTION BANK</div>
+            <span style={{fontSize:"0.7rem",color:T.textMuted}}>{bank.length} questions · {filtered.length} shown</span>
           </div>
           <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap"}}>
             <select style={{...S.inp,flex:2,minWidth:"120px"}} value={filterStd} onChange={e=>setFilterStd(e.target.value)}>
@@ -513,45 +513,45 @@ export default function TestBuilder({ teacher, readOnly }) {
             <input style={{...S.inp,flex:2,minWidth:"120px"}} value={filterText} onChange={e=>setFilterText(e.target.value)} placeholder="Search by ID, keyword…"/>
           </div>
           <div style={{display:"flex",gap:"0.5rem",alignItems:"center",flexWrap:"wrap"}}>
-            <span style={{fontSize:"0.72rem",color:"#555"}}>
+            <span style={{fontSize:"0.72rem",color:T.textSecondary}}>
               Auto-fill <input type="number" min={1} max={50} value={autoCount} onChange={e=>setAutoCount(Number(e.target.value))}
-                style={{width:"42px",padding:"2px 5px",border:"1px solid #c8d3dd",borderRadius:"3px",fontSize:"0.78rem",textAlign:"center"}}/> questions
+                style={{width:"42px",padding:"2px 5px",border:`1px solid ${T.border}`,borderRadius:T.xs,fontSize:"0.78rem",textAlign:"center"}}/> questions
             </span>
-            <button onClick={autoFill} style={{...S.smBtn,background:"#003865",color:"#fff",borderColor:"#003865"}}>⚡ Auto-fill</button>
-            <button onClick={()=>setSelected([])} style={{...S.smBtn,color:"#8b1a1a",borderColor:"#f0b8b8"}}>Clear All</button>
+            <button onClick={autoFill} style={{...S.smBtn,background:T.teal,color:T.white,borderColor:T.teal}}>⚡ Auto-fill</button>
+            <button onClick={()=>setSelected([])} style={{...S.smBtn,color:T.dangerText,borderColor:T.dangerBd}}>Clear All</button>
           </div>
         </div>
 
         <div style={{flex:1,overflowY:"auto",padding:"0.75rem"}}>
           {bank.length===0?(
-            <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"3rem",textAlign:"center",color:"#aaa"}}>
+            <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"3rem",textAlign:"center",color:T.textMuted}}>
               <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>📭</div>
-              <div style={{fontWeight:600,color:"#555"}}>Question bank is empty</div>
+              <div style={{fontWeight:600,color:T.textSecondary}}>Question bank is empty</div>
               <div style={{fontSize:"0.82rem",marginTop:"4px"}}>Use the Question Builder or PDF Importer to add questions.</div>
             </div>
           ):filtered.length===0?(
-            <div style={{padding:"2rem",textAlign:"center",color:"#aaa",fontSize:"0.85rem"}}>No questions match your filters.</div>
+            <div style={{padding:"2rem",textAlign:"center",color:T.textMuted,fontSize:"0.85rem"}}>No questions match your filters.</div>
           ):(
             filtered.map(q=>{
               const sel=isSelected(q.id);
               return (
-                <div key={q.id} style={{background:sel?"#ddeaf7":"#fff",border:`2px solid ${sel?"#003865":"#c8d3dd"}`,borderRadius:"4px",padding:"0.7rem 1rem",marginBottom:"0.5rem",display:"flex",alignItems:"flex-start",gap:"0.75rem"}}>
-                  <div onClick={()=>toggleSelect(q)} style={{width:"20px",height:"20px",borderRadius:"4px",border:`2px solid ${sel?"#003865":"#bcc8d4"}`,background:sel?"#003865":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:"2px",cursor:"pointer"}}>
-                    {sel&&<span style={{color:"#fff",fontSize:"0.7rem",fontWeight:700}}>✓</span>}
+                <div key={q.id} style={{background:sel?T.tealLight:T.white,border:`2px solid ${sel?T.midnight:T.border}`,borderRadius:T.xs,padding:"0.7rem 1rem",marginBottom:"0.5rem",display:"flex",alignItems:"flex-start",gap:"0.75rem"}}>
+                  <div onClick={()=>toggleSelect(q)} style={{width:"20px",height:"20px",borderRadius:T.xs,border:`2px solid ${sel?T.midnight:"#bcc8d4"}`,background:sel?T.midnight:T.white,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:"2px",cursor:"pointer"}}>
+                    {sel&&<span style={{color:T.white,fontSize:"0.7rem",fontWeight:700}}>✓</span>}
                   </div>
                   <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>toggleSelect(q)}>
                     <div style={{display:"flex",gap:"0.4rem",marginBottom:"3px",flexWrap:"wrap",alignItems:"center"}}>
-                      {q.id&&<span style={{fontSize:"0.65rem",fontWeight:700,fontFamily:"monospace",color:"#fff",background:"#003865",padding:"1px 7px",borderRadius:"3px",letterSpacing:"0.05em"}}>{q.id}</span>}
-                      <span style={{fontSize:"0.6rem",fontWeight:700,color:"#003865",background:"#ddeaf7",padding:"1px 6px",borderRadius:"2px",border:"1px solid #b3cde8"}}>{q.standard}</span>
-                      {q.dok&&<span style={{fontSize:"0.6rem",fontWeight:700,color:"#7a4e00",background:"#fff3cd",padding:"1px 6px",borderRadius:"2px",border:"1px solid #ffc107"}}>DOK {q.dok}</span>}
-                      <span style={{fontSize:"0.6rem",color:"#888"}}>{q.short}</span>
+                      {q.id&&<span style={{fontSize:"0.65rem",fontWeight:700,fontFamily:"monospace",color:T.white,background:T.midnight,padding:"1px 7px",borderRadius:T.xs,letterSpacing:"0.05em"}}>{q.id}</span>}
+                      <span style={{fontSize:"0.6rem",fontWeight:700,color:T.midnight,background:T.tealLight,padding:"1px 6px",borderRadius:"2px",border:`1px solid ${T.border}`}}>{q.standard}</span>
+                      {q.dok&&<span style={{fontSize:"0.6rem",fontWeight:700,color:T.warning,background:"#fff3cd",padding:"1px 6px",borderRadius:"2px",border:`1px solid ${T.warningBd}`}}>DOK {q.dok}</span>}
+                      <span style={{fontSize:"0.6rem",color:T.textSecondary}}>{q.short}</span>
                     </div>
-                    <div style={{fontSize:"0.85rem",color:"#1a1a1a",fontFamily:"Georgia,serif",lineHeight:1.5,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>
+                    <div style={{fontSize:"0.85rem",color:T.text,fontFamily:"Georgia,serif",lineHeight:1.5,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>
                       <MathText text={q.question}/>
                     </div>
                   </div>
                   <div style={{display:"flex",gap:"3px",flexShrink:0}}>
-                    <button onClick={e=>{e.stopPropagation();setEditingQ(q);}} style={{...S.smBtn,padding:"3px 8px",color:"#003865",borderColor:"#b3cde8",background:"#f0f6ff"}}>✏️</button>
+                    <button onClick={e=>{e.stopPropagation();setEditingQ(q);}} style={{...S.smBtn,padding:"3px 8px",color:T.teal,borderColor:T.border,background:T.surfaceAlt}}>✏️</button>
                     <button onClick={e=>{e.stopPropagation();setConfirmDelete(q);}} style={{...S.smBtn,padding:"3px 8px",color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2"}}>🗑</button>
                   </div>
                 </div>
@@ -563,11 +563,11 @@ export default function TestBuilder({ teacher, readOnly }) {
 
       {/* ── Right panel ── */}
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <div style={{background:"#004e94",display:"flex",alignItems:"flex-end",padding:"0 1rem",gap:"0.15rem",flexShrink:0}}>
+        <div style={{background:T.midnight,display:"flex",alignItems:"flex-end",padding:"0 1rem",gap:"0.15rem",flexShrink:0}}>
           {[["current","📋 Current Test"],["drill","⚡ Fluency Drill"],["library","📚 Test Library"]].map(([key,lbl])=>(
             <button key={key} onClick={()=>setRightTab(key)}
-              style={{background:rightTab===key?"#fff":"transparent",color:rightTab===key?"#003865":"#cce0f5",border:"none",padding:"0.55rem 0.9rem",fontSize:"0.75rem",fontWeight:700,cursor:"pointer",borderRadius:"4px 4px 0 0"}}>
-              {lbl}{key==="library"&&savedTests.length>0&&<span style={{marginLeft:"5px",background:rightTab===key?"#003865":"rgba(255,255,255,.25)",color:"#fff",borderRadius:"10px",padding:"0px 6px",fontSize:"0.65rem"}}>{savedTests.length}</span>}
+              style={{background:rightTab===key?"#fff":"transparent",color:rightTab===key?T.midnight:"rgba(13,148,136,.4)",border:"none",padding:"0.55rem 0.9rem",fontSize:"0.75rem",fontWeight:700,cursor:"pointer",borderRadius:"4px 4px 0 0"}}>
+              {lbl}{key==="library"&&savedTests.length>0&&<span style={{marginLeft:"5px",background:rightTab===key?T.midnight:"rgba(255,255,255,.25)",color:"#fff",borderRadius:"10px",padding:"0px 6px",fontSize:"0.65rem"}}>{savedTests.length}</span>}
             </button>
           ))}
         </div>
@@ -576,7 +576,7 @@ export default function TestBuilder({ teacher, readOnly }) {
         {rightTab==="current"&&(
           <>
             <div style={{background:"#fff",borderBottom:"1px solid #c8d3dd",padding:"0.75rem 1rem",flexShrink:0}}>
-              <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#003865",marginBottom:"0.4rem"}}>CURRENT SELECTION</div>
+              <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.midnight,marginBottom:"0.4rem"}}>CURRENT SELECTION</div>
               <input style={{...S.inp,fontWeight:600}} value={testTitle} onChange={e=>setTestTitle(e.target.value)} placeholder="Test title…"/>
               <div style={{fontSize:"0.7rem",color:"#888",marginTop:"4px"}}>
                 {selected.length} question{selected.length!==1?"s":""} selected
@@ -594,12 +594,12 @@ export default function TestBuilder({ teacher, readOnly }) {
               ):(
                 selectedQuestions.map((q,i)=>(
                   <div key={q.id} style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"0.6rem 0.85rem",marginBottom:"0.4rem",display:"flex",alignItems:"center",gap:"0.6rem"}}>
-                    <div style={{width:"22px",height:"22px",borderRadius:"50%",background:"#003865",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <div style={{width:"22px",height:"22px",borderRadius:"50%",background:T.teal,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                       <span style={{color:"#fff",fontSize:"0.65rem",fontWeight:700}}>{i+1}</span>
                     </div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{display:"flex",gap:"0.35rem",marginBottom:"2px"}}>
-                        <span style={{fontSize:"0.58rem",fontWeight:700,color:"#003865",background:"#ddeaf7",padding:"1px 5px",borderRadius:"2px"}}>{q.standard}</span>
+                        <span style={{fontSize:"0.58rem",fontWeight:700,color:T.midnight,background:T.tealLight,padding:"1px 5px",borderRadius:"2px"}}>{q.standard}</span>
                         {q.dok&&<span style={{fontSize:"0.58rem",fontWeight:700,color:"#7a4e00",background:"#fff3cd",padding:"1px 5px",borderRadius:"2px"}}>DOK {q.dok}</span>}
                       </div>
                       <div style={{fontSize:"0.8rem",color:"#1a1a1a",fontFamily:"Georgia,serif",overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>
@@ -618,7 +618,7 @@ export default function TestBuilder({ teacher, readOnly }) {
 
             <div style={{padding:"0.85rem 1rem",borderTop:"2px solid #c8d3dd",background:"#fff",flexShrink:0}}>
               <button onClick={()=>setShowSaveModal(true)} disabled={selected.length===0}
-                style={{width:"100%",background:selected.length===0?"#c8d3dd":"#003865",border:"none",borderRadius:"4px",padding:"0.8rem",fontSize:"0.95rem",fontWeight:700,color:"#fff",cursor:selected.length===0?"not-allowed":"pointer"}}>
+                style={{width:"100%",background:selected.length===0?"#c8d3dd":T.teal,border:"none",borderRadius:"4px",padding:"0.8rem",fontSize:"0.95rem",fontWeight:700,color:"#fff",cursor:selected.length===0?"not-allowed":"pointer"}}>
                 💾 Save to Library & Get Code
               </button>
               {selected.length>0&&(
@@ -666,7 +666,7 @@ export default function TestBuilder({ teacher, readOnly }) {
               <div style={{display:"flex",gap:"0.5rem",marginTop:"0.4rem"}}>
                 {[5,10,15,20].map(n=>(
                   <button key={n} onClick={()=>setDrillCount(n)}
-                    style={{flex:1,padding:"0.55rem",border:`2px solid ${drillCount===n?"#003865":"#c8d3dd"}`,borderRadius:"4px",background:drillCount===n?"#003865":"#fafbfc",color:drillCount===n?"#fff":"#555",fontSize:"0.85rem",fontWeight:700,cursor:"pointer"}}>
+                    style={{flex:1,padding:"0.55rem",border:`2px solid ${drillCount===n?T.teal:"#c8d3dd"}`,borderRadius:"4px",background:drillCount===n?T.teal:"#fafbfc",color:drillCount===n?"#fff":"#555",fontSize:"0.85rem",fontWeight:700,cursor:"pointer"}}>
                     {n}
                   </button>
                 ))}
@@ -709,7 +709,7 @@ export default function TestBuilder({ teacher, readOnly }) {
         {rightTab==="library"&&(
           <>
             <div style={{background:"#fff",borderBottom:"1px solid #c8d3dd",padding:"0.75rem 1rem",flexShrink:0}}>
-              <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#003865"}}>TEST LIBRARY</div>
+              <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.midnight}}>TEST LIBRARY</div>
               <div style={{fontSize:"0.72rem",color:"#888",marginTop:"2px"}}>{savedTests.length} saved test{savedTests.length!==1?"s":""} · Click Load to select questions</div>
             </div>
             <div style={{flex:1,overflowY:"auto",padding:"0.75rem"}}>
@@ -732,8 +732,8 @@ export default function TestBuilder({ teacher, readOnly }) {
                         </div>
                       </div>
                       <div style={{display:"flex",gap:"0.4rem",flexShrink:0,flexWrap:"wrap"}}>
-                        <button onClick={()=>loadSavedTest(t.id)} style={{...S.smBtn,background:"#003865",color:"#fff",borderColor:"#003865",padding:"5px 12px"}}>Load</button>
-                        <button onClick={()=>setAssignClassesTest(t)} style={{...S.smBtn,padding:"5px 10px",background:"#e8f0fa",borderColor:"#b3cde8",color:"#003865"}}>🏫 Classes</button>
+                        <button onClick={()=>loadSavedTest(t.id)} style={{...S.smBtn,background:T.teal,color:"#fff",borderColor:T.teal,padding:"5px 12px"}}>Load</button>
+                        <button onClick={()=>setAssignClassesTest(t)} style={{...S.smBtn,padding:"5px 10px",background:T.surfaceAlt,borderColor:T.border,color:T.teal}}>🏫 Classes</button>
                         <button onClick={()=>setConfirmDeleteTest(t)} style={{...S.smBtn,color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",padding:"5px 10px"}}>🗑</button>
                       </div>
                     </div>
@@ -741,7 +741,7 @@ export default function TestBuilder({ teacher, readOnly }) {
                     {t.code&&(
                       <div style={{marginTop:"0.6rem",display:"flex",alignItems:"center",gap:"0.5rem",background:"#f0f4f8",borderRadius:"3px",padding:"0.45rem 0.75rem"}}>
                         <span style={{fontSize:"0.62rem",color:"#555",fontWeight:700,letterSpacing:"0.1em"}}>STUDENT CODE</span>
-                        <span style={{...S.code,fontSize:"1rem",letterSpacing:"0.2em",color:"#003865"}}>{t.code}</span>
+                        <span style={{...S.code,fontSize:"1rem",letterSpacing:"0.2em",color:T.midnight}}>{t.code}</span>
                         <button onClick={()=>navigator.clipboard.writeText(`${window.location.origin}/?code=${t.code}`)}
                           style={{...S.smBtn,marginLeft:"auto",padding:"2px 8px",fontSize:"0.68rem"}}>📋 Copy Link</button>
                       </div>
@@ -767,11 +767,11 @@ export default function TestBuilder({ teacher, readOnly }) {
                                   if (!cur) return;
                                   const ids = checked ? (cur.classIds||[]).filter(x=>x!==cls.id) : [...(cur.classIds||[]), cls.id];
                                   setSavedTests(prev => prev.map(x => x.id===t.id ? {...x, classIds: ids} : x));
-                                }} style={{display:"flex",alignItems:"center",gap:"0.5rem",cursor:"pointer",padding:"3px 5px",borderRadius:"3px",background:checked?"#ddeaf7":"transparent",fontSize:"0.8rem"}}>
-                                  <div style={{width:"14px",height:"14px",borderRadius:"2px",border:`2px solid ${checked?"#003865":"#c8d3dd"}`,background:checked?"#003865":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                                }} style={{display:"flex",alignItems:"center",gap:"0.5rem",cursor:"pointer",padding:"3px 5px",borderRadius:"3px",background:checked?T.tealLight:"transparent",fontSize:"0.8rem"}}>
+                                  <div style={{width:"14px",height:"14px",borderRadius:"2px",border:`2px solid ${checked?T.teal:"#c8d3dd"}`,background:checked?T.teal:"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                                     {checked && <span style={{color:"#fff",fontSize:"0.55rem",fontWeight:900}}>✓</span>}
                                   </div>
-                                  <span style={{fontWeight:checked?700:400,color:checked?"#003865":"#333"}}>{cls.name}</span>
+                                  <span style={{fontWeight:checked?700:400,color:checked?T.teal:T.text}}>{cls.name}</span>
                                 </label>
                               );
                             })}
@@ -788,7 +788,7 @@ export default function TestBuilder({ teacher, readOnly }) {
                               await loadSavedTests();
                               setAssigningTest(null);
                             }}
-                              style={{...S.smBtn,background:"#003865",color:"#fff",borderColor:"#003865",flex:1,padding:"4px"}}>💾 Save</button>
+                              style={{...S.smBtn,background:T.teal,color:"#fff",borderColor:T.teal,flex:1,padding:"4px"}}>💾 Save</button>
                             <button onClick={()=>{ loadSavedTests(); setAssigningTest(null); }}
                               style={{...S.smBtn,padding:"4px 8px"}}>Cancel</button>
                           </div>
@@ -834,11 +834,11 @@ export default function TestBuilder({ teacher, readOnly }) {
               <div style={{fontSize:"1rem",fontWeight:700}}>Delete Question?</div>
             </div>
             <div style={{padding:"1.25rem"}}>
-              <p style={{fontSize:"0.85rem",color:"#333",margin:"0 0 0.75rem",fontFamily:"Georgia,serif",lineHeight:1.5}}><MathText text={confirmDelete.question}/></p>
+              <p style={{fontSize:"0.85rem",color:T.text,margin:"0 0 0.75rem",fontFamily:"Georgia,serif",lineHeight:1.5}}><MathText text={confirmDelete.question}/></p>
               <p style={{fontSize:"0.78rem",color:"#888",margin:0}}>This permanently removes the question and cannot be undone.</p>
             </div>
             <div style={{display:"flex",gap:"0.65rem",padding:"0.9rem 1.25rem",borderTop:"1px solid #dde3e9"}}>
-              <button onClick={()=>setConfirmDelete(null)} style={{flex:1,background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600,color:"#333"}}>Cancel</button>
+              <button onClick={()=>setConfirmDelete(null)} style={{flex:1,background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600,color:T.text}}>Cancel</button>
               <button onClick={()=>deleteQuestion(confirmDelete.id)} style={{flex:1,background:"#8b1a1a",border:"none",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",color:"#fff",fontWeight:700}}>Delete</button>
             </div>
           </div>

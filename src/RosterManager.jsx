@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { API } from "./shared/constants";
+import { API, T } from "./shared/constants";
 
 const S = {
-  inp:   { width:"100%", padding:"0.5rem 0.75rem", border:"1px solid #c8d3dd", borderRadius:"3px", fontSize:"0.85rem", background:"#fafbfc", boxSizing:"border-box" },
-  lbl:   { display:"block", fontSize:"0.75rem", fontWeight:700, letterSpacing:"0.12em", color:"#555", marginBottom:"4px" },
-  btn:   { border:"1px solid #c8d3dd", borderRadius:"3px", padding:"6px 14px", cursor:"pointer", fontSize:"0.78rem", fontWeight:600, background:"#f0f4f8", color:"#333" },
-  ta:    { width:"100%", padding:"0.5rem 0.75rem", border:"1px solid #c8d3dd", borderRadius:"3px", fontSize:"0.82rem", background:"#fafbfc", boxSizing:"border-box", resize:"vertical", fontFamily:"sans-serif", minHeight:"120px" },
+  inp:   { width:"100%", padding:"0.5rem 0.75rem", border:`1px solid ${T.border}`, borderRadius:T.xs, fontSize:"0.85rem", background:T.surface, boxSizing:"border-box" },
+  lbl:   { display:"block", fontSize:"0.75rem", fontWeight:700, letterSpacing:"0.12em", color:T.textSecondary, marginBottom:"4px" },
+  btn:   { border:`1px solid ${T.border}`, borderRadius:T.xs, padding:"6px 14px", cursor:"pointer", fontSize:"0.78rem", fontWeight:600, background:T.surfaceAlt, color:T.text },
+  ta:    { width:"100%", padding:"0.5rem 0.75rem", border:`1px solid ${T.border}`, borderRadius:T.xs, fontSize:"0.82rem", background:T.surface, boxSizing:"border-box", resize:"vertical", fontFamily:T.font, minHeight:"120px" },
 };
 
 
@@ -24,8 +24,8 @@ function AccomModal({ student, onSave, onClose }) {
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}}>
-      <div style={{background:"#fff",borderRadius:"6px",width:"100%",maxWidth:"380px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.22)"}}>
-        <div style={{background:"#003865",color:"#fff",padding:"0.9rem 1.25rem"}}>
+      <div style={{background:T.white,borderRadius:"6px",width:"100%",maxWidth:"380px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.22)"}}>
+        <div style={{background:T.midnight,color:T.white,padding:"0.9rem 1.25rem"}}>
           <div style={{fontSize:"0.75rem",letterSpacing:"0.12em",opacity:.7,marginBottom:"2px"}}>ACCOMMODATIONS</div>
           <div style={{fontSize:"1rem",fontWeight:700}}>{student.name}</div>
         </div>
@@ -33,17 +33,17 @@ function AccomModal({ student, onSave, onClose }) {
 
           {/* Extended Time */}
           <div>
-            <label style={{display:"block",fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"8px"}}>⏱ EXTENDED TIME (IEP / 504)</label>
+            <label style={{display:"block",fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"8px"}}>⏱ EXTENDED TIME (IEP / 504)</label>
             <div style={{display:"flex",gap:"0.5rem"}}>
               {[["none","Standard"],["1.5x","1.5×"],["2x","2×"]].map(([val,lbl])=>(
                 <button key={val} onClick={()=>setExtTime(val)}
-                  style={{flex:1,padding:"0.55rem",border:`2px solid ${extTime===val?"#003865":"#c8d3dd"}`,borderRadius:"4px",background:extTime===val?"#003865":"#fafbfc",color:extTime===val?"#fff":"#555",fontWeight:700,fontSize:"0.82rem",cursor:"pointer"}}>
+                  style={{flex:1,padding:"0.55rem",border:`2px solid ${extTime===val?T.teal:T.border}`,borderRadius:T.xs,background:extTime===val?T.teal:T.surface,color:extTime===val?T.white:T.textSecondary,fontWeight:700,fontSize:"0.82rem",cursor:"pointer"}}>
                   {lbl}
                 </button>
               ))}
             </div>
             {extTime !== "none" && (
-              <div style={{marginTop:"6px",fontSize:"0.72rem",color:"#555",background:"#f0f4f8",padding:"6px 10px",borderRadius:"3px"}}>
+              <div style={{marginTop:"6px",fontSize:"0.72rem",color:T.textSecondary,background:T.surfaceAlt,padding:"6px 10px",borderRadius:T.xs}}>
                 A 30-min test becomes {extTime==="1.5x"?"45":"60"} minutes for this student.
               </div>
             )}
@@ -51,25 +51,25 @@ function AccomModal({ student, onSave, onClose }) {
 
           {/* Reduce Answer Choices */}
           <div>
-            <label style={{display:"block",fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",marginBottom:"8px"}}>✂ REDUCE ANSWER CHOICES</label>
+            <label style={{display:"block",fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"8px"}}>✂ REDUCE ANSWER CHOICES</label>
             <div style={{display:"flex",gap:"0.5rem"}}>
               {[[false,"Standard (4 choices)"],[true,"Reduced (3 choices)"]].map(([val,lbl])=>(
                 <button key={String(val)} onClick={()=>setReduce(val)}
-                  style={{flex:1,padding:"0.55rem",border:`2px solid ${reduce===val?"#003865":"#c8d3dd"}`,borderRadius:"4px",background:reduce===val?"#003865":"#fafbfc",color:reduce===val?"#fff":"#555",fontWeight:600,fontSize:"0.78rem",cursor:"pointer"}}>
+                  style={{flex:1,padding:"0.55rem",border:`2px solid ${reduce===val?T.teal:T.border}`,borderRadius:T.xs,background:reduce===val?T.teal:T.surface,color:reduce===val?T.white:T.textSecondary,fontWeight:600,fontSize:"0.78rem",cursor:"pointer"}}>
                   {lbl}
                 </button>
               ))}
             </div>
             {reduce && (
-              <div style={{marginTop:"6px",fontSize:"0.72rem",color:"#555",background:"#f0f4f8",padding:"6px 10px",borderRadius:"3px"}}>
+              <div style={{marginTop:"6px",fontSize:"0.72rem",color:T.textSecondary,background:T.surfaceAlt,padding:"6px 10px",borderRadius:T.xs}}>
                 One incorrect choice is hidden on all multiple-choice questions.
               </div>
             )}
           </div>
         </div>
-        <div style={{display:"flex",gap:"0.65rem",padding:"0.9rem 1.25rem",borderTop:"1px solid #dde3e9"}}>
-          <button onClick={onClose} style={{flex:1,background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600,color:"#333"}}>Cancel</button>
-          <button onClick={handleSave} disabled={saving} style={{flex:1,background:"#1a6e2e",border:"none",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",color:"#fff",fontWeight:700,opacity:saving?.6:1}}>
+        <div style={{display:"flex",gap:"0.65rem",padding:"0.9rem 1.25rem",borderTop:`1px solid ${T.border}`}}>
+          <button onClick={onClose} style={{flex:1,background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600,color:T.text}}>Cancel</button>
+          <button onClick={handleSave} disabled={saving} style={{flex:1,background:T.success,border:"none",borderRadius:T.xs,padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",color:T.white,fontWeight:700,opacity:saving?.6:1}}>
             {saving?"Saving…":"Save Accommodations"}
           </button>
         </div>
@@ -79,7 +79,7 @@ function AccomModal({ student, onSave, onClose }) {
 }
 
 
-const GRP_COLORS = ["#003865","#1a6e2e","#7c3aed","#b45309","#dc2626"];
+const GRP_COLORS = [T.teal, T.success, "#7c3aed", "#b45309", T.danger];
 
 function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
   const CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
@@ -203,35 +203,35 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",
-      justifyContent:"center",zIndex:1000,fontFamily:"sans-serif",padding:"1rem"}}>
-      <div style={{background:"#fff",borderRadius:"8px",boxShadow:"0 8px 40px rgba(0,0,0,.2)",
+      justifyContent:"center",zIndex:1000,fontFamily:T.font,padding:"1rem"}}>
+      <div style={{background:T.white,borderRadius:T.r,boxShadow:"0 8px 40px rgba(0,0,0,.2)",
         width:"100%",maxWidth:maxW,display:"flex",flexDirection:"column",maxHeight:"88vh",overflow:"hidden"}}>
 
         {/* Header */}
-        <div style={{background:"#003865",color:"#fff",padding:"1rem 1.5rem",display:"flex",alignItems:"center",gap:"0.75rem",flexShrink:0}}>
+        <div style={{background:T.midnight,color:T.white,padding:"1rem 1.5rem",display:"flex",alignItems:"center",gap:"0.75rem",flexShrink:0}}>
           <img src="https://www.gstatic.com/images/branding/product/1x/classroom_2020q4_48dp.png"
             alt="" style={{width:"22px",height:"22px"}}/>
           <div style={{flex:1}}>
             <div style={{fontSize:"0.75rem",opacity:.65,letterSpacing:"0.14em"}}>GOOGLE CLASSROOM</div>
             <div style={{fontSize:"0.95rem",fontWeight:700}}>Import Class Roster</div>
           </div>
-          <button onClick={onClose} style={{background:"none",border:"none",color:"#fff",fontSize:"1.2rem",cursor:"pointer",opacity:.7}}>✕</button>
+          <button onClick={onClose} style={{background:"none",border:"none",color:T.white,fontSize:"1.2rem",cursor:"pointer",opacity:.7}}>✕</button>
         </div>
 
         <div style={{padding:"1.5rem",flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:"1rem"}}>
           {err && (
-            <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"4px",
-              padding:"0.6rem 1rem",fontSize:"0.82rem",color:"#8b1a1a",fontWeight:600}}>⚠ {err}</div>
+            <div style={{background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:T.xs,
+              padding:"0.6rem 1rem",fontSize:"0.82rem",color:T.dangerText,fontWeight:600}}>⚠ {err}</div>
           )}
 
           {step === "idle" && (
             <>
-              <div style={{fontSize:"0.85rem",color:"#555",lineHeight:1.6}}>
+              <div style={{fontSize:"0.85rem",color:T.textSecondary,lineHeight:1.6}}>
                 Sign in with your school Google account to pull your class rosters directly from Google Classroom. Student names will be imported automatically.
               </div>
               <button onClick={startAuth}
-                style={{background:"#fff",border:"2px solid #c8d3dd",borderRadius:"6px",padding:"0.75rem 1rem",
-                  display:"flex",alignItems:"center",justifyContent:"center",gap:"0.75rem",cursor:"pointer",fontWeight:700,color:"#003865"}}>
+                style={{background:T.white,border:`2px solid ${T.border}`,borderRadius:"6px",padding:"0.75rem 1rem",
+                  display:"flex",alignItems:"center",justifyContent:"center",gap:"0.75rem",cursor:"pointer",fontWeight:700,color:T.midnight}}>
                 <img src="https://www.gstatic.com/images/branding/googleg/1x/googleg_standard_color_128dp.png"
                   alt="" style={{width:"20px",height:"20px"}}/>
                 Sign in with Google
@@ -240,21 +240,21 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
           )}
 
           {step === "loading" && (
-            <div style={{textAlign:"center",color:"#888",padding:"2rem"}}>Loading…</div>
+            <div style={{textAlign:"center",color:T.textSecondary,padding:"2rem"}}>Loading…</div>
           )}
 
           {step === "pick" && (
             <>
-              <div style={{fontSize:"0.78rem",fontWeight:700,color:"#555",letterSpacing:"0.08em"}}>
+              <div style={{fontSize:"0.78rem",fontWeight:700,color:T.textSecondary,letterSpacing:"0.08em"}}>
                 SELECT A CLASS TO IMPORT
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:"0.4rem"}}>
                 {courses.map(c => (
                   <button key={c.id} onClick={() => fetchStudents(c)}
-                    style={{textAlign:"left",padding:"0.75rem 1rem",border:"2px solid #dde3e9",borderRadius:"6px",
-                      background:"#f8fafc",cursor:"pointer",fontWeight:600,color:"#1a1a1a",fontSize:"0.88rem"}}>
+                    style={{textAlign:"left",padding:"0.75rem 1rem",border:`2px solid ${T.border}`,borderRadius:"6px",
+                      background:T.surface,cursor:"pointer",fontWeight:600,color:T.text,fontSize:"0.88rem"}}>
                     {c.name}
-                    {c.section && <span style={{fontWeight:400,color:"#888",marginLeft:"6px"}}>· {c.section}</span>}
+                    {c.section && <span style={{fontWeight:400,color:T.textSecondary,marginLeft:"6px"}}>· {c.section}</span>}
                   </button>
                 ))}
               </div>
@@ -263,16 +263,16 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
 
           {step === "confirm" && selected && (
             <>
-              <div style={{fontSize:"0.78rem",fontWeight:700,color:"#555",letterSpacing:"0.08em"}}>
+              <div style={{fontSize:"0.78rem",fontWeight:700,color:T.textSecondary,letterSpacing:"0.08em"}}>
                 PREVIEW — {selected.name} — {students.length} students
               </div>
-              <div style={{border:"1px solid #dde3e9",borderRadius:"4px",overflow:"hidden",maxHeight:"220px",overflowY:"auto"}}>
+              <div style={{border:`1px solid ${T.border}`,borderRadius:T.xs,overflow:"hidden",maxHeight:"220px",overflowY:"auto"}}>
                 {students.map((s, i) => (
                   <div key={i} style={{display:"flex",alignItems:"center",gap:"0.75rem",padding:"0.45rem 0.75rem",
-                    borderBottom:i<students.length-1?"1px solid #eef1f4":"none",background:i%2===0?"#fff":"#f8fafc"}}>
-                    <div style={{width:"24px",height:"24px",borderRadius:"50%",background:"#003865",
+                    borderBottom:i<students.length-1?`1px solid ${T.border}`:"none",background:i%2===0?T.white:T.surface}}>
+                    <div style={{width:"24px",height:"24px",borderRadius:"50%",background:T.midnight,
                       display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                      <span style={{color:"#fff",fontSize:"0.75rem",fontWeight:700}}>{i+1}</span>
+                      <span style={{color:T.white,fontSize:"0.75rem",fontWeight:700}}>{i+1}</span>
                     </div>
                     <div style={{flex:1}}>
                       <div style={{fontSize:"0.85rem",fontWeight:600}}>{s.name}</div>
@@ -282,17 +282,17 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:"0.5rem"}}>
                 <button onClick={doImport} disabled={importing}
-                  style={{background:"#1a6e2e",border:"none",borderRadius:"6px",padding:"0.75rem",
-                    fontSize:"0.88rem",fontWeight:700,color:"#fff",cursor:"pointer",opacity:importing?0.7:1}}>
+                  style={{background:T.success,border:"none",borderRadius:"6px",padding:"0.75rem",
+                    fontSize:"0.88rem",fontWeight:700,color:T.white,cursor:"pointer",opacity:importing?0.7:1}}>
                   {importing ? "Importing…" : `✓ Import as one class (${students.length} students)`}
                 </button>
                 <button onClick={enterSplit} disabled={importing}
-                  style={{background:"#003865",border:"none",borderRadius:"6px",padding:"0.75rem",
-                    fontSize:"0.88rem",fontWeight:700,color:"#fff",cursor:"pointer",opacity:importing?0.5:1}}>
+                  style={{background:T.teal,border:"none",borderRadius:"6px",padding:"0.75rem",
+                    fontSize:"0.88rem",fontWeight:700,color:T.white,cursor:"pointer",opacity:importing?0.5:1}}>
                   ✂ Split into Groups (General / SPED / Gifted…)
                 </button>
                 <button onClick={() => setStep("pick")}
-                  style={{border:"1px solid #c8d3dd",borderRadius:"4px",padding:"0.5rem",background:"#fff",cursor:"pointer",fontSize:"0.82rem",color:"#555"}}>
+                  style={{border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"0.5rem",background:T.white,cursor:"pointer",fontSize:"0.82rem",color:T.textSecondary}}>
                   ← Pick a different class
                 </button>
               </div>
@@ -302,7 +302,7 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
           {step === "split" && (
             <>
               {/* Group definitions */}
-              <div style={{fontSize:"0.72rem",fontWeight:700,letterSpacing:"0.1em",color:"#555"}}>
+              <div style={{fontSize:"0.72rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary}}>
                 STEP 1 — DEFINE GROUPS
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:"0.4rem"}}>
@@ -311,15 +311,15 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
                   const count   = students.filter((_, si) => (assignments[si] ?? 0) === gi).length;
                   const isEditing = editingGrp === gi;
                   return (
-                    <div key={gi} style={{border:`2px solid ${isEditing ? color : "#dde3e9"}`,borderRadius:"6px",overflow:"hidden"}}>
+                    <div key={gi} style={{border:`2px solid ${isEditing ? color : T.border}`,borderRadius:"6px",overflow:"hidden"}}>
                       {/* Card header */}
                       <div onClick={() => setEditingGrp(isEditing ? null : gi)}
                         style={{display:"flex",alignItems:"center",gap:"0.6rem",padding:"0.55rem 0.85rem",
-                          background:isEditing ? color+"18" : "#f8fafc",cursor:"pointer",userSelect:"none"}}>
+                          background:isEditing ? color+"18" : T.surface,cursor:"pointer",userSelect:"none"}}>
                         <div style={{width:"10px",height:"10px",borderRadius:"50%",background:color,flexShrink:0}}/>
                         <div style={{flex:1}}>
-                          <span style={{fontWeight:700,fontSize:"0.88rem",color:"#1a1a1a"}}>{g.name}</span>
-                          <span style={{fontSize:"0.75rem",color:"#888",marginLeft:"8px"}}>
+                          <span style={{fontWeight:700,fontSize:"0.88rem",color:T.text}}>{g.name}</span>
+                          <span style={{fontSize:"0.75rem",color:T.textSecondary,marginLeft:"8px"}}>
                             {count} student{count!==1?"s":""}
                             {g.extendedTime !== "none" && ` · ⏱ ${g.extendedTime === "1.5x" ? "1.5×" : "2×"}`}
                             {g.reduceChoices && " · ✂ 3-choice"}
@@ -329,23 +329,23 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
                           <button onClick={e => { e.stopPropagation(); removeGroup(gi); }}
                             style={{background:"none",border:"none",color:"#bbb",cursor:"pointer",fontSize:"0.78rem",padding:"2px 6px",lineHeight:1}}>✕</button>
                         )}
-                        <span style={{fontSize:"0.75rem",color:"#666"}}>{isEditing ? "▲" : "▼"}</span>
+                        <span style={{fontSize:"0.75rem",color:T.textSecondary}}>{isEditing ? "▲" : "▼"}</span>
                       </div>
                       {/* Inline editor */}
                       {isEditing && (
-                        <div style={{padding:"0.85rem",borderTop:"1px solid #eef1f4",display:"flex",flexDirection:"column",gap:"0.6rem"}}>
+                        <div style={{padding:"0.85rem",borderTop:`1px solid ${T.border}`,display:"flex",flexDirection:"column",gap:"0.6rem"}}>
                           <div>
-                            <label style={{display:"block",fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"4px"}}>GROUP NAME</label>
+                            <label style={{display:"block",fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"4px"}}>GROUP NAME</label>
                             <input value={g.name} onChange={e => updateGroup(gi, {name: e.target.value})}
-                              style={{width:"100%",padding:"0.45rem 0.65rem",border:"1px solid #b3cde8",borderRadius:"3px",fontSize:"0.88rem",boxSizing:"border-box",outline:"none"}}/>
+                              style={{width:"100%",padding:"0.45rem 0.65rem",border:`1px solid ${T.border}`,borderRadius:T.xs,fontSize:"0.88rem",boxSizing:"border-box",outline:"none"}}/>
                           </div>
                           <div>
-                            <label style={{display:"block",fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"5px"}}>⏱ EXTENDED TIME (IEP / 504)</label>
+                            <label style={{display:"block",fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"5px"}}>⏱ EXTENDED TIME (IEP / 504)</label>
                             <div style={{display:"flex",gap:"0.4rem"}}>
                               {[["none","Standard"],["1.5x","1.5×"],["2x","2×"]].map(([val,lbl]) => (
                                 <button key={val} onClick={() => updateGroup(gi, {extendedTime: val})}
-                                  style={{flex:1,padding:"0.4rem",border:`2px solid ${g.extendedTime===val?color:"#c8d3dd"}`,borderRadius:"3px",
-                                    background:g.extendedTime===val?color:"#fafbfc",color:g.extendedTime===val?"#fff":"#555",
+                                  style={{flex:1,padding:"0.4rem",border:`2px solid ${g.extendedTime===val?color:T.border}`,borderRadius:T.xs,
+                                    background:g.extendedTime===val?color:T.surface,color:g.extendedTime===val?T.white:T.textSecondary,
                                     fontWeight:700,fontSize:"0.75rem",cursor:"pointer"}}>
                                   {lbl}
                                 </button>
@@ -353,12 +353,12 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
                             </div>
                           </div>
                           <div>
-                            <label style={{display:"block",fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"5px"}}>✂ ANSWER CHOICES</label>
+                            <label style={{display:"block",fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"5px"}}>✂ ANSWER CHOICES</label>
                             <div style={{display:"flex",gap:"0.4rem"}}>
                               {[[false,"Standard (4)"],[true,"Reduced (3)"]].map(([val,lbl]) => (
                                 <button key={String(val)} onClick={() => updateGroup(gi, {reduceChoices: val})}
-                                  style={{flex:1,padding:"0.4rem",border:`2px solid ${g.reduceChoices===val?color:"#c8d3dd"}`,borderRadius:"3px",
-                                    background:g.reduceChoices===val?color:"#fafbfc",color:g.reduceChoices===val?"#fff":"#555",
+                                  style={{flex:1,padding:"0.4rem",border:`2px solid ${g.reduceChoices===val?color:T.border}`,borderRadius:T.xs,
+                                    background:g.reduceChoices===val?color:T.surface,color:g.reduceChoices===val?T.white:T.textSecondary,
                                     fontWeight:600,fontSize:"0.72rem",cursor:"pointer"}}>
                                   {lbl}
                                 </button>
@@ -371,33 +371,33 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
                   );
                 })}
                 <button onClick={addGroup}
-                  style={{padding:"0.5rem",border:"2px dashed #c8d3dd",borderRadius:"6px",background:"#fafbfc",
-                    cursor:"pointer",fontSize:"0.82rem",fontWeight:600,color:"#555"}}>
+                  style={{padding:"0.5rem",border:`2px dashed ${T.border}`,borderRadius:"6px",background:T.surface,
+                    cursor:"pointer",fontSize:"0.82rem",fontWeight:600,color:T.textSecondary}}>
                   + Add Group
                 </button>
               </div>
 
               {/* Student assignment */}
-              <div style={{fontSize:"0.72rem",fontWeight:700,letterSpacing:"0.1em",color:"#555"}}>
+              <div style={{fontSize:"0.72rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary}}>
                 STEP 2 — ASSIGN STUDENTS ({students.length} total)
               </div>
-              <div style={{border:"1px solid #dde3e9",borderRadius:"4px",overflow:"hidden",maxHeight:"300px",overflowY:"auto"}}>
+              <div style={{border:`1px solid ${T.border}`,borderRadius:T.xs,overflow:"hidden",maxHeight:"300px",overflowY:"auto"}}>
                 {students.map((s, si) => {
                   const assigned = assignments[si] !== undefined ? assignments[si] : 0;
                   const aColor   = GRP_COLORS[assigned % GRP_COLORS.length];
                   return (
                     <div key={s.name} style={{display:"flex",alignItems:"center",gap:"0.5rem",padding:"0.35rem 0.75rem",
-                      borderBottom:si<students.length-1?"1px solid #eef1f4":"none",background:si%2===0?"#fff":"#f8fafc",flexWrap:"wrap"}}>
+                      borderBottom:si<students.length-1?`1px solid ${T.border}`:"none",background:si%2===0?T.white:T.surface,flexWrap:"wrap"}}>
                       <div style={{width:"8px",height:"8px",borderRadius:"50%",background:aColor,flexShrink:0}}/>
                       <div style={{flex:1,fontSize:"0.82rem",fontWeight:600,minWidth:"100px"}}>{s.name}</div>
                       <div style={{display:"flex",gap:"0.25rem",flexWrap:"wrap"}}>
                         {groups.map((g, idx) => (
                           <button key={idx}
                             onClick={() => setAssignments(prev => ({ ...prev, [si]: idx }))}
-                            style={{padding:"2px 8px",border:`2px solid ${assigned === idx ? GRP_COLORS[idx % GRP_COLORS.length] : "#dde3e9"}`,
+                            style={{padding:"2px 8px",border:`2px solid ${assigned === idx ? GRP_COLORS[idx % GRP_COLORS.length] : T.border}`,
                               borderRadius:"12px",fontSize:"0.75rem",fontWeight:700,cursor:"pointer",
-                              background:assigned === idx ? GRP_COLORS[idx % GRP_COLORS.length] : "#f8fafc",
-                              color:assigned === idx ? "#fff" : "#888",whiteSpace:"nowrap"}}>
+                              background:assigned === idx ? GRP_COLORS[idx % GRP_COLORS.length] : T.surface,
+                              color:assigned === idx ? T.white : T.textSecondary,whiteSpace:"nowrap"}}>
                             {g.name}
                           </button>
                         ))}
@@ -412,14 +412,14 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
 
         {/* Footer — split step only */}
         {step === "split" && (
-          <div style={{padding:"0.9rem 1.5rem",borderTop:"1px solid #dde3e9",display:"flex",gap:"0.65rem",flexShrink:0}}>
+          <div style={{padding:"0.9rem 1.5rem",borderTop:`1px solid ${T.border}`,display:"flex",gap:"0.65rem",flexShrink:0}}>
             <button onClick={() => setStep("confirm")}
-              style={{flex:1,background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600,color:"#333"}}>
+              style={{flex:1,background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600,color:T.text}}>
               ← Back
             </button>
             <button onClick={doImportGroups} disabled={importing}
-              style={{flex:2,background:"#1a6e2e",border:"none",borderRadius:"3px",padding:"0.65rem",
-                fontSize:"0.88rem",cursor:"pointer",color:"#fff",fontWeight:700,opacity:importing?0.6:1}}>
+              style={{flex:2,background:T.success,border:"none",borderRadius:T.xs,padding:"0.65rem",
+                fontSize:"0.88rem",cursor:"pointer",color:T.white,fontWeight:700,opacity:importing?0.6:1}}>
               {importing ? "Creating classes…" : `✓ Import ${groups.length} Group${groups.length!==1?"s":""}`}
             </button>
           </div>
@@ -479,30 +479,30 @@ function ClassroomSyncModal({ cls, onClose, onSync }) {
   }
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,fontFamily:"sans-serif"}}>
-      <div style={{background:"#fff",borderRadius:"8px",boxShadow:"0 8px 40px rgba(0,0,0,.2)",width:"100%",maxWidth:"400px",display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <div style={{background:"#003865",color:"#fff",padding:"1rem 1.5rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,fontFamily:T.font}}>
+      <div style={{background:T.white,borderRadius:T.r,boxShadow:"0 8px 40px rgba(0,0,0,.2)",width:"100%",maxWidth:"400px",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        <div style={{background:T.midnight,color:T.white,padding:"1rem 1.5rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
           <img src="https://www.gstatic.com/images/branding/product/1x/classroom_2020q4_48dp.png" alt="" style={{width:"22px",height:"22px"}}/>
           <div style={{flex:1}}>
             <div style={{fontSize:"0.75rem",opacity:.65,letterSpacing:"0.14em"}}>GOOGLE CLASSROOM · RE-SYNC</div>
             <div style={{fontSize:"0.95rem",fontWeight:700}}>{cls.name}</div>
           </div>
-          <button onClick={onClose} style={{background:"none",border:"none",color:"#fff",fontSize:"1.2rem",cursor:"pointer",opacity:.7}}>✕</button>
+          <button onClick={onClose} style={{background:"none",border:"none",color:T.white,fontSize:"1.2rem",cursor:"pointer",opacity:.7}}>✕</button>
         </div>
 
         <div style={{padding:"1.5rem",display:"flex",flexDirection:"column",gap:"1rem"}}>
           {err && (
-            <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"4px",padding:"0.6rem 1rem",fontSize:"0.82rem",color:"#8b1a1a",fontWeight:600}}>⚠ {err}</div>
+            <div style={{background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:T.xs,padding:"0.6rem 1rem",fontSize:"0.82rem",color:T.dangerText,fontWeight:600}}>⚠ {err}</div>
           )}
 
           {step === "idle" && (
             <>
-              <div style={{fontSize:"0.85rem",color:"#555",lineHeight:1.6}}>
+              <div style={{fontSize:"0.85rem",color:T.textSecondary,lineHeight:1.6}}>
                 Check Google Classroom for new students. Existing students, their accommodations, and scores will not be affected.
               </div>
               <button onClick={startSync}
-                style={{background:"#003865",border:"none",borderRadius:"6px",padding:"0.75rem",
-                  display:"flex",alignItems:"center",justifyContent:"center",gap:"0.75rem",cursor:"pointer",fontWeight:700,color:"#fff"}}>
+                style={{background:T.teal,border:"none",borderRadius:"6px",padding:"0.75rem",
+                  display:"flex",alignItems:"center",justifyContent:"center",gap:"0.75rem",cursor:"pointer",fontWeight:700,color:T.white}}>
                 <img src="https://www.gstatic.com/images/branding/googleg/1x/googleg_standard_color_128dp.png" alt="" style={{width:"20px",height:"20px",filter:"brightness(10)"}}/>
                 Connect to Google Classroom
               </button>
@@ -510,36 +510,36 @@ function ClassroomSyncModal({ cls, onClose, onSync }) {
           )}
 
           {step === "loading" && (
-            <div style={{textAlign:"center",color:"#888",padding:"1.5rem"}}>Fetching roster…</div>
+            <div style={{textAlign:"center",color:T.textSecondary,padding:"1.5rem"}}>Fetching roster…</div>
           )}
 
           {step === "review" && (
             <>
               {newStudents.length === 0 ? (
-                <div style={{textAlign:"center",color:"#1a6e2e",fontWeight:700,padding:"1.5rem",background:"#f0faf2",borderRadius:"6px",fontSize:"0.9rem"}}>
+                <div style={{textAlign:"center",color:T.success,fontWeight:700,padding:"1.5rem",background:T.successBg,borderRadius:"6px",fontSize:"0.9rem"}}>
                   ✓ Class is up to date — no new students found.
                 </div>
               ) : (
                 <>
-                  <div style={{fontSize:"0.82rem",color:"#555"}}>
+                  <div style={{fontSize:"0.82rem",color:T.textSecondary}}>
                     Found <strong>{newStudents.length} new student{newStudents.length!==1?"s":""}</strong> in Google Classroom:
                   </div>
-                  <div style={{border:"1px solid #dde3e9",borderRadius:"4px",overflow:"hidden",maxHeight:"200px",overflowY:"auto"}}>
+                  <div style={{border:`1px solid ${T.border}`,borderRadius:"4px",overflow:"hidden",maxHeight:"200px",overflowY:"auto"}}>
                     {newStudents.map((s, i) => (
-                      <div key={i} style={{padding:"0.45rem 0.75rem",borderBottom:i<newStudents.length-1?"1px solid #eef1f4":"none",background:i%2===0?"#fff":"#f8fafc"}}>
+                      <div key={i} style={{padding:"0.45rem 0.75rem",borderBottom:i<newStudents.length-1?`1px solid ${T.border}`:"none",background:i%2===0?T.white:T.surface}}>
                         <div style={{fontSize:"0.85rem",fontWeight:600}}>{s.name}</div>
                       </div>
                     ))}
                   </div>
                   <button onClick={doSync} disabled={syncing}
-                    style={{background:"#1a6e2e",border:"none",borderRadius:"6px",padding:"0.75rem",
-                      fontSize:"0.88rem",fontWeight:700,color:"#fff",cursor:"pointer",opacity:syncing?0.7:1}}>
+                    style={{background:T.success,border:"none",borderRadius:"6px",padding:"0.75rem",
+                      fontSize:"0.88rem",fontWeight:700,color:T.white,cursor:"pointer",opacity:syncing?0.7:1}}>
                     {syncing ? "Adding…" : `✓ Add ${newStudents.length} Student${newStudents.length!==1?"s":""}`}
                   </button>
                 </>
               )}
               <button onClick={onClose}
-                style={{border:"1px solid #c8d3dd",borderRadius:"4px",padding:"0.5rem",background:"#fff",cursor:"pointer",fontSize:"0.82rem",color:"#555"}}>
+                style={{border:`1px solid ${T.borderDark}`,borderRadius:"4px",padding:"0.5rem",background:T.white,cursor:"pointer",fontSize:"0.82rem",color:T.textSecondary}}>
                 {newStudents.length === 0 ? "Done" : "Cancel"}
               </button>
             </>
@@ -551,7 +551,7 @@ function ClassroomSyncModal({ cls, onClose, onSync }) {
 }
 
 
-export default function RosterManager({ teacher, readOnly }) {
+export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
   const [classes,    setClasses]    = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [activeClass,setActiveClass]= useState(null);
@@ -582,8 +582,13 @@ export default function RosterManager({ teacher, readOnly }) {
   async function addClass() {
     if (!newClassName.trim()) return;
     try {
-      await fetch(`${API}/roster/class`, { method:"POST", headers:{"Content-Type":"application/json"},
+      const r = await fetch(`${API}/roster/class`, { method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({ name: newClassName.trim(), teacherId: teacher?.teacherId || null }) });
+      const data = await r.json();
+      // Sync new classId into App state + sessionStorage so it survives navigation/refresh
+      if (onUpdateClassIds && teacher?.classIds !== null && data.id) {
+        onUpdateClassIds([...(teacher.classIds || []), data.id]);
+      }
       setNewClassName(""); await load(); flash("Class added!");
     } catch { flash("Failed to add class. Check your connection."); }
   }
@@ -591,7 +596,14 @@ export default function RosterManager({ teacher, readOnly }) {
   async function deleteClass(cid) {
     const cls = classes.find(c => c.id === cid);
     if (!window.confirm(`Delete "${cls?.name || "this class"}" and all its students? This cannot be undone.`)) return;
-    try { await fetch(`${API}/roster/class/${cid}`, { method:"DELETE" }); await load(); }
+    try {
+      await fetch(`${API}/roster/class/${cid}`, { method:"DELETE" });
+      // Sync removed classId out of App state + sessionStorage
+      if (onUpdateClassIds && teacher?.classIds !== null) {
+        onUpdateClassIds((teacher.classIds || []).filter(id => id !== cid));
+      }
+      await load();
+    }
     catch { flash("Failed to delete class. Check your connection."); }
   }
 
@@ -717,6 +729,7 @@ export default function RosterManager({ teacher, readOnly }) {
   async function handleImportGroups(groups) {
     // groups = [{name, extendedTime, reduceChoices, gcCourseId, students:[{name}]}]
     let lastCid = null;
+    const newCids = [];
     const allCurrentIds = classes.map(c => c.id);
     for (const g of groups) {
       if (!g.students.length) continue; // skip empty groups
@@ -726,6 +739,7 @@ export default function RosterManager({ teacher, readOnly }) {
       });
       const { id: newCid } = await r.json();
       lastCid = newCid;
+      newCids.push(newCid);
       // Add students
       await fetch(`${API}/roster/class/${newCid}/students`, {
         method:"POST", headers:{"Content-Type":"application/json"},
@@ -747,6 +761,10 @@ export default function RosterManager({ teacher, readOnly }) {
         });
       }
     }
+    // Sync all new classIds into App state + sessionStorage
+    if (onUpdateClassIds && teacher?.classIds !== null && newCids.length) {
+      onUpdateClassIds([...(teacher.classIds || []), ...newCids]);
+    }
     await load();
     setGcImportOpen(false);
     if (lastCid) setActiveClass(lastCid);
@@ -757,64 +775,64 @@ export default function RosterManager({ teacher, readOnly }) {
   const activeClassData = classes.find(c => c.id === activeClass);
   const totalStudents   = classes.reduce((a,c) => a + c.students.length, 0);
 
-  if (loading) return <div style={{padding:"3rem",textAlign:"center",color:"#666"}}>Loading roster…</div>;
+  if (loading) return <div style={{padding:"3rem",textAlign:"center",color:T.textSecondary}}>Loading roster…</div>;
 
   return (
-    <div style={{display:"flex",height:"100%",fontFamily:"sans-serif",background:"#e8edf2",overflow:"hidden"}}>
+    <div style={{display:"flex",height:"100%",fontFamily:"sans-serif",background:T.surfaceAlt,overflow:"hidden"}}>
 
       {/* ── Left: class list ── */}
-      <div style={{width:"260px",display:"flex",flexDirection:"column",borderRight:"2px solid #c8d3dd",background:"#fff",flexShrink:0,overflow:"hidden"}}>
-        <div style={{background:"#003865",color:"#fff",padding:"0.9rem 1.25rem",flexShrink:0}}>
+      <div style={{width:"260px",display:"flex",flexDirection:"column",borderRight:`2px solid ${T.borderDark}`,background:T.white,flexShrink:0,overflow:"hidden"}}>
+        <div style={{background:T.teal,color:T.white,padding:"0.9rem 1.25rem",flexShrink:0}}>
           <div style={{fontSize:"0.75rem",opacity:.65,letterSpacing:"0.14em"}}>TEACHER TOOLS</div>
           <div style={{fontSize:"1rem",fontWeight:700}}>Class Roster</div>
           <div style={{fontSize:"0.72rem",opacity:.7,marginTop:"2px"}}>{classes.length} class{classes.length!==1?"es":""} · {totalStudents} students</div>
         </div>
 
         {!readOnly && (
-        <div style={{padding:"0.85rem 1rem",borderBottom:"1px solid #dde3e9",flexShrink:0}}>
+        <div style={{padding:"0.85rem 1rem",borderBottom:`1px solid ${T.border}`,flexShrink:0}}>
           <label style={S.lbl}>NEW CLASS / PERIOD</label>
           <div style={{display:"flex",gap:"0.4rem"}}>
             <input style={{...S.inp,flex:1}} value={newClassName}
               onChange={e=>setNewClassName(e.target.value)}
               onKeyDown={e=>e.key==="Enter"&&addClass()}
               placeholder="e.g. Period 2"/>
-            <button onClick={addClass} style={{...S.btn,background:"#003865",color:"#fff",border:"none",flexShrink:0}}>+ Add</button>
+            <button onClick={addClass} style={{...S.btn,background:T.teal,color:T.white,border:"none",flexShrink:0}}>+ Add</button>
           </div>
           <button onClick={()=>setGcImportOpen(true)}
-            style={{...S.btn,marginTop:"0.6rem",width:"100%",background:"#fff",border:"1px solid #c8d3dd",
+            style={{...S.btn,marginTop:"0.6rem",width:"100%",background:T.white,border:`1px solid ${T.borderDark}`,
               display:"flex",alignItems:"center",justifyContent:"center",gap:"0.5rem",padding:"0.55rem"}}>
             <img src="https://www.gstatic.com/images/branding/product/1x/classroom_2020q4_48dp.png"
               alt="" style={{width:"16px",height:"16px"}}/>
-            <span style={{fontSize:"0.75rem",fontWeight:700,color:"#003865"}}>Import from Google Classroom</span>
+            <span style={{fontSize:"0.75rem",fontWeight:700,color:T.midnight}}>Import from Google Classroom</span>
           </button>
-          {msg && <div style={{fontSize:"0.72rem",color:"#1a6e2e",fontWeight:700,marginTop:"5px"}}>✓ {msg}</div>}
+          {msg && <div style={{fontSize:"0.72rem",color:T.success,fontWeight:700,marginTop:"5px"}}>✓ {msg}</div>}
         </div>
         )}
 
         <div style={{flex:1,overflowY:"auto",padding:"0.5rem"}}>
           {classes.length===0 ? (
-            <div style={{padding:"2rem 1rem",textAlign:"center",color:"#666",fontSize:"0.82rem"}}>No classes yet.</div>
+            <div style={{padding:"2rem 1rem",textAlign:"center",color:T.textSecondary,fontSize:"0.82rem"}}>No classes yet.</div>
           ) : classes.map(cls => {
             const isActive = cls.id===activeClass;
             return (
               <div key={cls.id} onClick={()=>setActiveClass(cls.id)}
-                style={{padding:"0.75rem 0.9rem",borderRadius:"4px",marginBottom:"0.35rem",background:isActive?"#ddeaf7":"#f8fafc",border:`2px solid ${isActive?"#003865":"#dde3e9"}`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                style={{padding:"0.75rem 0.9rem",borderRadius:"4px",marginBottom:"0.35rem",background:isActive?T.tealLight:T.surface,border:`2px solid ${isActive?T.teal:T.border}`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <div>
-                  <div style={{fontSize:"0.88rem",fontWeight:700,color:isActive?"#003865":"#1a1a1a"}}>{cls.name}</div>
-                  <div style={{fontSize:"0.75rem",color:"#888",marginTop:"1px"}}>{cls.students.length} student{cls.students.length!==1?"s":""}</div>
+                  <div style={{fontSize:"0.88rem",fontWeight:700,color:isActive?T.midnight:T.text}}>{cls.name}</div>
+                  <div style={{fontSize:"0.75rem",color:T.textSecondary,marginTop:"1px"}}>{cls.students.length} student{cls.students.length!==1?"s":""}</div>
                 </div>
                 <div style={{display:"flex",gap:"0.35rem",alignItems:"center",flexWrap:"wrap"}}>
                   {cls.gcCourseId && !readOnly && (
                     <button onClick={e=>{e.stopPropagation();setSyncModal(cls);}}
                       title="Sync new students from Google Classroom"
-                      style={{...S.btn,padding:"2px 7px",fontSize:"0.75rem",color:"#003865",borderColor:"#b3cde8",background:"#ddeaf7"}}>
+                      style={{...S.btn,padding:"2px 7px",fontSize:"0.75rem",color:T.midnight,borderColor:T.border,background:T.tealLight}}>
                       ↻ Sync
                     </button>
                   )}
                   {!readOnly && (
                   <button onClick={e=>{e.stopPropagation();deleteClass(cls.id);}}
                     title="Delete entire class"
-                    style={{...S.btn,padding:"2px 7px",color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",fontSize:"0.75rem"}}>🗑 Delete</button>
+                    style={{...S.btn,padding:"2px 7px",color:T.dangerText,borderColor:T.dangerBd,background:T.dangerBg,fontSize:"0.75rem"}}>🗑 Delete</button>
                   )}
                 </div>
               </div>
@@ -827,23 +845,23 @@ export default function RosterManager({ teacher, readOnly }) {
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
 
         {!activeClassData ? (
-          <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",color:"#666",gap:"0.5rem"}}>
+          <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",color:T.textSecondary,gap:"0.5rem"}}>
             <div style={{fontSize:"2rem"}}>👈</div>
-            <div style={{fontWeight:600,color:"#555"}}>Select a class to manage students</div>
+            <div style={{fontWeight:600,color:T.textSecondary}}>Select a class to manage students</div>
             <div style={{fontSize:"0.82rem"}}>Or create a new class on the left</div>
           </div>
         ) : (
           <>
             {/* Class header */}
-            <div style={{background:"#fff",borderBottom:"1px solid #c8d3dd",padding:"0.75rem 1.25rem",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div style={{background:T.white,borderBottom:`1px solid ${T.borderDark}`,padding:"0.75rem 1.25rem",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
               <div>
-                <div style={{fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.12em",color:"#003865"}}>{activeClassData.name.toUpperCase()}</div>
-                <div style={{fontSize:"1rem",fontWeight:700,color:"#1a1a1a",marginTop:"2px"}}>
+                <div style={{fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.12em",color:T.midnight}}>{activeClassData.name.toUpperCase()}</div>
+                <div style={{fontSize:"1rem",fontWeight:700,color:T.text,marginTop:"2px"}}>
                   {activeClassData.students.length} student{activeClassData.students.length!==1?"s":""}
                 </div>
               </div>
               {!readOnly && (
-                <label style={{display:"flex",alignItems:"center",gap:"0.5rem",fontSize:"0.78rem",color:"#555",cursor:"pointer",userSelect:"none"}}>
+                <label style={{display:"flex",alignItems:"center",gap:"0.5rem",fontSize:"0.78rem",color:T.textSecondary,cursor:"pointer",userSelect:"none"}}>
                   <span>Hide drill timer</span>
                   <div onClick={async () => {
                     const newVal = !(activeClassData.hideTimer ?? true);
@@ -856,11 +874,11 @@ export default function RosterManager({ teacher, readOnly }) {
                     } catch (e) { console.warn("Failed to update hideTimer:", e); }
                   }} style={{
                     width:36,height:20,borderRadius:10,
-                    background:(activeClassData.hideTimer ?? true) ? "#003865" : "#ccc",
+                    background:(activeClassData.hideTimer ?? true) ? T.teal : T.borderDark,
                     position:"relative",cursor:"pointer",transition:"background 0.2s"
                   }}>
                     <div style={{
-                      width:16,height:16,borderRadius:8,background:"#fff",position:"absolute",top:2,
+                      width:16,height:16,borderRadius:8,background:T.white,position:"absolute",top:2,
                       left:(activeClassData.hideTimer ?? true) ? 18 : 2,transition:"left 0.2s",
                       boxShadow:"0 1px 3px rgba(0,0,0,0.3)"
                     }}/>
@@ -871,11 +889,11 @@ export default function RosterManager({ teacher, readOnly }) {
 
             {/* Add students */}
             {!readOnly && (
-            <div style={{background:"#fff",borderBottom:"2px solid #dde3e9",padding:"1rem 1.25rem",flexShrink:0}}>
+            <div style={{background:T.white,borderBottom:`2px solid ${T.border}`,padding:"1rem 1.25rem",flexShrink:0}}>
               <div style={{display:"flex",gap:"0.4rem",marginBottom:"0.75rem",flexWrap:"wrap"}}>
                 {[["one","Add One"],["paste","Paste List"],["csv","📄 Upload CSV"]].map(([key,lbl])=>(
                   <button key={key} onClick={()=>{setAddMode(key);setCsvPreview(null);setCsvErr("");}}
-                    style={{...S.btn,background:addMode===key?"#003865":"#f0f4f8",color:addMode===key?"#fff":"#333",borderColor:addMode===key?"#003865":"#c8d3dd"}}>
+                    style={{...S.btn,background:addMode===key?T.teal:T.surfaceAlt,color:addMode===key?T.white:T.text,borderColor:addMode===key?T.teal:T.borderDark}}>
                     {lbl}
                   </button>
                 ))}
@@ -887,7 +905,7 @@ export default function RosterManager({ teacher, readOnly }) {
                     onKeyDown={e=>e.key==="Enter"&&addStudents()}
                     placeholder="First Last (e.g. Marcus Johnson)"/>
                   <button onClick={addStudents} disabled={adding||!oneInput.trim()}
-                    style={{...S.btn,background:oneInput.trim()?"#1a6e2e":"#c8d3dd",color:"#fff",border:"none",flexShrink:0}}>
+                    style={{...S.btn,background:oneInput.trim()?T.success:T.borderDark,color:T.white,border:"none",flexShrink:0}}>
                     {adding?"Adding…":"+ Add"}
                   </button>
                 </div>
@@ -897,16 +915,16 @@ export default function RosterManager({ teacher, readOnly }) {
                   <textarea style={S.ta} value={pasteInput} onChange={e=>setPasteInput(e.target.value)}
                     placeholder={"Marcus Johnson\nAva Williams\nDeShawn Brown\nKeisha Davis"}/>
                   <button onClick={addStudents} disabled={adding||!pasteInput.trim()}
-                    style={{...S.btn,marginTop:"0.5rem",background:pasteInput.trim()?"#003865":"#c8d3dd",color:"#fff",border:"none",padding:"0.6rem 1.5rem"}}>
+                    style={{...S.btn,marginTop:"0.5rem",background:pasteInput.trim()?T.teal:T.borderDark,color:T.white,border:"none",padding:"0.6rem 1.5rem"}}>
                     {adding?"Adding…":`+ Add ${pasteInput.split("\n").filter(n=>n.trim()).length} Student${pasteInput.split("\n").filter(n=>n.trim()).length!==1?"s":""}`}
                   </button>
                 </div>
               ) : addMode==="csv" ? (
                 <div style={{display:"flex",flexDirection:"column",gap:"0.75rem"}}>
                   {/* Format hint */}
-                  <div style={{background:"#f0f4f8",borderRadius:"3px",padding:"0.6rem 0.9rem",fontSize:"0.76rem",color:"#555",lineHeight:1.6}}>
+                  <div style={{background:T.surfaceAlt,borderRadius:"3px",padding:"0.6rem 0.9rem",fontSize:"0.76rem",color:T.textSecondary,lineHeight:1.6}}>
                     <strong>CSV format:</strong> one column — <code>name</code>. Header row optional. Example:<br/>
-                    <code style={{display:"block",marginTop:"4px",color:"#003865"}}>
+                    <code style={{display:"block",marginTop:"4px",color:T.midnight}}>
                       Marcus Johnson<br/>
                       Ava Williams<br/>
                       DeShawn Brown
@@ -915,25 +933,25 @@ export default function RosterManager({ teacher, readOnly }) {
                   {/* File picker */}
                   <input ref={csvRef} type="file" accept=".csv,.txt" onChange={handleCSVFile} style={{display:"none"}}/>
                   <button onClick={()=>csvRef.current?.click()}
-                    style={{...S.btn,background:"#003865",color:"#fff",border:"none",padding:"0.65rem",fontSize:"0.85rem",fontWeight:700}}>
+                    style={{...S.btn,background:T.teal,color:T.white,border:"none",padding:"0.65rem",fontSize:"0.85rem",fontWeight:700}}>
                     📂 Choose CSV File
                   </button>
-                  {csvErr && <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"3px",padding:"0.55rem 0.85rem",fontSize:"0.76rem",color:"#8b1a1a"}}>⚠ {csvErr}</div>}
+                  {csvErr && <div style={{background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:"3px",padding:"0.55rem 0.85rem",fontSize:"0.76rem",color:T.dangerText}}>⚠ {csvErr}</div>}
                   {/* Preview */}
                   {csvPreview && (
                     <div>
-                      <div style={{fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"6px"}}>
+                      <div style={{fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"6px"}}>
                         PREVIEW — {csvPreview.length} student{csvPreview.length!==1?"s":""}
                       </div>
-                      <div style={{maxHeight:"160px",overflowY:"auto",border:"1px solid #c8d3dd",borderRadius:"3px",background:"#fafbfc"}}>
+                      <div style={{maxHeight:"160px",overflowY:"auto",border:`1px solid ${T.borderDark}`,borderRadius:"3px",background:T.surface}}>
                         {csvPreview.map((r,i)=>(
-                          <div key={i} style={{display:"flex",alignItems:"center",gap:"0.75rem",padding:"0.4rem 0.75rem",borderBottom:i<csvPreview.length-1?"1px solid #eef1f4":"none"}}>
+                          <div key={i} style={{display:"flex",alignItems:"center",gap:"0.75rem",padding:"0.4rem 0.75rem",borderBottom:i<csvPreview.length-1?`1px solid ${T.border}`:"none"}}>
                             <span style={{fontSize:"0.82rem",fontWeight:600,flex:1}}>{r.name}</span>
                           </div>
                         ))}
                       </div>
                       <button onClick={importCSV} disabled={csvImporting}
-                        style={{...S.btn,marginTop:"0.6rem",width:"100%",background:"#1a6e2e",color:"#fff",border:"none",padding:"0.65rem",fontSize:"0.85rem",fontWeight:700,opacity:csvImporting?0.7:1}}>
+                        style={{...S.btn,marginTop:"0.6rem",width:"100%",background:T.success,color:T.white,border:"none",padding:"0.65rem",fontSize:"0.85rem",fontWeight:700,opacity:csvImporting?0.7:1}}>
                         {csvImporting?"Importing…":`✓ Import ${csvPreview.length} Student${csvPreview.length!==1?"s":""}`}
                       </button>
                     </div>
@@ -946,19 +964,19 @@ export default function RosterManager({ teacher, readOnly }) {
             {/* Student list */}
             <div style={{flex:1,overflowY:"auto",padding:"0.75rem 1.25rem"}}>
               {activeClassData.students.length===0 ? (
-                <div style={{padding:"2rem",textAlign:"center",color:"#666",fontSize:"0.85rem"}}>No students yet.</div>
+                <div style={{padding:"2rem",textAlign:"center",color:T.textSecondary,fontSize:"0.85rem"}}>No students yet.</div>
               ) : (
                 <div style={{display:"flex",flexDirection:"column",gap:"0.35rem"}}>
                   {activeClassData.students.map((s,i)=>(
-                    <div key={s.id} style={{background:"#fff",border:"1px solid #dde3e9",borderRadius:"3px",padding:"0.6rem 0.9rem",display:"flex",alignItems:"center",gap:"0.75rem",flexWrap:"wrap"}}>
-                      <div style={{width:"26px",height:"26px",borderRadius:"50%",background:"#003865",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                        <span style={{color:"#fff",fontSize:"0.75rem",fontWeight:700}}>{i+1}</span>
+                    <div key={s.id} style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:"3px",padding:"0.6rem 0.9rem",display:"flex",alignItems:"center",gap:"0.75rem",flexWrap:"wrap"}}>
+                      <div style={{width:"26px",height:"26px",borderRadius:"50%",background:T.teal,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <span style={{color:T.white,fontSize:"0.75rem",fontWeight:700}}>{i+1}</span>
                       </div>
-                      <div style={{flex:1,fontSize:"0.88rem",fontWeight:600,color:"#1a1a1a",minWidth:"120px"}}>
+                      <div style={{flex:1,fontSize:"0.88rem",fontWeight:600,color:T.text,minWidth:"120px"}}>
                         {s.name}
                         <span style={{display:"inline-flex",gap:"4px",marginLeft:"8px",verticalAlign:"middle"}}>
                           {s.extendedTime && s.extendedTime !== "none" && (
-                            <span style={{background:"#ddeaf7",border:"1px solid #b3cde8",borderRadius:"3px",padding:"1px 6px",fontSize:"0.75rem",fontWeight:700,color:"#003865"}}>
+                            <span style={{background:T.tealLight,border:`1px solid ${T.border}`,borderRadius:"3px",padding:"1px 6px",fontSize:"0.75rem",fontWeight:700,color:T.midnight}}>
                               ⏱ {s.extendedTime === "1.5x" ? "1.5×" : "2×"} TIME
                             </span>
                           )}
@@ -972,9 +990,9 @@ export default function RosterManager({ teacher, readOnly }) {
                       {!readOnly && (<>
                       <button onClick={()=>setAccomModal({cid:activeClassData.id, student:s})}
                         title="Accommodations (extended time, reduced choices)"
-                        style={{...S.btn,padding:"2px 8px",fontSize:"0.75rem",color:"#003865",borderColor:"#b3cde8",background:"#ddeaf7"}}>IEP</button>
+                        style={{...S.btn,padding:"2px 8px",fontSize:"0.75rem",color:T.midnight,borderColor:T.border,background:T.tealLight}}>IEP</button>
                       <button onClick={()=>removeStudent(activeClassData.id, s.id, s.name)}
-                        style={{...S.btn,padding:"2px 8px",color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",fontSize:"0.75rem"}}>✕</button>
+                        style={{...S.btn,padding:"2px 8px",color:T.dangerText,borderColor:T.dangerBd,background:T.dangerBg,fontSize:"0.75rem"}}>✕</button>
                       </>)}
                     </div>
                   ))}
@@ -1000,12 +1018,11 @@ export default function RosterManager({ teacher, readOnly }) {
             method:"POST", headers:{"Content-Type":"application/json"},
             body: JSON.stringify({ students: students.map(s => ({ name: s.name })) }),
           });
+          // Sync new classId into App state + sessionStorage
+          if (onUpdateClassIds && teacher?.classIds !== null) {
+            onUpdateClassIds([...(teacher.classIds || []), newCid]);
+          }
           await load();
-          const freshAll = await fetch(`${API}/roster`).then(r => r.json());
-          setClasses(teacher && teacher.classIds !== null
-            ? freshAll.filter(c => [...(teacher.classIds||[]), newCid].includes(c.id))
-            : freshAll
-          );
           setActiveClass(newCid);
           setGcImportOpen(false);
           flash(`Imported ${students.length} students from Google Classroom!`);
