@@ -745,17 +745,26 @@ export default function Dashboard({ teacher, readOnly }) {
         .map(([std, d]) => ({ std, ...d, pct: d.total ? Math.round((d.correct/d.total)*100) : 0, studentCount: d.students.size }))
         .sort((a,b) => a.pct - b.pct); // weakest first
 
+      // ── Fluency-based stat card data (correct source) ──────────────────────
+      const allFluencyStudents  = fluencyReport.flatMap(c => c.students);
+      const drilledStudents     = allFluencyStudents.filter(s => s.sessionCount > 0);
+      const totalFluencySessions = drilledStudents.reduce((a, s) => a + s.sessionCount, 0);
+      const weightedAccSum      = drilledStudents.reduce((a, s) => a + s.avgAccuracy * s.sessionCount, 0);
+      const fluencyAvgAcc       = totalFluencySessions > 0
+        ? Math.round(weightedAccSum / totalFluencySessions) + "%" : "—";
+      const improvingCount      = drilledStudents.filter(s => s.trend === "improving").length;
+
       return (
         <div style={{maxWidth:"960px",display:"flex",flexDirection:"column",gap:"1rem"}}>
-          {/* Summary cards */}
+          {/* Summary cards — sourced from fluency_data (all students, all sessions) */}
           <div style={{display:"flex",gap:"0.75rem",flexWrap:"wrap"}}>
             {[
-              ["Drill Sessions", drillSessions.length, "#7a4e00", "#fff8e1"],
-              ["Students Drilled", Object.keys(drillStudentMap).length, T.teal, "rgba(13,148,136,.1)"],
-              ["Standards Practiced", stdRows.length, "#1a6e2e", "#f0faf2"],
-              ["Avg Drill Score", drillSessions.length ? Math.round(drillSessions.reduce((a,s)=>a+s.pct,0)/drillSessions.length)+"%" : "—", "#555", "#f0f4f8"],
+              ["Drill Sessions",   totalFluencySessions,      T.warning,    T.warningBg],
+              ["Students Drilled", drilledStudents.length,    T.teal,       "rgba(13,148,136,.1)"],
+              ["Avg Accuracy",     fluencyAvgAcc,             T.success,    T.successBg],
+              ["Improving",        improvingCount,            T.midnight,   T.surfaceAlt],
             ].map(([lbl,val,c,bg])=>(
-              <div key={lbl} style={{background:bg,border:`1px solid ${c}22`,borderRadius:"4px",padding:"0.9rem 1.25rem",minWidth:"120px",flex:1}}>
+              <div key={lbl} style={{background:bg,border:`1px solid ${c}22`,borderRadius:T.xs,padding:"0.9rem 1.25rem",minWidth:"120px",flex:1}}>
                 <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.12em",color:c,marginBottom:"4px"}}>{lbl.toUpperCase()}</div>
                 <div style={{fontSize:"1.6rem",fontWeight:700,color:c}}>{val}</div>
               </div>
