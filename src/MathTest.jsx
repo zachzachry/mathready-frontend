@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useRive } from "@rive-app/react-canvas";
+import EggScene from "./shared/EggScene";
 import { AreaChart, Area, LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import MathText from "./shared/MathText";
 import TopBar from "./shared/TopBar";
@@ -1557,47 +1557,7 @@ function pickDrillOp(levels, streaks) {
   return ops[0];
 }
 
-// ── Drill result character — Gracie (Rive) ──────────────────────────────────
-// gracie.riv lives in /public.  State machine: gracie_controller
-// Animations found: IDLE, v20_smile (+ v0–v21 visemes for future lip-sync)
-
 const STAR_LABELS = ["", "Keep going! 📚", "Nice work! 👍", "Good job! ✨", "Great work! 🌟", "PERFECT! 🏆"];
-
-function DrillCharacter({ accuracy, studentId }) {
-  const stars   = accuracy >= 90 ? 5 : accuracy >= 75 ? 4 : accuracy >= 60 ? 3 : accuracy >= 40 ? 2 : 1;
-  const smiling = accuracy >= 60;
-
-
-  const { rive, RiveComponent } = useRive({
-    src: "/gracie.riv",
-    artboard: "Viseme",
-    animations: smiling ? ["IDLE", "v20_smile"] : ["IDLE"],
-    autoplay: true,
-    onLoad: () => {
-      if (rive) {
-        const inputs = rive.stateMachineInputs("gracie_controller");
-        if (inputs) console.log("Gracie inputs:", inputs.map(i => ({ name: i.name, type: i.type, value: i.value })));
-      }
-    },
-  });
-
-  return (
-    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"0.5rem"}}>
-      {/* CSS filter applied to wrapper div — tints the entire Rive canvas */}
-      <div style={{width:200,height:260}}>
-        <RiveComponent style={{width:"100%",height:"100%"}} />
-      </div>
-      <div style={{display:"flex",gap:"3px",fontSize:"1.25rem"}}>
-        {[1,2,3,4,5].map(s => (
-          <span key={s} style={{opacity: s <= stars ? 1 : 0.18}}>⭐</span>
-        ))}
-      </div>
-      <div style={{color:"rgba(255,255,255,0.85)",fontWeight:700,fontSize:"0.85rem",textAlign:"center"}}>
-        {STAR_LABELS[stars]}
-      </div>
-    </div>
-  );
-}
 
 // ── Drill session ───────────────────────────────────────────────────────────
 function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drillNumber = 1 }) {
@@ -1834,8 +1794,12 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
               {/* Character card */}
               <div style={{...glassCard,flex:"0 0 200px",minWidth:"160px",
                 display:"flex",flexDirection:"column",alignItems:"center",
-                justifyContent:"center",padding:"1.25rem 1rem"}}>
-                <DrillCharacter accuracy={accuracy} studentId={student?.id} />
+                justifyContent:"center",padding:"1.25rem 1rem", height:240}}>
+                <EggScene
+                  accuracy={accuracy}
+                  element="earth"
+                  sessionStars={accuracy>=90?5:accuracy>=75?4:accuracy>=60?3:accuracy>=40?2:1}
+                />
               </div>
 
               {/* Stats card */}
