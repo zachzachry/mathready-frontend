@@ -5,7 +5,6 @@
   "dependencies": {
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
-    "@rive-app/react-canvas": "^4.27.1",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
     "lottie-react": "^2.4.1",
