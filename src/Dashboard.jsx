@@ -745,31 +745,6 @@ export default function Dashboard({ teacher, readOnly }) {
             ))}
           </div>
 
-          {/* Per-student drill history — sourced from fluency_data */}
-          {fluencyReport.filter(c => c.students.some(s => s.sessionCount > 0)).map(cls => {
-            const active = cls.students.filter(s => s.sessionCount > 0)
-              .sort((a,b) => b.avgAccuracy - a.avgAccuracy);
-            return (
-              <div key={cls.classId} style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,overflow:"hidden"}}>
-                <div style={{padding:"0.75rem 1rem",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary}}>
-                  STUDENT DRILL HISTORY — {cls.className.toUpperCase()}
-                </div>
-                {active.map(s => (
-                  <div key={s.studentId} style={{padding:"0.65rem 1rem",borderBottom:`1px solid ${T.surface}`,display:"flex",alignItems:"center",gap:"1rem"}}>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:"0.85rem",fontWeight:700,color:T.text}}>{s.studentName}</div>
-                      <div style={{fontSize:"0.62rem",color:T.textMuted}}>
-                        Add {s.levels?.add ?? "—"} · Sub {s.levels?.sub ?? "—"} · Mul {s.levels?.mul ?? "—"} · Div {s.levels?.div ?? "—"}
-                      </div>
-                    </div>
-                    <div style={{fontSize:"0.72rem",color:T.textSecondary}}>{s.sessionCount} drill{s.sessionCount!==1?"s":""}</div>
-                    <div style={{fontWeight:700,fontSize:"0.9rem",color:lvlC(s.avgAccuracy),minWidth:"44px",textAlign:"right"}}>{s.avgAccuracy}%</div>
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-
           {/* Top 5 Leaderboard per class */}
           {leaderboard.filter(c => c.top5.length > 0).map(cls => (
             <div key={cls.classId} style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden"}}>
