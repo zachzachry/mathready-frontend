@@ -449,45 +449,49 @@ export default function Dashboard({ teacher, readOnly }) {
             </div>
             {sorted.map((s,i)=>{
               const name = s.studentName||s.name; const p=s.pct;
+              const isOpen = name===selected;
               return (
-                <div key={i} onClick={()=>setSelected(name===selected?null:name)}
-                  style={{padding:"0.7rem 1rem",borderBottom:`1px solid ${T.surfaceAlt}`,cursor:"pointer",background:name===selected?"#f0f6ff":T.white,display:"flex",alignItems:"center",gap:"0.75rem"}}>
-                  <div style={{width:"28px",height:"28px",borderRadius:"50%",background:lvlBg(p),border:`2px solid ${lvlC(p)}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    <span style={{fontSize:"0.65rem",fontWeight:700,color:lvlC(p)}}>{i+1}</span>
+                <React.Fragment key={i}>
+                  <div onClick={()=>setSelected(isOpen?null:name)}
+                    style={{padding:"0.7rem 1rem",borderBottom:`1px solid ${T.surfaceAlt}`,cursor:"pointer",background:isOpen?T.surfaceAlt:T.white,display:"flex",alignItems:"center",gap:"0.75rem",transition:"background .15s"}}>
+                    <div style={{width:"28px",height:"28px",borderRadius:"50%",background:lvlBg(p),border:`2px solid ${lvlC(p)}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      <span style={{fontSize:"0.65rem",fontWeight:700,color:lvlC(p)}}>{i+1}</span>
+                    </div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:"0.88rem",fontWeight:700,color:T.text}}>{name}</div>
+                      {s.className&&<div style={{fontSize:"0.65rem",color:T.textSecondary}}>{s.className}</div>}
+                    </div>
+                    {s.violations > 0 && (
+                      <div title={`${s.violations} testing violation${s.violations!==1?"s":""} detected`}
+                        style={{background:T.dangerText,color:T.white,borderRadius:T.xs,padding:"2px 7px",fontSize:"0.65rem",fontWeight:700,flexShrink:0}}>
+                        ⚠ {s.violations}
+                      </div>
+                    )}
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:"1rem",fontWeight:700,color:lvlC(p)}}>{p}%</div>
+                      <div style={{fontSize:"0.65rem",color:T.textSecondary}}>{s.score}/{s.total} · {s.timeUsed}</div>
+                    </div>
+                    <span style={{fontSize:"0.7rem",color:T.textMuted,flexShrink:0}}>{isOpen?"▲":"▼"}</span>
                   </div>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:"0.88rem",fontWeight:700,color:T.text}}>{name}</div>
-                    {s.className&&<div style={{fontSize:"0.65rem",color:T.textSecondary}}>{s.className}</div>}
-                  </div>
-                  {s.violations > 0 && (
-                    <div title={`${s.violations} testing violation${s.violations!==1?"s":""} detected`}
-                      style={{background:T.dangerText,color:T.white,borderRadius:T.xs,padding:"2px 7px",fontSize:"0.65rem",fontWeight:700,flexShrink:0}}>
-                      ⚠ {s.violations}
+                  {isOpen && (
+                    <div style={{padding:"0.75rem 1rem 0.75rem 3.5rem",background:T.surface,borderBottom:`1px solid ${T.surfaceAlt}`}}>
+                      <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"0.5rem"}}>ITEM DETAIL</div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:"4px"}}>
+                        {Object.entries(s.answers||{}).map(([qid,ans])=>{
+                          const q = bankQ.find(x=>x.id===qid);
+                          const ok = q && ans===q.correct;
+                          return <div key={qid} title={q?`${q.standard} — ${ok?"Correct":"Incorrect"}`:`Q${qid}`}
+                            style={{width:"28px",height:"28px",borderRadius:T.xs,background:ok?T.success:T.dangerText,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                            <span style={{color:T.white,fontSize:"0.7rem",fontWeight:700}}>{ok?"✓":"✗"}</span>
+                          </div>;
+                        })}
+                      </div>
                     </div>
                   )}
-                  <div style={{textAlign:"right"}}>
-                    <div style={{fontSize:"1rem",fontWeight:700,color:lvlC(p)}}>{p}%</div>
-                    <div style={{fontSize:"0.65rem",color:T.textSecondary}}>{s.score}/{s.total} · {s.timeUsed}</div>
-                  </div>
-                </div>
+                </React.Fragment>
               );
             })}
           </div>
-          {sel && (
-            <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"1rem 1.25rem"}}>
-              <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"0.75rem"}}>{(sel.studentName||sel.name).toUpperCase()} — ITEM DETAIL</div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:"4px"}}>
-                {Object.entries(sel.answers||{}).map(([qid,ans])=>{
-                  const q = bankQ.find(x=>x.id===qid);
-                  const ok = q && ans===q.correct;
-                  return <div key={qid} title={q?.standard||qid}
-                    style={{width:"28px",height:"28px",borderRadius:T.xs,background:ok?T.success:T.dangerText,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                    <span style={{color:T.white,fontSize:"0.7rem",fontWeight:700}}>{ok?"✓":"✗"}</span>
-                  </div>;
-                })}
-              </div>
-            </div>
-          )}
         </div>
       );
     }
