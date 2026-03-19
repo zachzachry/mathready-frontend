@@ -332,11 +332,16 @@ export default function Dashboard({ teacher, readOnly }) {
   async function handleClearMode(mode) {
     setClearing(true); setClearModal(false);
     try {
-      const url = mode === "all" ? `${API}/sessions` : `${API}/sessions?mode=${mode}`;
-      await fetch(url, { method: "DELETE" });
-      if (mode === "all") setSessions([]);
-      else if (mode === "tests") setSessions(prev => prev.filter(s => s.mode === "drill" || s.mode === "practice"));
-      else if (mode === "drills") setSessions(prev => prev.filter(s => s.mode !== "drill" && s.mode !== "practice"));
+      if (mode === "fluency") {
+        await fetch(`${API}/fluency/all`, { method: "DELETE" });
+        setFluencyReport([]); setLeaderboard([]);
+      } else {
+        const url = mode === "all" ? `${API}/sessions` : `${API}/sessions?mode=${mode}`;
+        await fetch(url, { method: "DELETE" });
+        if (mode === "all") { setSessions([]); await fetch(`${API}/fluency/all`, { method: "DELETE" }); setFluencyReport([]); setLeaderboard([]); }
+        else if (mode === "tests") setSessions(prev => prev.filter(s => s.mode === "drill" || s.mode === "practice"));
+        else if (mode === "drills") setSessions(prev => prev.filter(s => s.mode !== "drill" && s.mode !== "practice"));
+      }
     } catch {}
     setSelected(null); setClearing(false);
   }
@@ -788,7 +793,7 @@ export default function Dashboard({ teacher, readOnly }) {
                 FLUENCY LEVELS — {cls.className.toUpperCase()}
               </div>
               <div style={{overflowX:"auto"}}>
-              <div style={{display:"grid",gridTemplateColumns:"1fr repeat(4,48px) 4px repeat(4,48px) 46px 42px 52px 42px 42px",gap:0,fontSize:"0.68rem",minWidth:"700px"}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr repeat(4,48px) 4px repeat(4,48px) 46px 42px 52px 42px 36px 36px",gap:0,fontSize:"0.68rem",minWidth:"700px"}}>
                 {/* ── header row ── */}
                 <div style={{padding:"0.5rem 0.75rem",fontWeight:700,color:T.textSecondary,borderBottom:`2px solid ${T.border}`}}>Student</div>
                 {["Add","Sub","Mul","Div"].map(op=>(
@@ -803,6 +808,7 @@ export default function Dashboard({ teacher, readOnly }) {
                 <div style={{padding:"0.5rem 0.15rem",fontWeight:700,color:T.textSecondary,textAlign:"center",borderBottom:`2px solid ${T.border}`,fontSize:"0.6rem"}}>Avg %</div>
                 <div style={{padding:"0.5rem 0.15rem",fontWeight:700,color:T.textSecondary,textAlign:"center",borderBottom:`2px solid ${T.border}`,fontSize:"0.6rem"}}>Trend</div>
                 <div style={{padding:"0.5rem 0.15rem",fontWeight:700,color:T.textSecondary,textAlign:"center",borderBottom:`2px solid ${T.border}`,fontSize:"0.6rem"}}>Rpt</div>
+                <div style={{padding:"0.5rem 0.15rem",fontWeight:700,color:T.textSecondary,textAlign:"center",borderBottom:`2px solid ${T.border}`,fontSize:"0.6rem"}}>Rst</div>
 
                 {/* ── data rows ── */}
                 {cls.students.filter(s => s.sessionCount > 0).map(s => {
@@ -844,6 +850,19 @@ export default function Dashboard({ teacher, readOnly }) {
                         }}
                       >
                         📄
+                      </button>
+                    </div>
+                    <div style={{padding:"0.3rem 0.15rem",textAlign:"center",borderBottom:`1px solid ${T.surfaceAlt}`}}>
+                      <button
+                        onClick={async () => { if (!window.confirm(`Reset fluency data for ${s.student.name}?`)) return; await fetch(`${API}/fluency/student/${s.student.id}`, {method:"DELETE"}); refresh(); }}
+                        title="Reset fluency data"
+                        style={{
+                          background: T.dangerBg, border: `1px solid ${T.dangerBd}`,
+                          borderRadius: 6, padding:"2px 5px", cursor:"pointer",
+                          fontSize:"0.6rem", fontWeight:700, color:T.dangerText,
+                        }}
+                      >
+                        ↺
                       </button>
                     </div>
                   </React.Fragment>
@@ -1110,9 +1129,9 @@ export default function Dashboard({ teacher, readOnly }) {
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:"0.5rem",padding:"0 1.5rem 1.25rem"}}>
               {[
-                ["tests",  "Clear Test Scores only",         `${testSessions.length} test session${testSessions.length!==1?"s":""}`,  T.midnight,"rgba(13,148,136,.1)"],
-                ["drills", "Clear Drill & Practice data only", `${drillSessions.length} drill session${drillSessions.length!==1?"s":""}`, "#7a4e00","#fff8e1"],
-                ["all",    "Clear Everything",               `All ${sessions.length} sessions`,                                        "#8b1a1a","#fdf2f2"],
+                ["tests",   "Clear Test Scores only",          `${testSessions.length} test session${testSessions.length!==1?"s":""}`,  T.midnight,"rgba(13,148,136,.1)"],
+                ["fluency", "Clear Fluency Drill Data",        "All fluency levels, streaks, and drill sessions",                      T.teal,    "rgba(13,148,136,.08)"],
+                ["all",     "Clear Everything",                "All test scores + all fluency data",                                   T.dangerText, T.dangerBg],
               ].map(([mode, label, sub, c, bg]) => (
                 <button key={mode} onClick={() => handleClearMode(mode)}
                   style={{background:bg,border:`1px solid ${c}33`,borderRadius:"4px",padding:"0.75rem 1rem",textAlign:"left",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
