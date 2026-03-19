@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { QUESTIONS, lvl, lvlC, lvlBg, lvlBd, loadSessions, clearSessions, API, T } from "./shared/constants";
 import { generateClassReport } from "./generateReport";
+import ParentReport from "./ParentReport";
 
 const ALL_TABS = [
   ["overview",  "📊 Overview",       false],
@@ -284,6 +285,7 @@ export default function Dashboard({ teacher, readOnly }) {
   const [roster,   setRoster]   = useState([]);
   const [fluencyReport, setFluencyReport] = useState([]);
   const [leaderboard,   setLeaderboard]   = useState([]);
+  const [parentReportId, setParentReportId] = useState(null); // student ID for parent report modal
 
   // Growth filters
   const [growthClass,   setGrowthClass]   = useState("all");
@@ -837,7 +839,7 @@ export default function Dashboard({ teacher, readOnly }) {
               <div style={{padding:"0.75rem 1rem",background:"#f0f4f8",borderBottom:"1px solid #dde3e9",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555"}}>
                 FLUENCY LEVELS — {cls.className.toUpperCase()}
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr repeat(4,60px) 55px 60px 55px",gap:0,fontSize:"0.68rem"}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr repeat(4,60px) 55px 60px 55px 52px",gap:0,fontSize:"0.68rem"}}>
                 <div style={{padding:"0.5rem 0.75rem",fontWeight:700,color:"#555",borderBottom:"2px solid #dde3e9"}}>Student</div>
                 {["Add","Sub","Mul","Div"].map(op=>(
                   <div key={op} style={{padding:"0.5rem 0.25rem",fontWeight:700,color:"#555",textAlign:"center",borderBottom:"2px solid #dde3e9"}}>{op}</div>
@@ -845,6 +847,7 @@ export default function Dashboard({ teacher, readOnly }) {
                 <div style={{padding:"0.5rem 0.25rem",fontWeight:700,color:"#555",textAlign:"center",borderBottom:"2px solid #dde3e9"}}>Drills</div>
                 <div style={{padding:"0.5rem 0.25rem",fontWeight:700,color:"#555",textAlign:"center",borderBottom:"2px solid #dde3e9"}}>Avg %</div>
                 <div style={{padding:"0.5rem 0.25rem",fontWeight:700,color:"#555",textAlign:"center",borderBottom:"2px solid #dde3e9"}}>Trend</div>
+                <div style={{padding:"0.5rem 0.25rem",fontWeight:700,color:"#555",textAlign:"center",borderBottom:"2px solid #dde3e9"}}>Report</div>
                 {cls.students.filter(s => s.sessionCount > 0).map(s => (
                   <React.Fragment key={s.student.id}>
                     <div style={{padding:"0.45rem 0.75rem",borderBottom:"1px solid #f0f4f8",fontWeight:600,color:"#1a1a1a"}}>{s.student.name}</div>
@@ -857,6 +860,20 @@ export default function Dashboard({ teacher, readOnly }) {
                       color:s.avgAccuracy>=80?"#1a6e2e":s.avgAccuracy>=60?"#7a4e00":"#8b1a1a"}}>{s.avgAccuracy}%</div>
                     <div style={{padding:"0.45rem 0.25rem",textAlign:"center",borderBottom:"1px solid #f0f4f8",fontSize:"0.85rem"}}>
                       {s.trend === "improving" ? "📈" : s.trend === "declining" ? "📉" : "➡️"}
+                    </div>
+                    <div style={{padding:"0.3rem 0.25rem",textAlign:"center",borderBottom:"1px solid #f0f4f8"}}>
+                      <button
+                        onClick={() => setParentReportId(s.student.id)}
+                        title="Open parent report"
+                        style={{
+                          background: T.tealLight, border: `1px solid ${T.tealMuted}`,
+                          borderRadius: 6, padding:"2px 6px", cursor:"pointer",
+                          fontSize:"0.6rem", fontWeight:700, color:T.teal,
+                          whiteSpace:"nowrap",
+                        }}
+                      >
+                        📄
+                      </button>
                     </div>
                   </React.Fragment>
                 ))}
@@ -1104,6 +1121,14 @@ export default function Dashboard({ teacher, readOnly }) {
       <div style={{flex:1,padding:"1.25rem 1.5rem",overflowY:"auto"}}>
         {renderTab()}
       </div>
+
+      {/* Parent report modal */}
+      {parentReportId && (
+        <ParentReport
+          studentId={parentReportId}
+          onClose={() => setParentReportId(null)}
+        />
+      )}
     </div>
   );
 }
