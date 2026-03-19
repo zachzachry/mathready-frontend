@@ -1658,6 +1658,8 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
     if (isBestAcc || isBestPPM) setNewBest({ accuracy: isBestAcc, ppm: isBestPPM });
 
     setPhase("summary");
+    const _acc   = totalP ? Math.round(correctP / totalP * 100) : 0;
+    const _stars = _acc >= 90 ? 5 : _acc >= 75 ? 4 : _acc >= 60 ? 3 : _acc >= 40 ? 2 : 1;
     fetch(`${API}/fluency/session`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1669,6 +1671,7 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
         levels:      { ...levelsRef.current },
         log:         logRef.current,
         submitted:   now(),
+        stars:       _stars,
       }),
     }).catch((e) => { console.warn("Failed to save drill session to server:", e); });
   }
