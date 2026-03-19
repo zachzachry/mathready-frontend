@@ -431,14 +431,14 @@ export default function Dashboard({ teacher, readOnly }) {
         <div style={{display:"flex",flexDirection:"column",gap:"1rem",maxWidth:"860px"}}>
           <div style={{display:"flex",gap:"0.75rem",flexWrap:"wrap"}}>
             {[
-              ["Class Average", `${avgP}%`, lvlC(avgP), lvlBg(avgP)],
-              ["Proficient (≥80%)", profC, T.success, T.successBg],
-              ["Developing (60–79%)", devC, T.warning, T.warningBg],
-              ["Beginning (<60%)", begC, T.dangerText, T.dangerBg],
-              ["Submitted", testSessions.length, T.midnight, "rgba(13,148,136,.1)"],
-            ].map(([lbl,val,c,bg])=>(
-              <div key={lbl} style={{background:bg,border:`1px solid ${c}22`,borderRadius:T.xs,padding:"0.9rem 1.25rem",minWidth:"120px",flex:1}}>
-                <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.12em",color:c,marginBottom:"4px"}}>{lbl.toUpperCase()}</div>
+              ["Class Average", `${avgP}%`, lvlC(avgP)],
+              ["Proficient (≥80%)", profC, T.success],
+              ["Developing (60–79%)", devC, T.warning],
+              ["Beginning (<60%)", begC, T.danger],
+              ["Submitted", testSessions.length, T.teal],
+            ].map(([lbl,val,c])=>(
+              <div key={lbl} style={{background:T.white,border:`1px solid ${T.border}`,borderLeft:`3px solid ${c}`,borderRadius:T.xs,padding:"0.9rem 1.25rem",minWidth:"120px",flex:1}}>
+                <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"4px"}}>{lbl.toUpperCase()}</div>
                 <div style={{fontSize:"1.6rem",fontWeight:700,color:c}}>{val}</div>
               </div>
             ))}
@@ -733,13 +733,13 @@ export default function Dashboard({ teacher, readOnly }) {
           {/* Summary cards — sourced from fluency_data (all students, all sessions) */}
           <div style={{display:"flex",gap:"0.75rem",flexWrap:"wrap"}}>
             {[
-              ["Drill Sessions",   totalFluencySessions,      T.warning,    T.warningBg],
-              ["Students Drilled", drilledStudents.length,    T.teal,       "rgba(13,148,136,.1)"],
-              ["Avg Accuracy",     fluencyAvgAcc,             T.success,    T.successBg],
-              ["Improving",        improvingCount,            T.midnight,   T.surfaceAlt],
-            ].map(([lbl,val,c,bg])=>(
-              <div key={lbl} style={{background:bg,border:`1px solid ${c}22`,borderRadius:T.xs,padding:"0.9rem 1.25rem",minWidth:"120px",flex:1}}>
-                <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.12em",color:c,marginBottom:"4px"}}>{lbl.toUpperCase()}</div>
+              ["Drill Sessions",   totalFluencySessions,      T.warning],
+              ["Students Drilled", drilledStudents.length,    T.teal],
+              ["Avg Accuracy",     fluencyAvgAcc,             T.success],
+              ["Improving",        improvingCount,            T.midnight],
+            ].map(([lbl,val,c])=>(
+              <div key={lbl} style={{background:T.white,border:`1px solid ${T.border}`,borderLeft:`3px solid ${c}`,borderRadius:T.xs,padding:"0.9rem 1.25rem",minWidth:"120px",flex:1}}>
+                <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"4px"}}>{lbl.toUpperCase()}</div>
                 <div style={{fontSize:"1.6rem",fontWeight:700,color:c}}>{val}</div>
               </div>
             ))}
