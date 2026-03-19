@@ -843,6 +843,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
   // ── Lockdown ────────────────────────────────────────────
   const containerRef = useRef();
   const [violations,    setViolations]    = useState(0);
+  const [violationLog,  setViolationLog]  = useState([]); // [{reason, time, questionNum}]
   const [lockWarning,   setLockWarning]   = useState(null); // message string or null
   const [isFullscreen,  setIsFullscreen]  = useState(false);
   const [graceWarning,  setGraceWarning]  = useState(false); // gentle "please return" prompt
@@ -850,6 +851,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
 
   function addViolation(reason) {
     setViolations(v => v + 1);
+    setViolationLog(log => [...log, { reason, time: new Date().toISOString(), questionNum: idx + 1 }]);
     setLockWarning(reason);
   }
 
@@ -997,7 +999,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
       const given = ans[q.id] ?? null;
       return a + (gradeAnswer(q, given) ? 1 : 0);
     }, 0);
-    const session = { score, total:TOTAL, pct:pct(score,TOTAL), submitted:now(), timeUsed:untimed ? fmtTime(0) : fmtTime(timeLimitSecs-secs), answers:{...ans}, violations };
+    const session = { score, total:TOTAL, pct:pct(score,TOTAL), submitted:now(), timeUsed:untimed ? fmtTime(0) : fmtTime(timeLimitSecs-secs), answers:{...ans}, violations, violationLog };
     onFinish(session);
   }
 

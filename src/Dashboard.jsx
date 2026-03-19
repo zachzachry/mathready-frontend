@@ -4,13 +4,13 @@ import { generateClassReport } from "./generateReport";
 import ParentReport from "./ParentReport";
 
 const ALL_TABS = [
-  ["overview",  "📊 Overview",       false],
-  ["items",     "📋 Item Analysis",  false],
-  ["students",  "👤 Students",       false],
-  ["growth",    "📈 Growth",         false],
-  ["drills",    "🎯 Drills",         false],
-  ["profile",   "📋 Class Profile",  false],
-  ["controls",  "🎛 Test Controls",  true],  // true = hidden for readOnly
+  ["overview",  "📊 Overview",       false, false],
+  ["items",     "📋 Item Analysis",  false, false],
+  ["growth",    "📈 Growth",         false, false],
+  ["drills",    "🎯 Drills",         false, false],
+  ["profile",   "📋 Class Profile",  false, false],
+  ["controls",  "🎛 Test Controls",  true,  false],  // writeOnly
+  ["admin",     "🏫 School Overview", false, true],   // adminOnly
 ];
 
 // ── Focus student stats panel ──────────────────────────────
@@ -275,7 +275,8 @@ function TestControls() {
 }
 
 export default function Dashboard({ teacher, readOnly }) {
-  const TABS = ALL_TABS.filter(([,, writeOnly]) => !readOnly || !writeOnly);
+  const isAdmin = teacher && (teacher.role === "super_admin" || teacher.role === "school_admin");
+  const TABS = ALL_TABS.filter(([,, writeOnly, adminOnly]) => (!readOnly || !writeOnly) && (!adminOnly || isAdmin));
   const [tab,      setTab]      = useState("overview");
   const [sessions, setSessions] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -286,6 +287,7 @@ export default function Dashboard({ teacher, readOnly }) {
   const [fluencyReport, setFluencyReport] = useState([]);
   const [leaderboard,   setLeaderboard]   = useState([]);
   const [parentReportId, setParentReportId] = useState(null); // student ID for parent report modal
+  const [adminData, setAdminData] = useState(null);
 
   // Growth filters
   const [growthClass,   setGrowthClass]   = useState("all");
@@ -317,6 +319,10 @@ export default function Dashboard({ teacher, readOnly }) {
         );
         setLeaderboard(rosterArr.map((c, i) => ({ classId: c.id, className: c.name, top5: boards[i] || [] })));
       } catch (e) { console.warn("Failed to load fluency reports:", e); }
+      // Admin overview (only for admin roles)
+      if (teacher && (teacher.role === "super_admin" || teacher.role === "school_admin")) {
+        try { setAdminData(await fetch(`${API}/admin/overview`).then(r=>r.json())); } catch {}
+      }
     } catch { setSessions([]); }
     setLoading(false);
   }, []);
@@ -462,8 +468,9 @@ export default function Dashboard({ teacher, readOnly }) {
                       {s.className&&<div style={{fontSize:"0.65rem",color:T.textSecondary}}>{s.className}</div>}
                     </div>
                     {s.violations > 0 && (
-                      <div title={`${s.violations} testing violation${s.violations!==1?"s":""} detected`}
-                        style={{background:T.dangerText,color:T.white,borderRadius:T.xs,padding:"2px 7px",fontSize:"0.65rem",fontWeight:700,flexShrink:0}}>
+                      <div
+                        title={s.violationLog?.length ? s.violationLog.map(v=>`Q${v.questionNum}: ${v.reason}`).join("\n") : `${s.violations} testing violation${s.violations!==1?"s":""} (left fullscreen)`}
+                        style={{background:T.dangerText,color:T.white,borderRadius:T.xs,padding:"2px 7px",fontSize:"0.65rem",fontWeight:700,flexShrink:0,cursor:"help"}}>
                         ⚠ {s.violations}
                       </div>
                     )}
@@ -587,55 +594,6 @@ export default function Dashboard({ teacher, readOnly }) {
       );
     }
 
-    if (tab === "students") {
-      if (sessions.length === 0) return (
-        <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"3rem",textAlign:"center",color:"#aaa",maxWidth:"600px"}}>
-          <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>👤</div>
-          <div style={{fontSize:"1rem",fontWeight:600,color:"#555"}}>No submissions yet</div>
-        </div>
-      );
-      return (
-        <div style={{maxWidth:"860px",display:"flex",flexDirection:"column",gap:"0.75rem"}}>
-          {Object.entries(studentMap).map(([key, st])=>{
-            const latest = st.sessions[st.sessions.length-1];
-            const avg    = Math.round(st.sessions.reduce((a,s)=>a+s.pct,0)/st.sessions.length);
-            const mastery= standardMastery(st.sessions);
-            const weakStds = Object.entries(mastery).filter(([,v])=>v.total>=2&&v.correct/v.total<0.6).map(([std])=>std);
-            return (
-              <div key={key} style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden"}}>
-                <div style={{padding:"0.9rem 1.25rem",display:"flex",alignItems:"center",gap:"1rem",borderBottom:weakStds.length?"1px solid #f0f4f8":"none"}}>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:"0.9rem",fontWeight:700,color:"#1a1a1a"}}>{st.name}</div>
-                    {st.className&&<div style={{fontSize:"0.68rem",color:"#888"}}>{st.className}</div>}
-                  </div>
-                  <div style={{textAlign:"center"}}>
-                    <div style={{fontSize:"0.6rem",color:"#888",letterSpacing:"0.1em"}}>AVG</div>
-                    <div style={{fontSize:"1.2rem",fontWeight:700,color:lvlC(avg)}}>{avg}%</div>
-                  </div>
-                  <div style={{textAlign:"center"}}>
-                    <div style={{fontSize:"0.6rem",color:"#888",letterSpacing:"0.1em"}}>TESTS</div>
-                    <div style={{fontSize:"1.2rem",fontWeight:700,color:T.midnight}}>{st.sessions.length}</div>
-                  </div>
-                  <div style={{textAlign:"center"}}>
-                    <div style={{fontSize:"0.6rem",color:"#888",letterSpacing:"0.1em"}}>LATEST</div>
-                    <div style={{fontSize:"1.2rem",fontWeight:700,color:lvlC(latest.pct)}}>{latest.pct}%</div>
-                  </div>
-                </div>
-                {weakStds.length>0&&(
-                  <div style={{padding:"0.6rem 1.25rem",background:"#fdf2f2",display:"flex",alignItems:"center",gap:"0.5rem",flexWrap:"wrap"}}>
-                    <span style={{fontSize:"0.6rem",fontWeight:700,color:"#8b1a1a",letterSpacing:"0.1em"}}>NEEDS RETEACH:</span>
-                    {weakStds.map(std=>(
-                      <span key={std} style={{fontSize:"0.65rem",fontWeight:700,color:"#8b1a1a",background:"#fee2e2",padding:"1px 6px",borderRadius:"2px",border:"1px solid #fca5a5"}}>{std}</span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      );
-    }
-
     if (tab === "controls") return <TestControls/>;
     if (tab === "growth") {
       if (Object.keys(studentMap).length === 0) return (
@@ -663,12 +621,55 @@ export default function Dashboard({ teacher, readOnly }) {
             </select>
             {growthStudent!=="all"&&<button onClick={()=>setGrowthStudent("all")} style={{fontSize:"0.72rem",background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"4px 10px",cursor:"pointer"}}>✕ Clear</button>}
           </div>
+          {/* Cross-test comparison — only show in overview mode when multiple test codes exist */}
+          {!focusStudent && (() => {
+            const byCode = {};
+            const filtSess = growthClass === "all" ? testSessions : testSessions.filter(s => s.className === growthClass);
+            filtSess.forEach(s => {
+              const code = s.testCode || "Unknown";
+              if (!byCode[code]) byCode[code] = { scores: [], count: 0 };
+              byCode[code].scores.push(s.pct);
+              byCode[code].count++;
+            });
+            const codes = Object.entries(byCode).map(([code, d]) => ({
+              code, count: d.count,
+              avg: Math.round(d.scores.reduce((a,b) => a+b, 0) / d.scores.length),
+            }));
+            if (codes.length < 2) return null;
+            return (
+              <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,overflow:"hidden",marginBottom:"0.5rem"}}>
+                <div style={{padding:"0.75rem 1rem",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary}}>
+                  TEST-BY-TEST COMPARISON
+                </div>
+                <div style={{display:"flex",gap:"0.75rem",padding:"0.75rem 1rem",flexWrap:"wrap"}}>
+                  {codes.map((c, i) => {
+                    const prev = i > 0 ? codes[i-1].avg : null;
+                    const delta = prev != null ? c.avg - prev : null;
+                    return (
+                      <div key={c.code} style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"0.65rem 1rem",minWidth:"100px",textAlign:"center",flex:1}}>
+                        <div style={{fontSize:"0.58rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"4px"}}>{c.code}</div>
+                        <div style={{fontSize:"1.3rem",fontWeight:700,color:lvlC(c.avg)}}>{c.avg}%</div>
+                        <div style={{fontSize:"0.6rem",color:T.textMuted}}>{c.count} submissions</div>
+                        {delta != null && (
+                          <div style={{fontSize:"0.65rem",fontWeight:700,marginTop:"2px",
+                            color:delta>0?T.success:delta<0?T.dangerText:T.textMuted}}>
+                            {delta>0?"+":""}{delta}% vs prev
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           {focusStudent ? (
             <FocusStudentStats student={focusStudent} standardMasteryFn={standardMastery} bankQ={bankQ} lvlC={lvlC} lvlBg={lvlBg} lvlBd={lvlBd}/>
           ) : (
             <div style={{display:"flex",flexDirection:"column",gap:"0.5rem"}}>
-              <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden"}}>
-                <div style={{padding:"0.75rem 1rem",background:"#f0f4f8",borderBottom:"1px solid #dde3e9",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555"}}>
+              <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,overflow:"hidden"}}>
+                <div style={{padding:"0.75rem 1rem",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary}}>
                   STUDENT GROWTH OVERVIEW — {filteredStudents.length} students
                 </div>
                 {filteredStudents.map(([key, st])=>{
@@ -676,33 +677,45 @@ export default function Dashboard({ teacher, readOnly }) {
                   const first  = scores[0]; const last = scores[scores.length-1];
                   const delta  = scores.length>=2 ? last-first : null;
                   const avg    = Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
+                  const mastery = standardMastery(st.sessions);
+                  const weakStds = Object.entries(mastery).filter(([,v])=>v.total>=2&&v.correct/v.total<0.6).map(([std])=>std);
                   return (
-                    <div key={key} onClick={()=>setGrowthStudent(key)}
-                      style={{padding:"0.75rem 1rem 0.75rem 1.25rem",borderBottom:"1px solid #f0f4f8",display:"flex",alignItems:"center",gap:"1rem",cursor:"pointer",background:"#fff"}}>
+                    <div key={key} style={{borderBottom:`1px solid ${T.surfaceAlt}`}}>
+                    <div onClick={()=>setGrowthStudent(key)}
+                      style={{padding:"0.75rem 1rem 0.75rem 1.25rem",display:"flex",alignItems:"center",gap:"1rem",cursor:"pointer",background:"#fff"}}>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:"0.88rem",fontWeight:700,color:"#1a1a1a"}}>{st.name}</div>
-                        {st.className&&<div style={{fontSize:"0.65rem",color:"#888"}}>{st.className}</div>}
+                        <div style={{fontSize:"0.88rem",fontWeight:700,color:T.text}}>{st.name}</div>
+                        {st.className&&<div style={{fontSize:"0.65rem",color:T.textMuted}}>{st.className}</div>}
                       </div>
                       <div style={{flexShrink:0}}>
-                        <LineChart points={scores} width={120} height={36} color={delta>0?"#1a6e2e":delta<0?"#8b1a1a":"#888"}/>
+                        <LineChart points={scores} width={120} height={36} color={delta>0?T.success:delta<0?T.dangerText:T.textMuted}/>
                       </div>
                       <div style={{display:"flex",gap:"0.75rem",flexShrink:0}}>
                         <div style={{textAlign:"center",minWidth:"36px"}}>
-                          <div style={{fontSize:"0.55rem",color:"#aaa"}}>AVG</div>
+                          <div style={{fontSize:"0.55rem",color:T.textMuted}}>AVG</div>
                           <div style={{fontSize:"0.9rem",fontWeight:700,color:lvlC(avg)}}>{avg}%</div>
                         </div>
                         {delta!==null&&(
                           <div style={{textAlign:"center",minWidth:"40px"}}>
-                            <div style={{fontSize:"0.55rem",color:"#aaa"}}>ΔGROWTH</div>
-                            <div style={{fontSize:"0.9rem",fontWeight:700,color:delta>0?"#1a6e2e":delta<0?"#8b1a1a":"#888"}}>{delta>0?"+":""}{delta}%</div>
+                            <div style={{fontSize:"0.55rem",color:T.textMuted}}>ΔGROWTH</div>
+                            <div style={{fontSize:"0.9rem",fontWeight:700,color:delta>0?T.success:delta<0?T.dangerText:T.textMuted}}>{delta>0?"+":""}{delta}%</div>
                           </div>
                         )}
                         <div style={{textAlign:"center",minWidth:"28px"}}>
-                          <div style={{fontSize:"0.55rem",color:"#aaa"}}>TESTS</div>
+                          <div style={{fontSize:"0.55rem",color:T.textMuted}}>TESTS</div>
                           <div style={{fontSize:"0.9rem",fontWeight:700,color:T.midnight}}>{st.sessions.length}</div>
                         </div>
                       </div>
-                      <span style={{color:"#c8d3dd",fontSize:"0.8rem"}}>▶</span>
+                      <span style={{color:T.borderDark,fontSize:"0.8rem"}}>▶</span>
+                    </div>
+                    {weakStds.length>0&&(
+                      <div style={{padding:"0.4rem 1.25rem 0.5rem",background:T.dangerBg,display:"flex",alignItems:"center",gap:"0.5rem",flexWrap:"wrap"}}>
+                        <span style={{fontSize:"0.58rem",fontWeight:700,color:T.dangerText,letterSpacing:"0.1em"}}>NEEDS RETEACH:</span>
+                        {weakStds.map(std=>(
+                          <span key={std} style={{fontSize:"0.62rem",fontWeight:700,color:T.dangerText,background:T.white,padding:"1px 6px",borderRadius:"2px",border:`1px solid ${T.dangerBd}`}}>{std}</span>
+                        ))}
+                      </div>
+                    )}
                     </div>
                   );
                 })}
@@ -774,29 +787,52 @@ export default function Dashboard({ teacher, readOnly }) {
               <div style={{padding:"0.75rem 1rem",background:"#f0f4f8",borderBottom:"1px solid #dde3e9",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555"}}>
                 FLUENCY LEVELS — {cls.className.toUpperCase()}
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr repeat(4,60px) 55px 60px 55px 52px",gap:0,fontSize:"0.68rem"}}>
-                <div style={{padding:"0.5rem 0.75rem",fontWeight:700,color:"#555",borderBottom:"2px solid #dde3e9"}}>Student</div>
+              <div style={{overflowX:"auto"}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr repeat(4,48px) 4px repeat(4,48px) 46px 42px 52px 42px 42px",gap:0,fontSize:"0.68rem",minWidth:"700px"}}>
+                {/* ── header row ── */}
+                <div style={{padding:"0.5rem 0.75rem",fontWeight:700,color:T.textSecondary,borderBottom:`2px solid ${T.border}`}}>Student</div>
                 {["Add","Sub","Mul","Div"].map(op=>(
-                  <div key={op} style={{padding:"0.5rem 0.25rem",fontWeight:700,color:"#555",textAlign:"center",borderBottom:"2px solid #dde3e9"}}>{op}</div>
+                  <div key={`lvl-${op}`} style={{padding:"0.5rem 0.15rem",fontWeight:700,color:T.textSecondary,textAlign:"center",borderBottom:`2px solid ${T.border}`,fontSize:"0.6rem"}}>{op}<br/><span style={{fontWeight:400,fontSize:"0.5rem",color:T.textMuted}}>lvl</span></div>
                 ))}
-                <div style={{padding:"0.5rem 0.25rem",fontWeight:700,color:"#555",textAlign:"center",borderBottom:"2px solid #dde3e9"}}>Drills</div>
-                <div style={{padding:"0.5rem 0.25rem",fontWeight:700,color:"#555",textAlign:"center",borderBottom:"2px solid #dde3e9"}}>Avg %</div>
-                <div style={{padding:"0.5rem 0.25rem",fontWeight:700,color:"#555",textAlign:"center",borderBottom:"2px solid #dde3e9"}}>Trend</div>
-                <div style={{padding:"0.5rem 0.25rem",fontWeight:700,color:"#555",textAlign:"center",borderBottom:"2px solid #dde3e9"}}>Report</div>
-                {cls.students.filter(s => s.sessionCount > 0).map(s => (
+                <div style={{borderBottom:`2px solid ${T.border}`}}/>
+                {["Add","Sub","Mul","Div"].map(op=>(
+                  <div key={`acc-${op}`} style={{padding:"0.5rem 0.15rem",fontWeight:700,color:T.textSecondary,textAlign:"center",borderBottom:`2px solid ${T.border}`,fontSize:"0.6rem"}}>{op}<br/><span style={{fontWeight:400,fontSize:"0.5rem",color:T.textMuted}}>acc</span></div>
+                ))}
+                <div style={{padding:"0.5rem 0.15rem",fontWeight:700,color:T.textSecondary,textAlign:"center",borderBottom:`2px solid ${T.border}`,fontSize:"0.6rem"}}>Drills</div>
+                <div style={{padding:"0.5rem 0.15rem",fontWeight:700,color:T.textSecondary,textAlign:"center",borderBottom:`2px solid ${T.border}`,fontSize:"0.6rem"}}>PPM</div>
+                <div style={{padding:"0.5rem 0.15rem",fontWeight:700,color:T.textSecondary,textAlign:"center",borderBottom:`2px solid ${T.border}`,fontSize:"0.6rem"}}>Avg %</div>
+                <div style={{padding:"0.5rem 0.15rem",fontWeight:700,color:T.textSecondary,textAlign:"center",borderBottom:`2px solid ${T.border}`,fontSize:"0.6rem"}}>Trend</div>
+                <div style={{padding:"0.5rem 0.15rem",fontWeight:700,color:T.textSecondary,textAlign:"center",borderBottom:`2px solid ${T.border}`,fontSize:"0.6rem"}}>Rpt</div>
+
+                {/* ── data rows ── */}
+                {cls.students.filter(s => s.sessionCount > 0).map(s => {
+                  const oa = s.opAvgs || {};
+                  return (
                   <React.Fragment key={s.student.id}>
-                    <div style={{padding:"0.45rem 0.75rem",borderBottom:"1px solid #f0f4f8",fontWeight:600,color:"#1a1a1a"}}>{s.student.name}</div>
+                    <div style={{padding:"0.45rem 0.75rem",borderBottom:`1px solid ${T.surfaceAlt}`,fontWeight:600,color:T.text,display:"flex",alignItems:"center",gap:"0.4rem"}}>
+                      {s.student.name}
+                      {(s.streakDays||0) >= 2 && <span title={`${s.streakDays}-day streak`} style={{fontSize:"0.65rem"}}>🔥{s.streakDays}</span>}
+                    </div>
                     {["add","sub","mul","div"].map(op=>(
-                      <div key={op} style={{padding:"0.45rem 0.25rem",textAlign:"center",borderBottom:"1px solid #f0f4f8",fontWeight:700,
-                        color:s.levels[op]>=8?"#1a6e2e":s.levels[op]>=5?"#7a4e00":"#888"}}>{s.levels[op]}</div>
+                      <div key={`lvl-${op}`} style={{padding:"0.45rem 0.15rem",textAlign:"center",borderBottom:`1px solid ${T.surfaceAlt}`,fontWeight:700,
+                        color:s.levels[op]>=8?T.success:s.levels[op]>=5?T.warning:T.textMuted}}>{s.levels[op]}</div>
                     ))}
-                    <div style={{padding:"0.45rem 0.25rem",textAlign:"center",borderBottom:"1px solid #f0f4f8",color:"#888"}}>{s.sessionCount}</div>
-                    <div style={{padding:"0.45rem 0.25rem",textAlign:"center",borderBottom:"1px solid #f0f4f8",fontWeight:700,
-                      color:s.avgAccuracy>=80?"#1a6e2e":s.avgAccuracy>=60?"#7a4e00":"#8b1a1a"}}>{s.avgAccuracy}%</div>
-                    <div style={{padding:"0.45rem 0.25rem",textAlign:"center",borderBottom:"1px solid #f0f4f8",fontSize:"0.85rem"}}>
+                    <div style={{borderBottom:`1px solid ${T.surfaceAlt}`,background:T.border,width:"1px"}}/>
+                    {["add","sub","mul","div"].map(op=>{
+                      const v = oa[op];
+                      return (
+                        <div key={`acc-${op}`} style={{padding:"0.45rem 0.15rem",textAlign:"center",borderBottom:`1px solid ${T.surfaceAlt}`,fontWeight:600,fontSize:"0.62rem",
+                          color:v==null?T.textMuted:v>=80?T.success:v>=60?T.warning:T.dangerText}}>{v!=null?`${v}%`:"—"}</div>
+                      );
+                    })}
+                    <div style={{padding:"0.45rem 0.15rem",textAlign:"center",borderBottom:`1px solid ${T.surfaceAlt}`,color:T.textMuted}}>{s.sessionCount}</div>
+                    <div style={{padding:"0.45rem 0.15rem",textAlign:"center",borderBottom:`1px solid ${T.surfaceAlt}`,fontWeight:600,fontSize:"0.62rem",color:T.textSecondary}}>{s.lastSession?.ppm != null ? s.lastSession.ppm : "—"}</div>
+                    <div style={{padding:"0.45rem 0.15rem",textAlign:"center",borderBottom:`1px solid ${T.surfaceAlt}`,fontWeight:700,
+                      color:s.avgAccuracy>=80?T.success:s.avgAccuracy>=60?T.warning:T.dangerText}}>{s.avgAccuracy}%</div>
+                    <div style={{padding:"0.45rem 0.15rem",textAlign:"center",borderBottom:`1px solid ${T.surfaceAlt}`,fontSize:"0.85rem"}}>
                       {s.trend === "improving" ? "📈" : s.trend === "declining" ? "📉" : "➡️"}
                     </div>
-                    <div style={{padding:"0.3rem 0.25rem",textAlign:"center",borderBottom:"1px solid #f0f4f8"}}>
+                    <div style={{padding:"0.3rem 0.15rem",textAlign:"center",borderBottom:`1px solid ${T.surfaceAlt}`}}>
                       <button
                         onClick={() => setParentReportId(s.student.id)}
                         title="Open parent report"
@@ -811,10 +847,80 @@ export default function Dashboard({ teacher, readOnly }) {
                       </button>
                     </div>
                   </React.Fragment>
-                ))}
+                  );
+                })}
               </div>
             </div>
+            </div>
           ))}
+        </div>
+      );
+    }
+
+    if (tab === "admin") {
+      if (!adminData) return <div style={{textAlign:"center",color:T.textMuted,paddingTop:"3rem"}}>Loading school overview…</div>;
+      const { classes, schoolGaps, totalStudents, testedStudents, totalSessions } = adminData;
+      return (
+        <div style={{maxWidth:"960px",display:"flex",flexDirection:"column",gap:"1rem"}}>
+          {/* School-wide stat cards */}
+          <div style={{display:"flex",gap:"0.75rem",flexWrap:"wrap"}}>
+            {[
+              ["Total Students", totalStudents, T.midnight],
+              ["Tested",         testedStudents, T.teal],
+              ["Not Yet Tested", totalStudents - testedStudents, totalStudents - testedStudents > 0 ? T.warning : T.textMuted],
+              ["Total Sessions", totalSessions, T.success],
+            ].map(([lbl,val,c])=>(
+              <div key={lbl} style={{background:T.white,border:`1px solid ${T.border}`,borderLeft:`3px solid ${c}`,borderRadius:T.xs,padding:"0.9rem 1.25rem",minWidth:"120px",flex:1}}>
+                <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"4px"}}>{lbl.toUpperCase()}</div>
+                <div style={{fontSize:"1.6rem",fontWeight:700,color:c}}>{val}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Class comparison table */}
+          <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,overflow:"hidden"}}>
+            <div style={{padding:"0.75rem 1rem",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary}}>
+              CLASS COMPARISON — {classes.length} classes
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 70px 70px 70px 80px",gap:0,fontSize:"0.72rem"}}>
+              {["Class","Students","Tests","Drills","Avg Score"].map(h=>(
+                <div key={h} style={{padding:"0.5rem 0.75rem",fontWeight:700,color:T.textSecondary,borderBottom:`2px solid ${T.border}`,fontSize:"0.6rem"}}>{h}</div>
+              ))}
+              {classes.map(c=>(
+                <React.Fragment key={c.id}>
+                  <div style={{padding:"0.5rem 0.75rem",fontWeight:600,color:T.text,borderBottom:`1px solid ${T.surfaceAlt}`}}>{c.name}</div>
+                  <div style={{padding:"0.5rem 0.75rem",textAlign:"center",color:T.textSecondary,borderBottom:`1px solid ${T.surfaceAlt}`}}>{c.studentCount}</div>
+                  <div style={{padding:"0.5rem 0.75rem",textAlign:"center",color:T.textSecondary,borderBottom:`1px solid ${T.surfaceAlt}`}}>{c.sessionCount}</div>
+                  <div style={{padding:"0.5rem 0.75rem",textAlign:"center",color:T.textSecondary,borderBottom:`1px solid ${T.surfaceAlt}`}}>{c.drillCount}</div>
+                  <div style={{padding:"0.5rem 0.75rem",textAlign:"center",fontWeight:700,borderBottom:`1px solid ${T.surfaceAlt}`,
+                    color:c.avgScore==null?T.textMuted:c.avgScore>=80?T.success:c.avgScore>=60?T.warning:T.dangerText}}>
+                    {c.avgScore != null ? `${c.avgScore}%` : "—"}
+                  </div>
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+
+          {/* School-wide standard gaps */}
+          {schoolGaps.length > 0 && (
+            <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,overflow:"hidden"}}>
+              <div style={{padding:"0.75rem 1rem",background:T.dangerBg,borderBottom:`1px solid ${T.dangerBd}`,fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.dangerText}}>
+                SCHOOL-WIDE STANDARD GAPS — weakest first (min 5 attempts)
+              </div>
+              {schoolGaps.map((g,i)=>(
+                <div key={i} style={{padding:"0.55rem 1rem",borderBottom:`1px solid ${T.surfaceAlt}`,display:"flex",alignItems:"center",gap:"0.75rem"}}>
+                  <span style={{fontSize:"0.72rem",fontWeight:700,color:T.text,minWidth:"70px"}}>{g.standard}</span>
+                  <div style={{flex:1,height:"8px",background:T.surfaceAlt,borderRadius:"4px",overflow:"hidden"}}>
+                    <div style={{height:"100%",width:`${g.pct}%`,borderRadius:"4px",
+                      background:g.pct>=80?T.success:g.pct>=60?T.warning:T.danger}}/>
+                  </div>
+                  <span style={{fontSize:"0.72rem",fontWeight:700,minWidth:"38px",textAlign:"right",
+                    color:g.pct>=80?T.success:g.pct>=60?T.warning:T.dangerText}}>{g.pct}%</span>
+                  <span style={{fontSize:"0.6rem",color:T.textMuted}}>{g.total} attempts</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       );
     }

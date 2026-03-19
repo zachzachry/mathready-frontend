@@ -255,7 +255,10 @@ export default function ParentReport({ studentId, onClose }) {
                   <span style={{ fontSize: "1.3rem" }}>🏆</span>
                   <div>
                     <div style={{ fontSize: "0.58rem", letterSpacing: "0.1em", color: T.textMuted, fontWeight: 700 }}>PERSONAL BEST</div>
-                    <div style={{ fontSize: "0.95rem", fontWeight: 800, color: T.midnight }}>{data.personalBests.bestAccuracy}% accuracy</div>
+                    <div style={{ fontSize: "0.95rem", fontWeight: 800, color: T.midnight }}>
+                      {data.personalBests.bestAccuracy}%
+                      {data.personalBests.bestPPM > 0 && <span style={{color:T.textSecondary,fontWeight:600}}> · {data.personalBests.bestPPM} p/m</span>}
+                    </div>
                   </div>
                 </div>
               )}
