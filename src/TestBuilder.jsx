@@ -716,6 +716,26 @@ export default function TestBuilder({ teacher, readOnly }) {
         } catch {}
       }} onClose={()=>setAssignClassesTest(null)}/>}
 
+      {confirmDeleteTest&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
+          <div style={{background:"#fff",borderRadius:"6px",width:"100%",maxWidth:"400px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.25)"}}>
+            <div style={{background:"#8b1a1a",color:"#fff",padding:"0.9rem 1.25rem"}}>
+              <div style={{fontSize:"0.6rem",opacity:.75,letterSpacing:"0.12em",marginBottom:"2px"}}>TEST LIBRARY</div>
+              <div style={{fontSize:"1rem",fontWeight:700}}>Delete Test?</div>
+            </div>
+            <div style={{padding:"1.25rem"}}>
+              <p style={{fontSize:"0.9rem",color:T.text,margin:"0 0 0.5rem",fontWeight:700}}>{confirmDeleteTest.name||confirmDeleteTest.title||"Untitled Test"}</p>
+              <p style={{fontSize:"0.78rem",color:"#888",margin:"0 0 0.5rem"}}>{confirmDeleteTest.count} question{confirmDeleteTest.count!==1?"s":""} · Code: {confirmDeleteTest.code||"none"}</p>
+              <p style={{fontSize:"0.78rem",color:"#c0392b",margin:0,fontWeight:600}}>⚠ This permanently removes the test from the library. Student session data is not affected.</p>
+            </div>
+            <div style={{display:"flex",gap:"0.65rem",padding:"0.9rem 1.25rem",borderTop:"1px solid #dde3e9"}}>
+              <button onClick={()=>setConfirmDeleteTest(null)} style={{flex:1,background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600,color:T.text}}>Cancel</button>
+              <button onClick={()=>{deleteSavedTest(confirmDeleteTest.id);setConfirmDeleteTest(null);}} style={{flex:1,background:"#8b1a1a",border:"none",borderRadius:"3px",padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",color:"#fff",fontWeight:700}}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {confirmDelete&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
           <div style={{background:"#fff",borderRadius:"6px",width:"100%",maxWidth:"380px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.25)"}}>
