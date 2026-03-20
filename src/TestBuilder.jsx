@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import MathText from "./shared/MathText";
 import { API, T } from "./shared/constants";
 
-const STANDARDS = [
+const MATH_STANDARDS = [
   "5.NR.1.1","5.NR.1.2","5.NR.2.1","5.NR.2.2",
   "5.NR.3.1","5.NR.3.2","5.NR.3.3","5.NR.3.4","5.NR.3.5","5.NR.3.6",
   "5.NR.4.1","5.NR.4.2","5.NR.4.3","5.NR.4.4","5.NR.5.1",
@@ -10,6 +10,20 @@ const STANDARDS = [
   "5.MDR.7.1","5.MDR.7.2","5.MDR.7.3","5.MDR.7.4",
   "5.GSR.8.1","5.GSR.8.2","5.GSR.8.3","5.GSR.8.4",
 ];
+const SCIENCE_STANDARDS = [
+  // Earth & Space Science
+  "S5E1.a","S5E1.b","S5E1.c",
+  // Physical Science
+  "S5P1.a","S5P1.b","S5P1.c",
+  "S5P2.a","S5P2.b","S5P2.c",
+  "S5P3.a","S5P3.b",
+  // Life Science
+  "S5L1.a","S5L1.b",
+  "S5L2.a","S5L2.b",
+  "S5L3.a","S5L3.b","S5L3.c",
+  "S5L4.a","S5L4.b",
+];
+const STANDARDS_BY_SUBJECT = { math: MATH_STANDARDS, science: SCIENCE_STANDARDS };
 const DOK_LABELS = { 1:"Recall", 2:"Skill/Concept", 3:"Strategic", 4:"Extended" };
 
 const S = {
@@ -26,8 +40,9 @@ function genCode() {
 
 // ── Edit Question Modal ────────────────────────────────────
 function EditModal({ question, onSave, onClose }) {
-  const [q, setQ] = useState({ ...question });
+  const [q, setQ] = useState({ ...question, subject: question.subject||"math" });
   const [saving, setSaving] = useState(false);
+  const editStds = STANDARDS_BY_SUBJECT[q.subject] || MATH_STANDARDS;
 
   function updateChoice(i, val) {
     const choices = [...q.choices]; choices[i] = val;
@@ -53,9 +68,15 @@ function EditModal({ question, onSave, onClose }) {
         </div>
         <div style={{overflowY:"auto",padding:"1.25rem",display:"flex",flexDirection:"column",gap:"0.85rem"}}>
           <div style={{display:"flex",gap:"0.75rem"}}>
+            <div style={{flex:1}}><label style={S.lbl}>SUBJECT</label>
+              <select style={S.inp} value={q.subject} onChange={e=>setQ(p=>({...p,subject:e.target.value,standard:STANDARDS_BY_SUBJECT[e.target.value]?.[0]||""}))}>
+                <option value="math">Math</option>
+                <option value="science">Science</option>
+              </select>
+            </div>
             <div style={{flex:2}}><label style={S.lbl}>STANDARD</label>
               <select style={S.inp} value={q.standard} onChange={e=>setQ(p=>({...p,standard:e.target.value}))}>
-                {STANDARDS.map(s=><option key={s} value={s}>{s}</option>)}
+                {editStds.map(s=><option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div style={{flex:1}}><label style={S.lbl}>DOK</label>
@@ -345,12 +366,16 @@ export default function TestBuilder({ teacher, readOnly }) {
   const [allClasses,  setAllClasses]  = useState([]);
   const [assigningTest, setAssigningTest] = useState(null); // test id being assigned
   const [savedMsg, setSavedMsg]       = useState("");
+  const [libSearch, setLibSearch]     = useState("");
+  const [libSort,   setLibSort]       = useState("newest");
   const [rightTab, setRightTab]       = useState("current");
 
+  const [subject,    setSubject]    = useState("math");
   const [filterStd,  setFilterStd]  = useState("");
   const [filterDok,  setFilterDok]  = useState("");
   const [filterText, setFilterText] = useState("");
   const [autoCount,  setAutoCount]  = useState(10);
+  const activeStandards = STANDARDS_BY_SUBJECT[subject] || MATH_STANDARDS;
 
 
   const loadBank = useCallback(async () => {
@@ -381,6 +406,8 @@ export default function TestBuilder({ teacher, readOnly }) {
   },[loadBank,loadActive,loadSavedTests]);
 
   const filtered = bank.filter(q => {
+    const qSubject = q.subject || "math";
+    if (qSubject !== subject) return false;
     if (filterStd  && !q.standard?.startsWith(filterStd)) return false;
     if (filterDok  && q.dok !== Number(filterDok))         return false;
     if (filterText) {
@@ -431,7 +458,7 @@ export default function TestBuilder({ teacher, readOnly }) {
 
   async function saveTest(name, code, adaptive=false, timerCfg={}) {
     try {
-      const r = await fetch(`${API}/tests/saved`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,code,title:testTitle,questions:selectedQuestions,adaptive,...timerCfg})});
+      const r = await fetch(`${API}/tests/saved`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,code,title:testTitle,questions:selectedQuestions,adaptive,subject,...timerCfg})});
       const data = await r.json();
       if (r.status===400) return data.detail || "Code already in use";
       await loadSavedTests();
@@ -456,6 +483,18 @@ export default function TestBuilder({ teacher, readOnly }) {
     catch {}
   }
 
+  async function duplicateSavedTest(id) {
+    try {
+      const r = await fetch(`${API}/tests/saved/${id}`);
+      const t = await r.json();
+      const body = { name: `${t.name} (copy)`, questions: t.questions||[], title: t.title||"",
+        adaptive: t.adaptive||false, untimed: t.untimed||false, timeLimitSecs: t.timeLimitSecs||1800,
+        warnSecs: t.warnSecs||300, oneAttempt: t.oneAttempt||false, classIds: [], subject: t.subject||"math" };
+      await fetch(`${API}/tests/saved`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+      await loadSavedTests();
+    } catch {}
+  }
+
   if (loading) return <div style={{padding:"3rem",textAlign:"center",color:T.textMuted}}>Loading question bank…</div>;
 
   return (
@@ -466,12 +505,21 @@ export default function TestBuilder({ teacher, readOnly }) {
         <div style={{background:T.white,borderBottom:`1px solid ${T.border}`,padding:"0.75rem 1rem",display:"flex",flexDirection:"column",gap:"0.5rem",flexShrink:0}}>
           <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
             <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.midnight}}>QUESTION BANK</div>
-            <span style={{fontSize:"0.7rem",color:T.textMuted}}>{bank.length} questions · {filtered.length} shown</span>
+            <span style={{fontSize:"0.7rem",color:T.textMuted}}>{bank.length} total · {filtered.length} shown</span>
+            <div style={{marginLeft:"auto",display:"flex",borderRadius:T.xs,overflow:"hidden",border:`1px solid ${T.border}`}}>
+              {[["math","Math"],["science","Science"]].map(([key,lbl])=>(
+                <button key={key} onClick={()=>{setSubject(key);setFilterStd("");}}
+                  style={{padding:"3px 12px",fontSize:"0.72rem",fontWeight:600,border:"none",cursor:"pointer",
+                    background:subject===key?T.midnight:T.surfaceAlt,color:subject===key?T.white:T.textSecondary}}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
           </div>
           <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap"}}>
             <select style={{...S.inp,flex:2,minWidth:"120px"}} value={filterStd} onChange={e=>setFilterStd(e.target.value)}>
               <option value="">All Standards</option>
-              {STANDARDS.map(s=><option key={s} value={s}>{s}</option>)}
+              {activeStandards.map(s=><option key={s} value={s}>{s}</option>)}
             </select>
             <select style={{...S.inp,flex:1,minWidth:"100px"}} value={filterDok} onChange={e=>setFilterDok(e.target.value)}>
               <option value="">All DOK</option>
@@ -598,111 +646,108 @@ export default function TestBuilder({ teacher, readOnly }) {
         )}
 
         {/* Library */}
-        {rightTab==="library"&&(
+        {rightTab==="library"&&(()=>{
+          const q = libSearch.trim().toLowerCase();
+          const filtered = savedTests.filter(t => {
+            if ((t.subject||"math") !== subject) return false;
+            if (!q) return true;
+            return (t.name||"").toLowerCase().includes(q) || (t.code||"").toLowerCase().includes(q);
+          });
+          const sorted = [...filtered].sort((a,b) => {
+            if (libSort==="oldest")  return (a.saved_at||"").localeCompare(b.saved_at||"");
+            if (libSort==="name")    return (a.name||"").localeCompare(b.name||"");
+            if (libSort==="most-q")  return (b.count||0)-(a.count||0);
+            if (libSort==="least-q") return (a.count||0)-(b.count||0);
+            return (b.saved_at||"").localeCompare(a.saved_at||""); // newest
+          });
+          return (
           <>
-            <div style={{background:"#fff",borderBottom:"1px solid #c8d3dd",padding:"0.75rem 1rem",flexShrink:0}}>
-              <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.midnight}}>TEST LIBRARY</div>
-              <div style={{fontSize:"0.72rem",color:"#888",marginTop:"2px"}}>{savedTests.length} saved test{savedTests.length!==1?"s":""} · Click Load to select questions</div>
+            <div style={{background:T.white,borderBottom:`1px solid ${T.border}`,padding:"0.75rem 1rem",flexShrink:0}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"0.5rem"}}>
+                <div>
+                  <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.midnight}}>TEST LIBRARY</div>
+                  <div style={{fontSize:"0.68rem",color:T.textSecondary,marginTop:"1px"}}>{savedTests.length} test{savedTests.length!==1?"s":""}{q?` · ${filtered.length} match${filtered.length!==1?"es":""}`:""}</div>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:"0.4rem",alignItems:"center"}}>
+                <input value={libSearch} onChange={e=>setLibSearch(e.target.value)} placeholder="Search by name or code..."
+                  style={{...S.inp,flex:1,fontSize:"0.78rem",padding:"5px 8px",margin:0}}/>
+                <select value={libSort} onChange={e=>setLibSort(e.target.value)}
+                  style={{...S.inp,width:"auto",fontSize:"0.72rem",padding:"5px 6px",margin:0,color:T.textSecondary}}>
+                  <option value="newest">Newest</option>
+                  <option value="oldest">Oldest</option>
+                  <option value="name">A-Z</option>
+                  <option value="most-q">Most Questions</option>
+                  <option value="least-q">Fewest Questions</option>
+                </select>
+              </div>
             </div>
             <div style={{flex:1,overflowY:"auto",padding:"0.75rem"}}>
-              {savedTests.length===0?(
+              {sorted.length===0?(
                 <div style={{padding:"3rem 1rem",textAlign:"center",color:"#aaa"}}>
-                  <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>📚</div>
-                  <div style={{fontWeight:600,color:"#555",marginBottom:"4px"}}>No saved tests yet</div>
-                  <div style={{fontSize:"0.82rem"}}>Build a test and click "Save to Library".</div>
+                  <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>{q?"🔍":"📚"}</div>
+                  <div style={{fontWeight:600,color:"#555",marginBottom:"4px"}}>{q?"No tests match your search":"No saved tests yet"}</div>
+                  <div style={{fontSize:"0.82rem"}}>{q?"Try a different search term.":"Build a test and click \"Save to Library\"."}</div>
                 </div>
               ):(
-                savedTests.map(t=>(
-                  <div key={t.id} style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"0.85rem 1rem",marginBottom:"0.5rem"}}>
+                sorted.map(t=>{
+                  /* Extract unique standards from the full test via the question bank */
+                  const testStds = [...new Set((bank||[]).filter(bq=>(t.questionIds||[]).includes(bq.id)||(savedTests.find(x=>x.id===t.id)?.questions||[]).some(sq=>sq.id===bq.id)).map(bq=>bq.standard).filter(Boolean))].sort();
+                  const classNames = (t.classIds||[]).map(id=>allClasses.find(c=>c.id===id)?.name).filter(Boolean);
+                  return (
+                  <div key={t.id} style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:"6px",padding:"0.85rem 1rem",marginBottom:"0.6rem",transition:"box-shadow .15s",boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
                     <div style={{display:"flex",alignItems:"flex-start",gap:"0.75rem"}}>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:"0.9rem",fontWeight:700,color:"#1a1a1a"}}>{t.name}</div>
-                        <div style={{fontSize:"0.72rem",color:"#888",marginTop:"2px"}}>
-                          {`${t.count} question${t.count!==1?"s":""} · Saved ${t.saved_at}`}
+                        <div style={{fontSize:"0.9rem",fontWeight:700,color:T.text}}>{t.name||"Untitled"}</div>
+                        <div style={{fontSize:"0.7rem",color:T.textSecondary,marginTop:"2px"}}>
+                          {t.count} Q{t.count!==1?"s":""} · {t.saved_at}
+                          {t.oneAttempt&&<span style={{marginLeft:"6px",background:"#fff3e0",color:"#e65100",borderRadius:"3px",padding:"0px 5px",fontSize:"0.6rem",fontWeight:600}}>1 attempt</span>}
+                          {t.untimed&&<span style={{marginLeft:"4px",background:"#e8f5e9",color:"#2e7d32",borderRadius:"3px",padding:"0px 5px",fontSize:"0.6rem",fontWeight:600}}>untimed</span>}
+                          {t.adaptive&&<span style={{marginLeft:"4px",background:"#e3f2fd",color:"#1565c0",borderRadius:"3px",padding:"0px 5px",fontSize:"0.6rem",fontWeight:600}}>adaptive</span>}
                         </div>
                       </div>
-                      <div style={{display:"flex",gap:"0.4rem",flexShrink:0,flexWrap:"wrap"}}>
-                        <button onClick={()=>loadSavedTest(t.id)} style={{...S.smBtn,background:T.teal,color:"#fff",borderColor:T.teal,padding:"5px 12px"}}>Load</button>
-                        <button onClick={()=>setAssignClassesTest(t)} style={{...S.smBtn,padding:"5px 10px",background:T.surfaceAlt,borderColor:T.border,color:T.teal}}>🏫 Classes</button>
-                        <button onClick={()=>setConfirmDeleteTest(t)} style={{...S.smBtn,color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",padding:"5px 10px"}}>🗑</button>
+                      <div style={{display:"flex",gap:"0.35rem",flexShrink:0}}>
+                        <button onClick={()=>loadSavedTest(t.id)} title="Load into editor"
+                          style={{...S.smBtn,background:T.teal,color:"#fff",borderColor:T.teal,padding:"5px 12px"}}>Load</button>
+                        <button onClick={()=>duplicateSavedTest(t.id)} title="Duplicate test"
+                          style={{...S.smBtn,padding:"5px 8px",background:T.surfaceAlt,borderColor:T.border,color:T.text}}>📄</button>
+                        <button onClick={()=>setAssignClassesTest(t)} title="Assign classes"
+                          style={{...S.smBtn,padding:"5px 8px",background:T.surfaceAlt,borderColor:T.border,color:T.teal}}>🏫</button>
+                        <button onClick={()=>setConfirmDeleteTest(t)} title="Delete test"
+                          style={{...S.smBtn,color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",padding:"5px 8px"}}>🗑</button>
                       </div>
                     </div>
-                    {/* Code badge */}
+                    {/* Code + Copy */}
                     {t.code&&(
-                      <div style={{marginTop:"0.6rem",display:"flex",alignItems:"center",gap:"0.5rem",background:"#f0f4f8",borderRadius:"3px",padding:"0.45rem 0.75rem"}}>
-                        <span style={{fontSize:"0.62rem",color:"#555",fontWeight:700,letterSpacing:"0.1em"}}>STUDENT CODE</span>
-                        <span style={{...S.code,fontSize:"1rem",letterSpacing:"0.2em",color:T.midnight}}>{t.code}</span>
+                      <div style={{marginTop:"0.5rem",display:"flex",alignItems:"center",gap:"0.5rem",background:T.surface,borderRadius:"4px",padding:"0.4rem 0.65rem"}}>
+                        <span style={{fontSize:"0.58rem",color:T.textSecondary,fontWeight:700,letterSpacing:"0.1em"}}>CODE</span>
+                        <span style={{...S.code,fontSize:"0.95rem",letterSpacing:"0.2em",color:T.midnight}}>{t.code}</span>
                         <button onClick={()=>navigator.clipboard.writeText(`${window.location.origin}/?code=${t.code}`)}
-                          style={{...S.smBtn,marginLeft:"auto",padding:"2px 8px",fontSize:"0.68rem"}}>📋 Copy Link</button>
+                          style={{...S.smBtn,marginLeft:"auto",padding:"2px 8px",fontSize:"0.65rem"}}>📋 Copy Link</button>
                       </div>
                     )}
-                    {/* Class assignment badge */}
-                    <div onClick={()=>setAssignClassesTest(t)} style={{marginTop:"4px",display:"flex",alignItems:"center",gap:"0.4rem",cursor:"pointer"}}>
-                      {t.classIds?.length > 0
-                        ? <span style={{fontSize:"0.68rem",color:"#1a6e2e",background:"#f0faf2",border:"1px solid #b3dfc0",borderRadius:"10px",padding:"1px 8px"}}>🏫 {t.classIds.length} class{t.classIds.length!==1?"es":""} assigned</span>
-                        : <span style={{fontSize:"0.68rem",color:"#e67e00",background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"10px",padding:"1px 8px"}}>⚠ No class assigned — click to fix</span>
-                      }
+                    {/* Standards tags */}
+                    {testStds.length>0&&(
+                      <div style={{marginTop:"0.45rem",display:"flex",flexWrap:"wrap",gap:"3px"}}>
+                        {testStds.map(std=>(
+                          <span key={std} style={{fontSize:"0.58rem",fontWeight:600,background:"#eef2ff",color:"#4338ca",borderRadius:"3px",padding:"1px 6px",border:"1px solid #c7d2fe"}}>{std}</span>
+                        ))}
+                      </div>
+                    )}
+                    {/* Class assignments */}
+                    <div style={{marginTop:"0.4rem",fontSize:"0.68rem",color:classNames.length?T.textSecondary:"#e67e00"}}>
+                      {classNames.length
+                        ? <span>🏫 {classNames.join(", ")}</span>
+                        : <span onClick={()=>setAssignClassesTest(t)} style={{cursor:"pointer"}}>⚠ No class assigned</span>}
                     </div>
-                    {/* Class assignment */}
-                    {assigningTest === t.id ? (
-                        <div style={{marginTop:"0.5rem",background:"#f8fafc",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.6rem"}}>
-                          <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#555",marginBottom:"6px"}}>ASSIGN TO CLASSES</div>
-                          <div style={{display:"flex",flexDirection:"column",gap:"3px",maxHeight:"110px",overflowY:"auto",marginBottom:"6px"}}>
-                            {allClasses.map(cls => {
-                              const liveTest = savedTests.find(x=>x.id===t.id);
-                              const checked = (liveTest?.classIds||[]).includes(cls.id);
-                              return (
-                                <label key={cls.id} onClick={()=>{
-                                  const cur = savedTests.find(x=>x.id===t.id);
-                                  if (!cur) return;
-                                  const ids = checked ? (cur.classIds||[]).filter(x=>x!==cls.id) : [...(cur.classIds||[]), cls.id];
-                                  setSavedTests(prev => prev.map(x => x.id===t.id ? {...x, classIds: ids} : x));
-                                }} style={{display:"flex",alignItems:"center",gap:"0.5rem",cursor:"pointer",padding:"3px 5px",borderRadius:"3px",background:checked?T.tealLight:"transparent",fontSize:"0.8rem"}}>
-                                  <div style={{width:"14px",height:"14px",borderRadius:"2px",border:`2px solid ${checked?T.teal:"#c8d3dd"}`,background:checked?T.teal:"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                                    {checked && <span style={{color:"#fff",fontSize:"0.55rem",fontWeight:900}}>✓</span>}
-                                  </div>
-                                  <span style={{fontWeight:checked?700:400,color:checked?T.teal:T.text}}>{cls.name}</span>
-                                </label>
-                              );
-                            })}
-                            {allClasses.length===0 && <div style={{color:"#aaa",fontSize:"0.75rem"}}>No classes found.</div>}
-                          </div>
-                          <div style={{display:"flex",gap:"0.4rem"}}>
-                            <button onClick={async ()=>{
-                              const cur = savedTests.find(x=>x.id===t.id);
-                              if (!cur) return;
-                              await fetch(`${API}/tests/saved/${t.id}/classes`,{
-                                method:"PATCH", headers:{"Content-Type":"application/json"},
-                                body: JSON.stringify({classIds: cur.classIds||[]})
-                              });
-                              await loadSavedTests();
-                              setAssigningTest(null);
-                            }}
-                              style={{...S.smBtn,background:T.teal,color:"#fff",borderColor:T.teal,flex:1,padding:"4px"}}>💾 Save</button>
-                            <button onClick={()=>{ loadSavedTests(); setAssigningTest(null); }}
-                              style={{...S.smBtn,padding:"4px 8px"}}>Cancel</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{marginTop:"0.5rem",display:"flex",alignItems:"center",gap:"0.5rem"}}>
-                          <span style={{fontSize:"0.68rem",color:(t.classIds||[]).length?"#555":"#e67e00"}}>
-                            {(t.classIds||[]).length
-                              ? `🏫 ${(t.classIds||[]).map(id=>allClasses.find(c=>c.id===id)?.name||id).join(", ")}`
-                              : "⚠ No class assigned"}
-                          </span>
-                          <button onClick={()=>setAssigningTest(t.id)}
-                            style={{...S.smBtn,padding:"2px 8px",fontSize:"0.65rem",marginLeft:"auto",whiteSpace:"nowrap"}}>
-                            Assign Classes
-                          </button>
-                        </div>
-                      )
-                    }
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           </>
-        )}
+          );
+        })()}
       </div>
 
       {/* Modals */}
