@@ -275,7 +275,7 @@ function TestControls() {
 }
 
 export default function Dashboard({ teacher, readOnly }) {
-  const isAdmin = teacher && (teacher.role === "super_admin" || teacher.role === "school_admin");
+  const isAdmin = teacher && (teacher.teacherRole === "super_admin" || teacher.teacherRole === "school_admin");
   const TABS = ALL_TABS.filter(([,, writeOnly, adminOnly]) => (!readOnly || !writeOnly) && (!adminOnly || isAdmin));
   const [tab,      setTab]      = useState("overview");
   const [sessions, setSessions] = useState([]);
@@ -320,7 +320,7 @@ export default function Dashboard({ teacher, readOnly }) {
         setLeaderboard(rosterArr.map((c, i) => ({ classId: c.id, className: c.name, top5: boards[i] || [] })));
       } catch (e) { console.warn("Failed to load fluency reports:", e); }
       // Admin overview (only for admin roles)
-      if (teacher && (teacher.role === "super_admin" || teacher.role === "school_admin")) {
+      if (teacher && (teacher.teacherRole === "super_admin" || teacher.teacherRole === "school_admin")) {
         try { setAdminData(await fetch(`${API}/admin/overview`).then(r=>r.json())); } catch {}
       }
     } catch { setSessions([]); }
@@ -485,21 +485,66 @@ export default function Dashboard({ teacher, readOnly }) {
                     </div>
                     <span style={{fontSize:"0.7rem",color:T.textMuted,flexShrink:0}}>{isOpen?"▲":"▼"}</span>
                   </div>
-                  {isOpen && (
-                    <div style={{padding:"0.75rem 1rem 0.75rem 3.5rem",background:T.surface,borderBottom:`1px solid ${T.surfaceAlt}`}}>
-                      <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"0.5rem"}}>ITEM DETAIL</div>
-                      <div style={{display:"flex",flexWrap:"wrap",gap:"4px"}}>
+                  {isOpen && (()=>{
+                    /* Build per-standard breakdown for this session */
+                    const stdMap = {};
+                    Object.entries(s.answers||{}).forEach(([qid,ans])=>{
+                      const q = bankQ.find(x=>x.id===qid);
+                      if (!q) return;
+                      if (!stdMap[q.standard]) stdMap[q.standard] = { correct:0, total:0 };
+                      stdMap[q.standard].total++;
+                      if (ans===q.correct) stdMap[q.standard].correct++;
+                    });
+                    const stds = Object.entries(stdMap).sort(([a],[b])=>a.localeCompare(b));
+                    /* Look up full student history */
+                    const sKey = s.studentId || s.studentName || s.name;
+                    const fullStudent = studentMap[sKey];
+                    const hasHistory = fullStudent && fullStudent.sessions.length >= 2;
+                    return (
+                    <div style={{padding:"1rem 1rem 1rem 3.5rem",background:T.surface,borderBottom:`1px solid ${T.surfaceAlt}`}}>
+                      {/* Standard mastery for THIS session */}
+                      <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"0.5rem"}}>STANDARD BREAKDOWN</div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:"0.4rem",marginBottom:"0.75rem"}}>
+                        {stds.map(([std,v])=>{
+                          const sp = Math.round((v.correct/v.total)*100);
+                          return (
+                            <div key={std} title={`${v.correct}/${v.total} correct`}
+                              style={{background:sp>=80?T.successBg:sp>=60?T.warningBg:T.dangerBg,border:`1px solid ${sp>=80?T.successBd:sp>=60?T.warningBd:T.dangerBd}`,borderRadius:T.xs,padding:"0.3rem 0.55rem",textAlign:"center",minWidth:"72px"}}>
+                              <div style={{fontSize:"0.58rem",fontWeight:700,color:T.textSecondary}}>{std}</div>
+                              <div style={{fontSize:"0.85rem",fontWeight:700,color:sp>=80?T.success:sp>=60?T.warning:T.dangerText}}>{sp}%</div>
+                              <div style={{fontSize:"0.55rem",color:T.textMuted}}>{v.correct}/{v.total}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {/* Item detail row */}
+                      <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"0.4rem"}}>ITEM DETAIL</div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:"4px",marginBottom:"0.75rem"}}>
                         {Object.entries(s.answers||{}).map(([qid,ans])=>{
                           const q = bankQ.find(x=>x.id===qid);
                           const ok = q && ans===q.correct;
                           return <div key={qid} title={q?`${q.standard} — ${ok?"Correct":"Incorrect"}`:`Q${qid}`}
-                            style={{width:"28px",height:"28px",borderRadius:T.xs,background:ok?T.success:T.dangerText,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                            <span style={{color:T.white,fontSize:"0.7rem",fontWeight:700}}>{ok?"✓":"✗"}</span>
+                            style={{width:"26px",height:"26px",borderRadius:T.xs,background:ok?T.success:T.dangerText,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                            <span style={{color:T.white,fontSize:"0.65rem",fontWeight:700}}>{ok?"✓":"✗"}</span>
                           </div>;
                         })}
                       </div>
+                      {/* Action buttons */}
+                      <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap"}}>
+                        {hasHistory && (
+                          <button onClick={(e)=>{e.stopPropagation(); setTab("growth"); setGrowthStudent(sKey);}}
+                            style={{background:T.midnight,color:T.white,border:"none",borderRadius:T.xs,padding:"5px 12px",fontSize:"0.72rem",fontWeight:600,cursor:"pointer"}}>
+                            📈 View Growth History ({fullStudent.sessions.length} sessions)
+                          </button>
+                        )}
+                        <button onClick={(e)=>{e.stopPropagation(); setParentReportId(s.studentId||s.studentName||s.name);}}
+                          style={{background:T.teal,color:T.white,border:"none",borderRadius:T.xs,padding:"5px 12px",fontSize:"0.72rem",fontWeight:600,cursor:"pointer"}}>
+                          📋 Parent Report
+                        </button>
+                      </div>
                     </div>
-                  )}
+                    );
+                  })()}
                 </React.Fragment>
               );
             })}
@@ -789,8 +834,12 @@ export default function Dashboard({ teacher, readOnly }) {
           {/* Fluency Levels per class */}
           {fluencyReport.filter(c => c.students.some(s => s.sessionCount > 0)).map(cls => (
             <div key={cls.classId} style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden"}}>
-              <div style={{padding:"0.75rem 1rem",background:"#f0f4f8",borderBottom:"1px solid #dde3e9",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555"}}>
-                FLUENCY LEVELS — {cls.className.toUpperCase()}
+              <div style={{padding:"0.75rem 1rem",background:"#f0f4f8",borderBottom:"1px solid #dde3e9",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span>FLUENCY LEVELS — {cls.className.toUpperCase()}</span>
+                <button onClick={() => setParentReportId({classId: cls.classId})}
+                  style={{background:T.teal,color:"#fff",border:"none",borderRadius:T.xs,padding:"3px 10px",fontSize:"0.65rem",fontWeight:700,cursor:"pointer",letterSpacing:"normal"}}>
+                  🖨️ Print All Reports
+                </button>
               </div>
               <div style={{overflowX:"auto"}}>
               <div style={{display:"grid",gridTemplateColumns:"1fr repeat(4,48px) 4px repeat(4,48px) 46px 42px 52px 42px 36px 36px",gap:0,fontSize:"0.68rem",minWidth:"700px"}}>
@@ -901,8 +950,8 @@ export default function Dashboard({ teacher, readOnly }) {
             <div style={{padding:"0.75rem 1rem",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary}}>
               CLASS COMPARISON — {classes.length} classes
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 70px 70px 70px 80px",gap:0,fontSize:"0.72rem"}}>
-              {["Class","Students","Tests","Drills","Avg Score"].map(h=>(
+            <div style={{display:"grid",gridTemplateColumns:"1fr 70px 70px 70px 80px 50px",gap:0,fontSize:"0.72rem"}}>
+              {["Class","Students","Tests","Drills","Avg Score",""].map(h=>(
                 <div key={h} style={{padding:"0.5rem 0.75rem",fontWeight:700,color:T.textSecondary,borderBottom:`2px solid ${T.border}`,fontSize:"0.6rem"}}>{h}</div>
               ))}
               {classes.map(c=>(
@@ -914,6 +963,20 @@ export default function Dashboard({ teacher, readOnly }) {
                   <div style={{padding:"0.5rem 0.75rem",textAlign:"center",fontWeight:700,borderBottom:`1px solid ${T.surfaceAlt}`,
                     color:c.avgScore==null?T.textMuted:c.avgScore>=80?T.success:c.avgScore>=60?T.warning:T.dangerText}}>
                     {c.avgScore != null ? `${c.avgScore}%` : "—"}
+                  </div>
+                  <div style={{padding:"0.5rem 0.75rem",textAlign:"center",borderBottom:`1px solid ${T.surfaceAlt}`}}>
+                    {c.sessionCount > 0 && (
+                      <button onClick={async()=>{
+                        if(!window.confirm(`Clear test scores for "${c.name}"? Drill data is kept. This cannot be undone.`)) return;
+                        try {
+                          await fetch(`${API}/sessions/class/${c.id}`,{method:"DELETE"});
+                          refresh();
+                        } catch {}
+                      }} title="Clear test data for this class"
+                        style={{background:"none",border:"none",cursor:"pointer",fontSize:"0.8rem",color:T.dangerText,padding:"2px 4px"}}>
+                        🗑
+                      </button>
+                    )}
                   </div>
                 </React.Fragment>
               ))}
@@ -1185,7 +1248,8 @@ export default function Dashboard({ teacher, readOnly }) {
       {/* Parent report modal */}
       {parentReportId && (
         <ParentReport
-          studentId={parentReportId}
+          studentId={typeof parentReportId === "string" ? parentReportId : undefined}
+          classId={typeof parentReportId === "object" ? parentReportId.classId : undefined}
           onClose={() => setParentReportId(null)}
         />
       )}

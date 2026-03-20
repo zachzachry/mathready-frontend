@@ -135,8 +135,8 @@ const ALL_TOOLS = [
 ];
 
 function effectiveClassIds(teacher) {
-  const role = teacher?.teacherRole || "teacher";
-  if (role === "super_admin" || role === "school_admin") return null;
+  // All roles filter to their own assigned classes.
+  // Admins get school-wide data via the School Overview tab separately.
   return teacher?.classIds ?? [];
 }
 

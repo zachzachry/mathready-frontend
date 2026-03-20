@@ -85,7 +85,10 @@ function TeacherForm({ teacher, allClasses, onSave, onCancel, onClassCreated }) 
   const [name,       setName]       = useState(teacher?.name     || "");
   const [email,      setEmail]      = useState(teacher?.email    || "");
   const [role,       setRole]       = useState(teacher?.role     || "teacher");
-  const [classIds,   setClassIds]   = useState(teacher?.classIds || []);
+  const [classIds,   setClassIds]   = useState(() => {
+    const ids = teacher?.classIds || [];
+    return ids.filter(id => allClasses.some(c => c.id === id));
+  });
   const [err,        setErr]        = useState("");
   const [saving,     setSaving]     = useState(false);
 
