@@ -234,7 +234,7 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose, 
   }
 
   const duplicate = savedTests.find(t =>
-    t.name?.trim().toLowerCase() === name.trim().toLowerCase()
+    t.name?.trim().toLowerCase() === name.trim().toLowerCase() && (!editing || t.id !== editing.id)
   );
 
   function handleCodeChange(val) {
@@ -651,8 +651,8 @@ export default function TestBuilder({ teacher, readOnly }) {
       const url = editingTestId ? `${API}/tests/saved/${editingTestId.id}` : `${API}/tests/saved`;
       const method = editingTestId ? "PUT" : "POST";
       const r = await fetch(url,{method,headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+      if (!r.ok) { const err = await r.json().catch(()=>({})); return err.detail || `Server error (${r.status})`; }
       const data = await r.json();
-      if (r.status===400) return data.detail || "Code already in use";
       await loadSavedTests();
       setSavedMsg(editingTestId ? `Updated! Code: ${data.code}` : `Saved! Code: ${data.code}`);
       setEditingTestId(null);
