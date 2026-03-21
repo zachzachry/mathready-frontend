@@ -496,12 +496,20 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
                       {(q.zones||[]).map((zone,zi)=>(
                         <div key={zi} style={{border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"0.5rem",background:T.white}}>
                           <div style={{fontSize:"0.65rem",fontWeight:700,color:T.midnight,textAlign:"center",borderBottom:`1px solid ${T.border}`,paddingBottom:"0.3rem",marginBottom:"0.3rem"}}>{zone}</div>
-                          {(q.items||[]).filter(item=>(q.correct||{})[item]===zi).map(item=>(
+                          {(q.items||[]).filter(item=>{const v=(q.correct||{})[item]; return typeof v==="number" && v===zi;}).map(item=>(
                             <div key={item} style={{fontSize:"0.75rem",background:"#e3edf7",borderRadius:"3px",padding:"3px 8px",marginBottom:"2px",fontWeight:600}}>{item}</div>
                           ))}
                         </div>
                       ))}
                     </div>
+                    {(q.items||[]).filter(item=>(q.correct||{})[item]==="distractor").length > 0 && (
+                      <div style={{marginTop:"0.4rem",padding:"0.35rem 0.6rem",background:"#fdf2f2",border:`1px solid ${T.dangerBd}`,borderRadius:T.xs}}>
+                        <span style={{fontSize:"0.62rem",fontWeight:700,color:T.dangerText}}>DISTRACTORS: </span>
+                        <span style={{fontSize:"0.75rem",color:T.text}}>
+                          {(q.items||[]).filter(item=>(q.correct||{})[item]==="distractor").join(", ")}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
