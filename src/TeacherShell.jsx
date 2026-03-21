@@ -182,6 +182,9 @@ export default function TeacherShell({ onBack, teacher, onUpdateClassIds, onView
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
   const [showViewAs,  setShowViewAs]  = useState(false);
   const [allTeachers, setAllTeachers] = useState([]);
+  const [showStudentPicker, setShowStudentPicker] = useState(false);
+  const [pickerClasses,     setPickerClasses]     = useState([]);
+  const [pickerSearch,      setPickerSearch]      = useState("");
 
   const activeTool       = tools.find(t => t.id === tool) ? tool : "dashboard";
   const effectiveTeacher = { ...teacher, classIds: effectiveClassIds(teacher) };
@@ -258,7 +261,10 @@ export default function TeacherShell({ onBack, teacher, onUpdateClassIds, onView
                     cursor:"pointer",width:"100%",textAlign:"left",color:"rgba(255,255,255,.65)",fontSize:"0.75rem",fontWeight:600,transition:"background .15s"}}>
                   👁 View as Teacher
                 </button>
-                <button onClick={onViewAsStudent}
+                <button onClick={()=>{
+                  const classFilter = teacher?.classIds?.length ? `?classIds=${teacher.classIds.join(",")}` : "";
+                  fetch(`${API}/roster${classFilter}`).then(r=>r.json()).then(d=>{setPickerClasses(Array.isArray(d)?d:[]);setShowStudentPicker(true);}).catch(()=>{});
+                }}
                   style={{display:"flex",alignItems:"center",gap:"0.5rem",padding:"0.55rem 0.65rem",
                     background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.1)",borderRadius:T.xs,
                     cursor:"pointer",width:"100%",textAlign:"left",color:"rgba(255,255,255,.65)",fontSize:"0.75rem",fontWeight:600,transition:"background .15s"}}>
@@ -301,6 +307,50 @@ export default function TeacherShell({ onBack, teacher, onUpdateClassIds, onView
           })()}
         </div>
       </div>
+
+      {/* Student Picker Modal */}
+      {showStudentPicker && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
+          <div style={{background:T.white,borderRadius:"6px",width:"100%",maxWidth:"420px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.25)"}}>
+            <div style={{background:T.midnight,color:T.white,padding:"0.9rem 1.25rem"}}>
+              <div style={{fontSize:"0.6rem",opacity:.65,letterSpacing:"0.14em"}}>IMPERSONATE</div>
+              <div style={{fontSize:"1rem",fontWeight:700}}>View as Student</div>
+            </div>
+            <div style={{padding:"1rem 1.25rem"}}>
+              <input value={pickerSearch} onChange={e=>setPickerSearch(e.target.value)}
+                placeholder="Search students…" autoFocus
+                style={{width:"100%",padding:"0.5rem 0.75rem",border:`1px solid ${T.border}`,borderRadius:T.xs,fontSize:"0.85rem",marginBottom:"0.75rem",boxSizing:"border-box"}}/>
+              <div style={{maxHeight:"350px",overflowY:"auto",display:"flex",flexDirection:"column",gap:"2px"}}>
+                {pickerClasses.map(cls => {
+                  const filtered = (cls.students||[]).filter(s =>
+                    !pickerSearch || s.name.toLowerCase().includes(pickerSearch.toLowerCase())
+                  );
+                  if (filtered.length === 0) return null;
+                  return (
+                    <div key={cls.id}>
+                      <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,padding:"0.5rem 0.5rem 0.2rem",borderTop:`1px solid ${T.border}`}}>{cls.name}</div>
+                      {filtered.map(s => (
+                        <button key={s.id} onClick={()=>{
+                          setShowStudentPicker(false);
+                          onViewAsStudent({student: s, cls: {id: cls.id, name: cls.name}});
+                        }}
+                          style={{display:"block",width:"100%",textAlign:"left",padding:"0.45rem 0.65rem",border:"none",
+                            background:T.white,cursor:"pointer",fontSize:"0.82rem",color:T.text,borderRadius:"3px"}}
+                          onMouseOver={e=>e.currentTarget.style.background=T.surface}
+                          onMouseOut={e=>e.currentTarget.style.background=T.white}>
+                          {s.name}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+              <button onClick={()=>setShowStudentPicker(false)}
+                style={{marginTop:"0.75rem",width:"100%",background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600}}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

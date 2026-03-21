@@ -413,7 +413,16 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
           {/* Answer — Drag & Drop */}
           {isDragDrop && (
           <div>
-            <label style={lbl}>DROP ZONES <span style={{fontWeight:400,color:T.textMuted}}>— categories students will sort items into</span></label>
+            <div style={{display:"flex",gap:"0.5rem",alignItems:"center",marginBottom:"0.75rem"}}>
+              <span style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary}}>LAYOUT</span>
+              {[["categories","📊 Sort into Categories"],["blanks","📝 Fill in Blanks"]].map(([v,l])=>(
+                <button key={v} onClick={()=>update("ddLayout",v)}
+                  style={{padding:"4px 10px",borderRadius:T.xs,border:`2px solid ${(q.ddLayout||"categories")===v?T.teal:T.border}`,background:(q.ddLayout||"categories")===v?T.teal:T.surface,color:(q.ddLayout||"categories")===v?T.white:T.textSecondary,fontSize:"0.72rem",fontWeight:700,cursor:"pointer"}}>
+                  {l}
+                </button>
+              ))}
+            </div>
+            <label style={lbl}>{(q.ddLayout||"categories")==="blanks"?"BLANK LABELS":"DROP ZONES"} <span style={{fontWeight:400,color:T.textMuted}}>— {(q.ddLayout||"categories")==="blanks"?"named slots students fill in":"categories students will sort items into"}</span></label>
             <div style={{display:"flex",flexDirection:"column",gap:"0.4rem",marginBottom:"0.75rem"}}>
               {(q.zones||["Category 1","Category 2"]).map((zone,i)=>(
                 <div key={i} style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
@@ -428,7 +437,7 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
                 style={{alignSelf:"flex-start",border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"4px 12px",cursor:"pointer",fontSize:"0.75rem",fontWeight:600,background:T.surfaceAlt,color:T.text}}>+ Add Zone</button>
             </div>
 
-            <label style={lbl}>DRAG ITEMS <span style={{fontWeight:400,color:T.textMuted}}>— assign each to its correct zone</span></label>
+            <label style={lbl}>{(q.ddLayout||"categories")==="blanks"?"ANSWER TILES":"DRAG ITEMS"} <span style={{fontWeight:400,color:T.textMuted}}>— {(q.ddLayout||"categories")==="blanks"?"options students drag into blanks (include distractors)":"assign each to its correct zone"}</span></label>
             <div style={{display:"flex",flexDirection:"column",gap:"0.4rem"}}>
               {(q.items||[""]).map((item,i)=>(
                 <div key={i} style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>

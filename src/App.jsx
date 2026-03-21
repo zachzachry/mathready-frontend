@@ -115,6 +115,7 @@ export default function App() {
   const [teacherIdentity,  setTeacherIdentity]  = useState(restored?.teacher || null);
   const [studentCredential,setStudentCredential] = useState(null);
   const [adminIdentity,    setAdminIdentity]     = useState(null); // stashed admin when impersonating
+  const [impersonateStudent, setImpersonateStudent] = useState(null);
 
   function reset() {
     // If impersonating, return to admin view instead of signing out
@@ -127,7 +128,7 @@ export default function App() {
     }
     window.history.replaceState({}, "", window.location.pathname);
     clearSession();
-    setScreen("home"); setTeacherIdentity(null); setStudentCredential(null);
+    setScreen("home"); setTeacherIdentity(null); setStudentCredential(null); setImpersonateStudent(null);
   }
 
   function handleTeacherSuccess(data) {
@@ -156,9 +157,12 @@ export default function App() {
     // Don't save impersonation to session — it's temporary
   }
 
-  // Super admin: view as student (jump to student flow)
-  function handleViewAsStudent() {
+  // Super admin: view as student (pick from roster then jump to student flow)
+  function handleViewAsStudent(studentData) {
     setAdminIdentity(teacherIdentity); // stash the real admin
+    if (studentData) {
+      setImpersonateStudent(studentData); // {student, cls}
+    }
     setScreen("student");
     setStudentCredential(null);
   }
@@ -173,7 +177,8 @@ export default function App() {
     />
   );
   if (screen === "student") return <MathTest onBack={reset} prefillCode={urlCode||undefined}
-    directPracticeClassId={urlPracticeClass||undefined} prefillCredential={studentCredential}/>;
+    directPracticeClassId={urlPracticeClass||undefined} prefillCredential={studentCredential}
+    impersonateStudent={impersonateStudent}/>;
 
   // ── Home — single unified sign-in ──
   return (

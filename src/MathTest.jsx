@@ -8,14 +8,22 @@ import { buildWeightMap, updateSessionWeights, pickAdaptiveQuestion, ALL_STANDAR
 import PlotGrid from "./shared/PlotGrid";
 
 /* ── Drag-and-Drop Answer Component ─────────────────────── */
-function DragDropAnswer({ zones=[], items=[], value, onChange, revealed, correctMap }) {
+function DragDropAnswer({ zones=[], items=[], value, onChange, revealed, correctMap, ddLayout="categories" }) {
   // value is a JSON string mapping item→zoneIndex, e.g. {"Melting ice":0,"Burning wood":1}
   const placement = (() => { try { return value ? JSON.parse(value) : {}; } catch { return {}; } })();
   const [dragging, setDragging] = useState(null);
 
   function handleDrop(zoneIdx) {
     if (revealed || !dragging) return;
-    const next = { ...placement, [dragging]: zoneIdx };
+    // For blanks layout: each blank accepts only one item, so clear any item already in this blank
+    const next = { ...placement };
+    if (ddLayout === "blanks") {
+      // Remove any item currently in this blank
+      for (const k of Object.keys(next)) {
+        if (next[k] === zoneIdx) delete next[k];
+      }
+    }
+    next[dragging] = zoneIdx;
     onChange(JSON.stringify(next));
     setDragging(null);
   }
@@ -29,6 +37,89 @@ function DragDropAnswer({ zones=[], items=[], value, onChange, revealed, correct
 
   const unplaced = items.filter(item => placement[item] === undefined);
 
+  // ── Fill-in Blanks layout ──
+  if (ddLayout === "blanks") return (
+    <div>
+      <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"0.75rem"}}>
+        DRAG A TILE INTO EACH BLANK
+      </div>
+
+      {/* Blank slots */}
+      <div style={{display:"flex",flexDirection:"column",gap:"0.5rem",marginBottom:"1rem"}}>
+        {zones.map((zone, zIdx) => {
+          const placedItem = items.find(item => placement[item] === zIdx);
+          let slotBg = T.surface, slotBorder = `2px dashed ${T.border}`;
+          if (revealed && correctMap && placedItem) {
+            const isRight = correctMap[placedItem] === zIdx;
+            slotBg = isRight ? T.successBg : T.dangerBg;
+            slotBorder = `2px solid ${isRight ? T.success : T.dangerText}`;
+          } else if (placedItem) {
+            slotBg = "#e3edf7"; slotBorder = `2px solid ${T.midnight}44`;
+          }
+          return (
+            <div key={zIdx}
+              onDragOver={e => e.preventDefault()}
+              onDrop={() => handleDrop(zIdx)}
+              onTouchEnd={() => { if (dragging) handleDrop(zIdx); }}
+              style={{display:"flex",alignItems:"center",gap:"0.75rem"}}>
+              <span style={{fontSize:"0.85rem",fontWeight:700,color:T.midnight,minWidth:"100px"}}>{zone}</span>
+              <div style={{flex:1,maxWidth:"180px",minHeight:"42px",display:"flex",alignItems:"center",justifyContent:"center",
+                background:slotBg,border:slotBorder,borderRadius:"6px",padding:"0.3rem 0.6rem",transition:"all .15s"}}>
+                {placedItem ? (
+                  <div style={{display:"flex",alignItems:"center",gap:"0.4rem",width:"100%"}}>
+                    <span style={{flex:1,fontSize:"1rem",fontWeight:700,color:T.midnight,textAlign:"center"}}><MathText text={placedItem}/></span>
+                    {!revealed && <button onClick={() => removeItem(placedItem)} style={{background:"none",border:"none",cursor:"pointer",color:T.textMuted,fontSize:"0.75rem",padding:"0 2px"}}>✕</button>}
+                    {revealed && correctMap && (
+                      <span style={{fontSize:"0.8rem",fontWeight:700}}>{correctMap[placedItem]===zIdx?"✓":"✗"}</span>
+                    )}
+                  </div>
+                ) : (
+                  <span style={{fontSize:"0.78rem",color:T.textMuted,fontStyle:"italic"}}>___</span>
+                )}
+              </div>
+              {revealed && correctMap && placedItem && correctMap[placedItem] !== zIdx && (
+                <span style={{fontSize:"0.72rem",color:T.success,fontWeight:600}}>
+                  → {items.find(it => correctMap[it] === zIdx) || "?"}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Tile pool */}
+      <div style={{display:"flex",flexWrap:"wrap",gap:"0.4rem",padding:"0.6rem",background:T.surface,borderRadius:T.xs,border:`1px dashed ${T.border}`,minHeight:"40px"}}>
+        {unplaced.length === 0 && !revealed && <span style={{fontSize:"0.75rem",color:T.textMuted,fontStyle:"italic"}}>All tiles placed</span>}
+        {unplaced.map(item => (
+          <div key={item}
+            draggable={!revealed}
+            onDragStart={() => setDragging(item)}
+            onTouchStart={() => setDragging(item)}
+            style={{background:T.midnight,color:T.white,borderRadius:T.xs,padding:"0.5rem 1rem",fontSize:"0.95rem",fontWeight:700,cursor:revealed?"default":"grab",userSelect:"none",minWidth:"36px",textAlign:"center"}}>
+            <MathText text={item}/>
+          </div>
+        ))}
+      </div>
+
+      {/* Corrections */}
+      {revealed && correctMap && (() => {
+        const wrong = items.filter(item => placement[item] !== undefined && placement[item] !== correctMap[item]);
+        if (wrong.length === 0) return null;
+        return (
+          <div style={{marginTop:"0.75rem",padding:"0.6rem",background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:T.xs}}>
+            <div style={{fontSize:"0.65rem",fontWeight:700,color:T.dangerText,marginBottom:"0.3rem"}}>CORRECTIONS:</div>
+            {wrong.map(item => (
+              <div key={item} style={{fontSize:"0.78rem",color:T.text}}>
+                <strong>{item}</strong> → {zones[correctMap[item]]}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+    </div>
+  );
+
+  // ── Categories layout (original) ──
   return (
     <div>
       <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"0.75rem"}}>
@@ -112,7 +203,7 @@ const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
 
 // ── Student Login ──────────────────────────────────────────
 // Flow: google → choice (drill | test code) → [code → confirm] or [drill start]
-function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillCredential }) {
+function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillCredential, impersonateStudent }) {
   const [credential, setCredential] = useState(prefillCredential || null);
   const [code,       setCode]       = useState(prefillCode || "");
   const [err,        setErr]        = useState("");
@@ -122,7 +213,11 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
   const [cls,        setCls]        = useState(null);
   const [studentAssignments, setStudentAssignments] = useState([]);
   // skip google step if credential already provided from home screen sign-in
-  const [step, setStep] = useState(prefillCredential ? (prefillCode ? "code" : "choice") : "google");
+  const [step, setStep] = useState(
+    impersonateStudent ? "choice"
+    : prefillCredential ? (prefillCode ? "code" : "choice")
+    : "google"
+  );
   const googleBtnRef = useRef(null);
   const [googleReady, setGoogleReady] = useState(!!window.google);
 
@@ -154,26 +249,34 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
 
   // Fetch student assignments when reaching choice screen
   useEffect(() => {
-    if (step !== "choice" || !credential) return;
+    if (step !== "choice") return;
     (async () => {
       try {
-        // First get student identity
-        const r = await fetch(`${API}/auth/google/drill`, {
-          method:"POST", headers:{"Content-Type":"application/json"},
-          body: JSON.stringify({ token: credential }),
-        });
-        const d = await r.json();
-        if (r.ok && d.student) {
-          setStudent(d.student);
-          setCls(d.cls);
-          // Then fetch their assignments
-          const ar = await fetch(`${API}/assignments/student/${d.student.id}`);
+        if (impersonateStudent) {
+          // Admin impersonation — use provided student data directly
+          setStudent(impersonateStudent.student);
+          setCls(impersonateStudent.cls);
+          const ar = await fetch(`${API}/assignments/student/${impersonateStudent.student.id}`);
           const ad = await ar.json();
           setStudentAssignments(ad.assignments || []);
+        } else if (credential) {
+          // Normal Google auth flow
+          const r = await fetch(`${API}/auth/google/drill`, {
+            method:"POST", headers:{"Content-Type":"application/json"},
+            body: JSON.stringify({ token: credential }),
+          });
+          const d = await r.json();
+          if (r.ok && d.student) {
+            setStudent(d.student);
+            setCls(d.cls);
+            const ar = await fetch(`${API}/assignments/student/${d.student.id}`);
+            const ad = await ar.json();
+            setStudentAssignments(ad.assignments || []);
+          }
         }
       } catch {}
     })();
-  }, [step, credential]);
+  }, [step, credential, impersonateStudent]);
 
   // Step 2 — validate test code + verify stored credential against roster
   async function checkCode() {
@@ -614,6 +717,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
                 onChange={v => handleChoose(v)}
                 revealed={revealed}
                 correctMap={revealed ? (q.correct||q.answer||{}) : null}
+                ddLayout={q.ddLayout||"categories"}
               />
               {!revealed && selected && (
                 <button onClick={() => handleChoose(selected)}
@@ -1018,7 +1122,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
 
   function addViolation(reason) {
     setViolations(v => v + 1);
-    setViolationLog(log => [...log, { reason, time: new Date().toISOString(), questionNum: idx + 1 }]);
+    setViolationLog(log => [...log, { reason, time: new Date().toISOString(), questionNum: cur + 1 }]);
     setLockWarning(reason);
   }
 
@@ -1383,6 +1487,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
                 onChange={v => { setAns(p=>({...p,[q.id]:v})); handleAdaptiveAnswer(q.id, v); }}
                 revealed={false}
                 correctMap={null}
+                ddLayout={q.ddLayout||"categories"}
               />
             ) : q.type === "multiselect" ? (
               <>
@@ -2489,7 +2594,7 @@ function _loadSaved() {
 }
 
 // ── Main shell ─────────────────────────────────────────────
-export default function MathTest({ onBack, prefillCode, directPracticeClassId, directDrillMode, prefillCredential }) {
+export default function MathTest({ onBack, prefillCode, directPracticeClassId, directDrillMode, prefillCredential, impersonateStudent }) {
   // prefillCode           = test code from ?code= URL param (goes straight to Google step)
   // directPracticeClassId = class ID from ?practice= URL param (direct practice via Google)
   // directDrillMode       = true when launched from "Practice Drill" home button (no code)
@@ -2635,6 +2740,7 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
       onBack={onBack}
       prefillCode={prefillCode}
       prefillCredential={prefillCredential}
+      impersonateStudent={impersonateStudent}
     />;
 
   if (screen === "google-practice")
