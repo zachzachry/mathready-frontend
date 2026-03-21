@@ -352,8 +352,13 @@ export default function Dashboard({ teacher, readOnly }) {
   const drillSessions = sessions.filter(s => s.mode === "drill" || s.mode === "practice");
 
   // ── Overview stats (tests only) ──
-  // Unique test codes for filter dropdown
-  const testCodes = [...new Set(testSessions.map(s=>s.testCode||s.code||"").filter(Boolean))];
+  // Build code→name map from sessions (testTitle stored alongside testCode)
+  const testCodeNames = {};
+  testSessions.forEach(s => {
+    const code = s.testCode || s.code || "";
+    if (code && !testCodeNames[code]) testCodeNames[code] = s.testTitle || s.testName || code;
+  });
+  const testCodes = Object.keys(testCodeNames);
   // Filter by selected test
   const filteredTestSessions = overviewTest === "all" ? testSessions
     : testSessions.filter(s=>(s.testCode||s.code||"")=== overviewTest);
@@ -483,14 +488,14 @@ export default function Dashboard({ teacher, readOnly }) {
               <select value={overviewTest} onChange={e=>{setOverviewTest(e.target.value);setSelected(null);}}
                 style={{fontSize:"0.78rem",padding:"0.3rem 0.5rem",border:`1px solid ${T.border}`,borderRadius:T.xs,background:T.white}}>
                 <option value="all">All Tests</option>
-                {testCodes.map(c=><option key={c} value={c}>{c}</option>)}
+                {testCodes.map(c=><option key={c} value={c}>{testCodeNames[c] !== c ? `${testCodeNames[c]} (${c})` : c}</option>)}
               </select>
             </div>
           )}
           <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,overflow:"hidden"}}>
             <div style={{padding:"0.75rem 1rem",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary}}>
               TEST SCORES — {sorted.length} student{sorted.length!==1?"s":""}
-              {overviewTest !== "all" && <span style={{marginLeft:"0.5rem",fontFamily:"monospace",background:T.midnight,color:T.white,padding:"1px 6px",borderRadius:"3px"}}>{overviewTest}</span>}
+              {overviewTest !== "all" && <span style={{marginLeft:"0.5rem",background:T.midnight,color:T.white,padding:"1px 6px",borderRadius:"3px",fontSize:"0.6rem"}}>{testCodeNames[overviewTest]!==overviewTest?`${testCodeNames[overviewTest]} · `:""}<span style={{fontFamily:"monospace"}}>{overviewTest}</span></span>}
             </div>
             {sorted.map((s,i)=>{
               const name = s.studentName||s.name; const p=s.pct;
