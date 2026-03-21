@@ -2638,6 +2638,7 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
   const [student,         setStudent]         = useState(_hasSession ? _saved.student : null);
   const [cls,             setCls]             = useState(_hasSession ? _saved.cls    : null);
   const [testCode,        setTestCode]        = useState("");
+  const [testTitle,       setTestTitle]       = useState("");
   const [finalSession,    setFinalSession]    = useState(null);
   const [practiceHistory, setPracticeHistory] = useState([]);
   const [drillKey,        setDrillKey]        = useState(0);   // increment to remount (Play Again)
@@ -2667,7 +2668,7 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
   }
 
   function handleStartTest(studentObj, classObj, code, testInfo) {
-    setStudent(studentObj); setCls(classObj); setTestCode(code);
+    setStudent(studentObj); setCls(classObj); setTestCode(code); setTestTitle(testInfo?.title || "");
     const drill = testInfo?.type === "drill";
     setIsDrill(drill);
     setIsAdaptive(!!testInfo?.adaptive && !drill);
@@ -2712,6 +2713,7 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
       classId:     cls?.id       || "",
       className:   cls?.name     || "",
       testCode,
+      testTitle,
       mode: isDrill ? "drill" : "test",
     };
     try {
