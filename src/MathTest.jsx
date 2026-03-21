@@ -642,6 +642,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
     if (q.type === "plotpoint") return JSON.stringify(Array.isArray(q.answer)?q.answer:(()=>{try{return JSON.parse(q.answer);}catch{return null;}})());
     if (q.type === "multiselect") return JSON.stringify([...(Array.isArray(q.answer)?q.answer:[])].sort());
     if (q.type === "keypad") return String(q.answer??"").trim().toLowerCase();
+    if (q.type === "dragdrop") return JSON.stringify(q.correct||q.answer||{});
     return q.correct;
   })();
   const streak  = (() => { let s=0; for(let i=history.length-1;i>=0;i--){ if(history[i].correct) s++; else break; } return s; })();
@@ -898,10 +899,20 @@ function PracticeResults({ session, history, onReset }) {
                         <PlotGrid answer={q.answer} placed={chosen?(()=>{try{return JSON.parse(chosen);}catch{return null;}})():null} revealed readOnly size={180}/>
                       </div>
                     )}
-                    {!isCorrect && q.type!=="plotpoint" && (
+                    {!isCorrect && q.type!=="plotpoint" && q.type!=="dragdrop" && (
                       <div style={{fontSize:"0.78rem"}}>
-                        <span style={{color:T.success}}>Correct: <strong><MathText text={q.correct}/></strong></span>
+                        <span style={{color:T.success}}>Correct: <strong><MathText text={typeof q.correct==="object"?JSON.stringify(q.correct):q.correct}/></strong></span>
                         {chosen && <span style={{color:T.dangerText}}> · Your answer: <MathText text={chosen}/></span>}
+                      </div>
+                    )}
+                    {!isCorrect && q.type==="dragdrop" && (
+                      <div style={{fontSize:"0.78rem"}}>
+                        <span style={{color:T.success}}>Correct placement: </span>
+                        {(q.items||[]).filter(it=>(q.correct||{})[it]!=="distractor").map(it=>(
+                          <span key={it} style={{display:"inline-block",background:"#e8f5e9",borderRadius:"3px",padding:"1px 6px",margin:"1px 2px",fontSize:"0.72rem"}}>
+                            <strong>{it}</strong> → {(q.zones||[])[(q.correct||q.answer||{})[it]]||"?"}
+                          </span>
+                        ))}
                       </div>
                     )}
                     {q.explanation && !isCorrect && (
@@ -2473,6 +2484,7 @@ function StudentResults({ session, questions, onReset }) {
                 if (q.type === "plotpoint") { try { const arr = Array.isArray(q.answer)?q.answer:JSON.parse(q.answer); return `(${arr[0]}, ${arr[1]})`; } catch { return "?"; } }
                 if (q.type === "multiselect") { const arr = Array.isArray(q.answer)?q.answer:[]; return arr.join(", ") || "?"; }
                 if (q.type === "keypad") return String(q.answer ?? "");
+                if (q.type === "dragdrop") return (q.items||[]).filter(it=>(q.correct||{})[it]!=="distractor").map(it=>`${it} → ${(q.zones||[])[(q.correct||q.answer||{})[it]]||"?"}`).join(", ");
                 return q.correct;
               })();
               // Human-readable student answer
@@ -2480,6 +2492,7 @@ function StudentResults({ session, questions, onReset }) {
                 if (!a) return null;
                 if (q.type === "plotpoint") { try { const arr=JSON.parse(a); return `(${arr[0]}, ${arr[1]})`; } catch { return a; } }
                 if (q.type === "multiselect") { try { return JSON.parse(a).join(", "); } catch { return a; } }
+                if (q.type === "dragdrop") { try { const g=JSON.parse(a); return Object.entries(g).map(([item,zi])=>`${item} → ${(q.zones||[])[zi]||"?"}`).join(", "); } catch { return a; } }
                 return a;
               })();
               return <div key={q.id} style={{display:"flex",gap:"0.75rem",marginBottom:"0.6rem",padding:"0.7rem 0.85rem",background:ok?T.successBg:T.dangerBg,border:`1px solid ${ok?T.successBd:T.dangerBd}`,borderRadius:T.xs}}>
