@@ -90,27 +90,34 @@ function DragDropAnswer({ zones=[], items=[], value, onChange, revealed, correct
       {/* Tile pool */}
       <div style={{display:"flex",flexWrap:"wrap",gap:"0.4rem",padding:"0.6rem",background:T.surface,borderRadius:T.xs,border:`1px dashed ${T.border}`,minHeight:"40px"}}>
         {unplaced.length === 0 && !revealed && <span style={{fontSize:"0.75rem",color:T.textMuted,fontStyle:"italic"}}>All tiles placed</span>}
-        {unplaced.map(item => (
+        {unplaced.map(item => {
+          const isDistractor = revealed && correctMap && correctMap[item] === "distractor";
+          return (
           <div key={item}
             draggable={!revealed}
             onDragStart={() => setDragging(item)}
             onTouchStart={() => setDragging(item)}
-            style={{background:T.midnight,color:T.white,borderRadius:T.xs,padding:"0.5rem 1rem",fontSize:"0.95rem",fontWeight:700,cursor:revealed?"default":"grab",userSelect:"none",minWidth:"36px",textAlign:"center"}}>
-            <MathText text={item}/>
+            style={{background:isDistractor?T.successBg:T.midnight,color:isDistractor?T.success:T.white,border:isDistractor?`2px solid ${T.success}`:"none",borderRadius:T.xs,padding:"0.5rem 1rem",fontSize:"0.95rem",fontWeight:700,cursor:revealed?"default":"grab",userSelect:"none",minWidth:"36px",textAlign:"center"}}>
+            <MathText text={item}/>{isDistractor && <span style={{marginLeft:"0.3rem",fontSize:"0.7rem"}}>✓</span>}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Corrections */}
       {revealed && correctMap && (() => {
-        const wrong = items.filter(item => placement[item] !== undefined && placement[item] !== correctMap[item]);
+        const wrong = items.filter(item => {
+          const c = correctMap[item];
+          if (c === "distractor") return placement[item] !== undefined;
+          return placement[item] !== undefined && placement[item] !== c;
+        });
         if (wrong.length === 0) return null;
         return (
           <div style={{marginTop:"0.75rem",padding:"0.6rem",background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:T.xs}}>
             <div style={{fontSize:"0.65rem",fontWeight:700,color:T.dangerText,marginBottom:"0.3rem"}}>CORRECTIONS:</div>
             {wrong.map(item => (
               <div key={item} style={{fontSize:"0.78rem",color:T.text}}>
-                <strong>{item}</strong> → {zones[correctMap[item]]}
+                <strong>{item}</strong> → {correctMap[item]==="distractor" ? "does not belong anywhere" : zones[correctMap[item]]}
               </div>
             ))}
           </div>
@@ -129,15 +136,18 @@ function DragDropAnswer({ zones=[], items=[], value, onChange, revealed, correct
       {/* Unplaced items (drag source) */}
       <div style={{display:"flex",flexWrap:"wrap",gap:"0.4rem",marginBottom:"1rem",minHeight:"40px",padding:"0.6rem",background:T.surface,borderRadius:T.xs,border:`1px dashed ${T.border}`}}>
         {unplaced.length === 0 && !revealed && <span style={{fontSize:"0.75rem",color:T.textMuted,fontStyle:"italic"}}>All items placed</span>}
-        {unplaced.map(item => (
+        {unplaced.map(item => {
+          const isDistractor = revealed && correctMap && correctMap[item] === "distractor";
+          return (
           <div key={item}
             draggable={!revealed}
             onDragStart={() => setDragging(item)}
             onTouchStart={() => setDragging(item)}
-            style={{background:T.midnight,color:T.white,borderRadius:T.xs,padding:"0.45rem 0.85rem",fontSize:"0.82rem",fontWeight:600,cursor:revealed?"default":"grab",userSelect:"none"}}>
-            <MathText text={item}/>
+            style={{background:isDistractor?T.successBg:T.midnight,color:isDistractor?T.success:T.white,border:isDistractor?`2px solid ${T.success}`:"none",borderRadius:T.xs,padding:"0.45rem 0.85rem",fontSize:"0.82rem",fontWeight:600,cursor:revealed?"default":"grab",userSelect:"none"}}>
+            <MathText text={item}/>{isDistractor && <span style={{marginLeft:"0.3rem",fontSize:"0.7rem"}}>✓</span>}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Drop zones */}
@@ -158,7 +168,7 @@ function DragDropAnswer({ zones=[], items=[], value, onChange, revealed, correct
                 {zoneItems.map(item => {
                   let bg = "#e3edf7", border = `1px solid ${T.midnight}33`, textColor = T.text;
                   if (revealed && correctMap) {
-                    const isRight = correctMap[item] === zIdx;
+                    const isRight = correctMap[item] === zIdx && correctMap[item] !== "distractor";
                     bg = isRight ? T.successBg : T.dangerBg;
                     border = `1px solid ${isRight ? T.success : T.dangerText}`;
                     textColor = isRight ? T.success : T.dangerText;
@@ -168,7 +178,7 @@ function DragDropAnswer({ zones=[], items=[], value, onChange, revealed, correct
                       <span style={{flex:1,fontSize:"0.8rem",fontWeight:600,color:textColor}}><MathText text={item}/></span>
                       {!revealed && <button onClick={() => removeItem(item)} style={{background:"none",border:"none",cursor:"pointer",color:T.textMuted,fontSize:"0.75rem",padding:"0 2px"}}>✕</button>}
                       {revealed && correctMap && (
-                        <span style={{fontSize:"0.7rem",fontWeight:700}}>{correctMap[item]===zIdx?"✓":"✗"}</span>
+                        <span style={{fontSize:"0.7rem",fontWeight:700}}>{correctMap[item]===zIdx&&correctMap[item]!=="distractor"?"✓":"✗"}</span>
                       )}
                     </div>
                   );
@@ -182,14 +192,18 @@ function DragDropAnswer({ zones=[], items=[], value, onChange, revealed, correct
 
       {/* Show misplaced items' correct zones after reveal */}
       {revealed && correctMap && (() => {
-        const wrong = items.filter(item => placement[item] !== correctMap[item]);
+        const wrong = items.filter(item => {
+          const c = correctMap[item];
+          if (c === "distractor") return placement[item] !== undefined;
+          return placement[item] !== c;
+        });
         if (wrong.length === 0) return null;
         return (
           <div style={{marginTop:"0.75rem",padding:"0.6rem",background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:T.xs}}>
             <div style={{fontSize:"0.65rem",fontWeight:700,color:T.dangerText,marginBottom:"0.3rem"}}>CORRECTIONS:</div>
             {wrong.map(item => (
               <div key={item} style={{fontSize:"0.78rem",color:T.text}}>
-                <strong>{item}</strong> → {zones[correctMap[item]]}
+                <strong>{item}</strong> → {correctMap[item]==="distractor" ? "does not belong anywhere" : zones[correctMap[item]]}
               </div>
             ))}
           </div>
@@ -560,7 +574,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
       if (q.type === "plotpoint") return sel === JSON.stringify(Array.isArray(q.answer)?q.answer:(()=>{try{return JSON.parse(q.answer);}catch{return null;}})());
       if (q.type === "multiselect") { try { return JSON.stringify([...JSON.parse(sel)].sort())===JSON.stringify([...(Array.isArray(q.answer)?q.answer:[])].sort()); } catch { return false; } }
       if (q.type === "keypad") return String(q.answer??"").trim().toLowerCase()===String(sel).trim().toLowerCase();
-      if (q.type === "dragdrop") { try { const given=JSON.parse(sel); const correct=q.correct||q.answer||{}; return (q.items||[]).every(item=>given[item]===correct[item]); } catch { return false; } }
+      if (q.type === "dragdrop") { try { const given=JSON.parse(sel); const correct=q.correct||q.answer||{}; return (q.items||[]).every(item=>{const c=correct[item]; if(c==="distractor") return given[item]===undefined; return given[item]===c;}); } catch { return false; } }
       return sel === q.correct;
     }
     const isCorrect = gradeIt(curQ, selected);
@@ -796,7 +810,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
           {revealed && (() => {
               let isOk;
               if (q.type === "dragdrop") {
-                try { const g=JSON.parse(selected); const cm=q.correct||q.answer||{}; isOk=(q.items||[]).every(item=>g[item]===cm[item]); } catch { isOk=false; }
+                try { const g=JSON.parse(selected); const cm=q.correct||q.answer||{}; isOk=(q.items||[]).every(item=>{const c=cm[item]; if(c==="distractor") return g[item]===undefined; return g[item]===c;}); } catch { isOk=false; }
               } else if (q.type === "multiselect") {
                 try { isOk = JSON.stringify([...JSON.parse(selected)].sort()) === correct; } catch { isOk = false; }
               } else if (q.type === "keypad") {
@@ -1259,7 +1273,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
       return String(q.answer ?? "").trim().toLowerCase() === String(given).trim().toLowerCase();
     }
     if (q.type === "dragdrop") {
-      try { const g=JSON.parse(given); const correct=q.correct||q.answer||{}; return (q.items||[]).every(item=>g[item]===correct[item]); } catch { return false; }
+      try { const g=JSON.parse(given); const correct=q.correct||q.answer||{}; return (q.items||[]).every(item=>{const c=correct[item]; if(c==="distractor") return g[item]===undefined; return g[item]===c;}); } catch { return false; }
     }
     return given === q.correct;
   }

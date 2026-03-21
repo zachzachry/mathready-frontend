@@ -213,7 +213,7 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
     if (isPlot)     return Array.isArray(q.answer) && q.answer.length === 2;
     if (isKeypad)   return q.answer != null && String(q.answer).trim() !== "";
     if (isMulti)    return Array.isArray(q.answer) && q.answer.length >= 2 && q.choices.filter(c=>c).length >= 4;
-    if (isDragDrop) { const filledItems=(q.items||[]).filter(x=>x.trim()); const cor=typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{}; return (q.zones||[]).length>=2 && filledItems.length>=2 && filledItems.every(item=>cor[item]!==undefined); }
+    if (isDragDrop) { const fi=(q.items||[]).filter(x=>x.trim()); const cor=typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{}; const zoneHasItem=(q.zones||[]).every((_,zi)=>fi.some(it=>cor[it]===zi)); return (q.zones||[]).length>=2 && fi.length>=2 && fi.every(item=>cor[item]!==undefined) && zoneHasItem; }
     return q.choices.filter(c=>c).length === 4 && !!q.correct;
   })();
 
@@ -451,9 +451,10 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
                     }} placeholder={`Item ${i+1}`}/>
                   <select style={{flex:1,padding:"0.45rem 0.5rem",border:`1px solid ${T.border}`,borderRadius:T.xs,fontSize:"0.78rem",background:T.surface}}
                     value={(q.correct||{})[item]??""}
-                    onChange={e=>{const c={...(typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{}),[item]:Number(e.target.value)};update("correct",c);}}>
+                    onChange={e=>{const v=e.target.value; const c={...(typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{})}; if(v==="") {delete c[item];} else if(v==="distractor") {c[item]="distractor";} else {c[item]=Number(v);} update("correct",c);}}>
                     <option value="">— assign zone —</option>
                     {(q.zones||[]).map((z,zi)=><option key={zi} value={zi}>{z}</option>)}
+                    <option value="distractor">🚫 Distractor (unused)</option>
                   </select>
                   {(q.items||[]).length>1 && <button onClick={()=>{
                     const items=(q.items||[]).filter((_,j)=>j!==i);
@@ -580,7 +581,7 @@ export default function QuestionBuilder() {
       if (q.type === "plotpoint") return Array.isArray(q.answer) && q.answer.length === 2;
       if (q.type === "keypad")    return q.answer != null && String(q.answer).trim() !== "";
       if (q.type === "multiselect") return Array.isArray(q.answer) && q.answer.length >= 2 && q.choices.filter(c=>c).length >= 4;
-      if (q.type === "dragdrop") { const filledItems=(q.items||[]).filter(x=>x.trim()); const cor=typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{}; return (q.zones||[]).length>=2 && filledItems.length>=2 && filledItems.every(item=>cor[item]!==undefined); }
+      if (q.type === "dragdrop") { const fi=(q.items||[]).filter(x=>x.trim()); const cor=typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{}; const zoneHasItem=(q.zones||[]).every((_,zi)=>fi.some(it=>cor[it]===zi)); return (q.zones||[]).length>=2 && fi.length>=2 && fi.every(item=>cor[item]!==undefined) && zoneHasItem; }
       return q.choices.filter(c=>c).length === 4 && q.correct;
     });
     if (complete_qs.length === 0) return;
@@ -747,7 +748,7 @@ export default function QuestionBuilder() {
     if (q.type === "plotpoint") return Array.isArray(q.answer) && q.answer.length === 2;
     if (q.type === "keypad")    return q.answer != null && String(q.answer).trim() !== "";
     if (q.type === "multiselect") return Array.isArray(q.answer) && q.answer.length >= 2 && q.choices.filter(c=>c).length >= 4;
-    if (q.type === "dragdrop") { const fi=(q.items||[]).filter(x=>x.trim()); const cor=typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{}; return (q.zones||[]).length>=2 && fi.length>=2 && fi.every(item=>cor[item]!==undefined); }
+    if (q.type === "dragdrop") { const fi=(q.items||[]).filter(x=>x.trim()); const cor=typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{}; const zoneHasItem=(q.zones||[]).every((_,zi)=>fi.some(it=>cor[it]===zi)); return (q.zones||[]).length>=2 && fi.length>=2 && fi.every(item=>cor[item]!==undefined) && zoneHasItem; }
     return q.choices.filter(c=>c).length === 4 && q.correct;
   }).length;
 
