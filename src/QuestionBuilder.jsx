@@ -213,7 +213,7 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
     if (isPlot)     return Array.isArray(q.answer) && q.answer.length === 2;
     if (isKeypad)   return q.answer != null && String(q.answer).trim() !== "";
     if (isMulti)    return Array.isArray(q.answer) && q.answer.length >= 2 && q.choices.filter(c=>c).length >= 4;
-    if (isDragDrop) { const fi=(q.items||[]).filter(x=>x.trim()); const cor=typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{}; const zoneHasItem=(q.zones||[]).every((_,zi)=>fi.some(it=>cor[it]===zi)); return (q.zones||[]).length>=2 && fi.length>=2 && fi.every(item=>cor[item]!==undefined) && zoneHasItem; }
+    if (isDragDrop) { const fi=(q.items||[]).filter(x=>x.trim()); const cor=typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{}; const hasReal=fi.some(item=>typeof cor[item]==="number"); const noDupes=new Set(fi.map(x=>x.trim())).size===fi.length; return (q.zones||[]).length>=2 && fi.length>=2 && fi.every(item=>cor[item]!==undefined) && hasReal && noDupes; }
     return q.choices.filter(c=>c).length === 4 && !!q.correct;
   })();
 
@@ -439,9 +439,12 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
 
             <label style={lbl}>{(q.ddLayout||"categories")==="blanks"?"ANSWER TILES":"DRAG ITEMS"} <span style={{fontWeight:400,color:T.textMuted}}>— {(q.ddLayout||"categories")==="blanks"?"options students drag into blanks (include distractors)":"assign each to its correct zone"}</span></label>
             <div style={{display:"flex",flexDirection:"column",gap:"0.4rem"}}>
-              {(q.items||[""]).map((item,i)=>(
+              {(q.items||[""]).map((item,i)=>{
+                const isDupe=item.trim()&&(q.items||[]).filter(x=>x.trim()===item.trim()).length>1;
+                return (
                 <div key={i} style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
-                  <input style={{flex:2,padding:"0.45rem 0.65rem",border:`1px solid ${T.border}`,borderRadius:T.xs,fontSize:"0.85rem",background:T.surface,boxSizing:"border-box"}}
+                  <input style={{flex:2,padding:"0.45rem 0.65rem",border:`1px solid ${isDupe?"#c0392b":T.border}`,borderRadius:T.xs,fontSize:"0.85rem",background:isDupe?"#fdf2f2":T.surface,boxSizing:"border-box"}}
+                    title={isDupe?"Duplicate item name — each item must be unique":""}
                     value={item} onChange={e=>{
                       const oldVal=item; const newVal=e.target.value;
                       const it=[...(q.items||[])];it[i]=newVal;
@@ -463,7 +466,7 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
                     onChange({...q,items,correct});
                   }} style={{border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"3px 8px",cursor:"pointer",fontSize:"0.75rem",color:"#8b1a1a",background:"#fdf2f2"}}>✕</button>}
                 </div>
-              ))}
+              );})}
               <button onClick={()=>update("items",[...(q.items||[]),""])}
                 style={{alignSelf:"flex-start",border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"4px 12px",cursor:"pointer",fontSize:"0.75rem",fontWeight:600,background:T.surfaceAlt,color:T.text}}>+ Add Item</button>
             </div>
@@ -589,7 +592,7 @@ export default function QuestionBuilder() {
       if (q.type === "plotpoint") return Array.isArray(q.answer) && q.answer.length === 2;
       if (q.type === "keypad")    return q.answer != null && String(q.answer).trim() !== "";
       if (q.type === "multiselect") return Array.isArray(q.answer) && q.answer.length >= 2 && q.choices.filter(c=>c).length >= 4;
-      if (q.type === "dragdrop") { const fi=(q.items||[]).filter(x=>x.trim()); const cor=typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{}; const zoneHasItem=(q.zones||[]).every((_,zi)=>fi.some(it=>cor[it]===zi)); return (q.zones||[]).length>=2 && fi.length>=2 && fi.every(item=>cor[item]!==undefined) && zoneHasItem; }
+      if (q.type === "dragdrop") { const fi=(q.items||[]).filter(x=>x.trim()); const cor=typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{}; const hasReal=fi.some(item=>typeof cor[item]==="number"); const noDupes=new Set(fi.map(x=>x.trim())).size===fi.length; return (q.zones||[]).length>=2 && fi.length>=2 && fi.every(item=>cor[item]!==undefined) && hasReal && noDupes; }
       return q.choices.filter(c=>c).length === 4 && q.correct;
     });
     if (complete_qs.length === 0) return;
@@ -756,7 +759,7 @@ export default function QuestionBuilder() {
     if (q.type === "plotpoint") return Array.isArray(q.answer) && q.answer.length === 2;
     if (q.type === "keypad")    return q.answer != null && String(q.answer).trim() !== "";
     if (q.type === "multiselect") return Array.isArray(q.answer) && q.answer.length >= 2 && q.choices.filter(c=>c).length >= 4;
-    if (q.type === "dragdrop") { const fi=(q.items||[]).filter(x=>x.trim()); const cor=typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{}; const zoneHasItem=(q.zones||[]).every((_,zi)=>fi.some(it=>cor[it]===zi)); return (q.zones||[]).length>=2 && fi.length>=2 && fi.every(item=>cor[item]!==undefined) && zoneHasItem; }
+    if (q.type === "dragdrop") { const fi=(q.items||[]).filter(x=>x.trim()); const cor=typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{}; const hasReal=fi.some(item=>typeof cor[item]==="number"); const noDupes=new Set(fi.map(x=>x.trim())).size===fi.length; return (q.zones||[]).length>=2 && fi.length>=2 && fi.every(item=>cor[item]!==undefined) && hasReal && noDupes; }
     return q.choices.filter(c=>c).length === 4 && q.correct;
   }).length;
 
