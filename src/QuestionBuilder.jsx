@@ -191,10 +191,11 @@ function PasteImageZone({ image, onImage, onClear, placeholder }) {
 function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, isFirst, isLast }) {
   const [open, setOpen]         = useState(index === 0);
   const [suggestion, setSuggestion] = useState(null);
-  const isPlot   = q.type === "plotpoint";
-  const isMulti  = q.type === "multiselect";
-  const isKeypad = q.type === "keypad";
-  const isMCQ    = !isPlot && !isMulti && !isKeypad;
+  const isPlot     = q.type === "plotpoint";
+  const isMulti    = q.type === "multiselect";
+  const isKeypad   = q.type === "keypad";
+  const isDragDrop = q.type === "dragdrop";
+  const isMCQ      = !isPlot && !isMulti && !isKeypad && !isDragDrop;
 
   function update(field, value)  { onChange({ ...q, [field]: value }); }
   function updateChoice(i, val)  { const c=[...q.choices]; c[i]=val; update("choices",c); }
@@ -209,9 +210,10 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
 
   const isComplete = (() => {
     if (!q.question || !q.standard || !q.dok) return false;
-    if (isPlot)   return Array.isArray(q.answer) && q.answer.length === 2;
-    if (isKeypad) return q.answer != null && String(q.answer).trim() !== "";
-    if (isMulti)  return Array.isArray(q.answer) && q.answer.length >= 2 && q.choices.filter(c=>c).length >= 4;
+    if (isPlot)     return Array.isArray(q.answer) && q.answer.length === 2;
+    if (isKeypad)   return q.answer != null && String(q.answer).trim() !== "";
+    if (isMulti)    return Array.isArray(q.answer) && q.answer.length >= 2 && q.choices.filter(c=>c).length >= 4;
+    if (isDragDrop) { const filledItems=(q.items||[]).filter(x=>x.trim()); const cor=typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{}; return (q.zones||[]).length>=2 && filledItems.length>=2 && filledItems.every(item=>cor[item]!==undefined); }
     return q.choices.filter(c=>c).length === 4 && !!q.correct;
   })();
 
@@ -295,8 +297,11 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
           {/* Question type toggle */}
           <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
             <span style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary}}>QUESTION TYPE</span>
-            {[["mcq","📝 Multiple Choice"],["multiselect","☑ Multi-Select"],["keypad","🔢 Numeric Answer"],["plotpoint","📍 Plot a Point"]].map(([t,lbl2])=>(
-              <button key={t} onClick={()=>update("type",t)}
+            {[["mcq","📝 Multiple Choice"],["multiselect","☑ Multi-Select"],["keypad","🔢 Numeric Answer"],["plotpoint","📍 Plot a Point"],["dragdrop","🔀 Drag & Drop"]].map(([t,lbl2])=>(
+              <button key={t} onClick={()=>{
+                if(t==="dragdrop") onChange({...q,type:t,zones:q.zones||["Category 1","Category 2"],items:q.items||[""],correct:(typeof q.correct==="object"&&!Array.isArray(q.correct))?q.correct:{}});
+                else update("type",t);
+              }}
                 style={{padding:"5px 12px",borderRadius:T.xs,border:`2px solid ${q.type===t?T.teal:T.border}`,background:q.type===t?T.teal:T.surface,color:q.type===t?T.white:T.textSecondary,fontSize:"0.78rem",fontWeight:700,cursor:"pointer"}}>
                 {lbl2}
               </button>
@@ -405,6 +410,56 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
           </div>
           )}
 
+          {/* Answer — Drag & Drop */}
+          {isDragDrop && (
+          <div>
+            <label style={lbl}>DROP ZONES <span style={{fontWeight:400,color:T.textMuted}}>— categories students will sort items into</span></label>
+            <div style={{display:"flex",flexDirection:"column",gap:"0.4rem",marginBottom:"0.75rem"}}>
+              {(q.zones||["Category 1","Category 2"]).map((zone,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
+                  <span style={{fontSize:"0.72rem",fontWeight:700,color:T.midnight,width:"20px"}}>{i+1}.</span>
+                  <input style={{flex:1,padding:"0.45rem 0.65rem",border:`1px solid ${T.border}`,borderRadius:T.xs,fontSize:"0.85rem",background:T.surface,boxSizing:"border-box"}}
+                    value={zone} onChange={e=>{const z=[...(q.zones||[])];z[i]=e.target.value;update("zones",z);}} placeholder={`Category ${i+1}`}/>
+                  {(q.zones||[]).length>2 && <button onClick={()=>update("zones",(q.zones||[]).filter((_,j)=>j!==i))}
+                    style={{border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"3px 8px",cursor:"pointer",fontSize:"0.75rem",color:"#8b1a1a",background:"#fdf2f2"}}>✕</button>}
+                </div>
+              ))}
+              <button onClick={()=>update("zones",[...(q.zones||[]),`Category ${(q.zones||[]).length+1}`])}
+                style={{alignSelf:"flex-start",border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"4px 12px",cursor:"pointer",fontSize:"0.75rem",fontWeight:600,background:T.surfaceAlt,color:T.text}}>+ Add Zone</button>
+            </div>
+
+            <label style={lbl}>DRAG ITEMS <span style={{fontWeight:400,color:T.textMuted}}>— assign each to its correct zone</span></label>
+            <div style={{display:"flex",flexDirection:"column",gap:"0.4rem"}}>
+              {(q.items||[""]).map((item,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
+                  <input style={{flex:2,padding:"0.45rem 0.65rem",border:`1px solid ${T.border}`,borderRadius:T.xs,fontSize:"0.85rem",background:T.surface,boxSizing:"border-box"}}
+                    value={item} onChange={e=>{
+                      const oldVal=item; const newVal=e.target.value;
+                      const it=[...(q.items||[])];it[i]=newVal;
+                      const cor={...(typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{})};
+                      if(oldVal in cor){cor[newVal]=cor[oldVal];delete cor[oldVal];}
+                      onChange({...q,items:it,correct:cor});
+                    }} placeholder={`Item ${i+1}`}/>
+                  <select style={{flex:1,padding:"0.45rem 0.5rem",border:`1px solid ${T.border}`,borderRadius:T.xs,fontSize:"0.78rem",background:T.surface}}
+                    value={(q.correct||{})[item]??""}
+                    onChange={e=>{const c={...(typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{}),[item]:Number(e.target.value)};update("correct",c);}}>
+                    <option value="">— assign zone —</option>
+                    {(q.zones||[]).map((z,zi)=><option key={zi} value={zi}>{z}</option>)}
+                  </select>
+                  {(q.items||[]).length>1 && <button onClick={()=>{
+                    const items=(q.items||[]).filter((_,j)=>j!==i);
+                    const correct={...(typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{})};
+                    delete correct[item];
+                    onChange({...q,items,correct});
+                  }} style={{border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"3px 8px",cursor:"pointer",fontSize:"0.75rem",color:"#8b1a1a",background:"#fdf2f2"}}>✕</button>}
+                </div>
+              ))}
+              <button onClick={()=>update("items",[...(q.items||[]),""])}
+                style={{alignSelf:"flex-start",border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"4px 12px",cursor:"pointer",fontSize:"0.75rem",fontWeight:600,background:T.surfaceAlt,color:T.text}}>+ Add Item</button>
+            </div>
+          </div>
+          )}
+
           {/* Live preview */}
           {(q.question || q.questionImage) && (
             <div style={{ borderTop: "1px solid #eef1f4", paddingTop: "1rem" }}>
@@ -424,6 +479,19 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
                   <div style={{marginTop:"0.5rem"}}>
                     <PlotGrid answer={q.answer} placed={q.answer} readOnly size={220}/>
                     {q.answer && <div style={{fontSize:"0.78rem",color:T.success,marginTop:"4px",fontWeight:700}}>Answer: ({q.answer[0]}, {q.answer[1]})</div>}
+                  </div>
+                ) : isDragDrop ? (
+                  <div style={{marginTop:"0.5rem"}}>
+                    <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min((q.zones||[]).length,3)},1fr)`,gap:"0.5rem"}}>
+                      {(q.zones||[]).map((zone,zi)=>(
+                        <div key={zi} style={{border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"0.5rem",background:T.white}}>
+                          <div style={{fontSize:"0.65rem",fontWeight:700,color:T.midnight,textAlign:"center",borderBottom:`1px solid ${T.border}`,paddingBottom:"0.3rem",marginBottom:"0.3rem"}}>{zone}</div>
+                          {(q.items||[]).filter(item=>(q.correct||{})[item]===zi).map(item=>(
+                            <div key={item} style={{fontSize:"0.75rem",background:"#e3edf7",borderRadius:"3px",padding:"3px 8px",marginBottom:"2px",fontWeight:600}}>{item}</div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -503,6 +571,7 @@ export default function QuestionBuilder() {
       if (q.type === "plotpoint") return Array.isArray(q.answer) && q.answer.length === 2;
       if (q.type === "keypad")    return q.answer != null && String(q.answer).trim() !== "";
       if (q.type === "multiselect") return Array.isArray(q.answer) && q.answer.length >= 2 && q.choices.filter(c=>c).length >= 4;
+      if (q.type === "dragdrop") { const filledItems=(q.items||[]).filter(x=>x.trim()); const cor=typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{}; return (q.zones||[]).length>=2 && filledItems.length>=2 && filledItems.every(item=>cor[item]!==undefined); }
       return q.choices.filter(c=>c).length === 4 && q.correct;
     });
     if (complete_qs.length === 0) return;
@@ -515,7 +584,7 @@ export default function QuestionBuilder() {
           ...q,
           type: (Array.isArray(q.answer) && q.answer.length === 2 && q.choices.filter(c=>c).length === 0)
             ? "plotpoint"
-          : (["multiselect","keypad","plotpoint","mcq"].includes(q.type) ? q.type : "mcq")
+          : (["multiselect","keypad","plotpoint","dragdrop","mcq"].includes(q.type) ? q.type : "mcq")
         };
         await fetch(`${API}/questions`, {
           method: "POST",
@@ -669,6 +738,7 @@ export default function QuestionBuilder() {
     if (q.type === "plotpoint") return Array.isArray(q.answer) && q.answer.length === 2;
     if (q.type === "keypad")    return q.answer != null && String(q.answer).trim() !== "";
     if (q.type === "multiselect") return Array.isArray(q.answer) && q.answer.length >= 2 && q.choices.filter(c=>c).length >= 4;
+    if (q.type === "dragdrop") { const fi=(q.items||[]).filter(x=>x.trim()); const cor=typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{}; return (q.zones||[]).length>=2 && fi.length>=2 && fi.every(item=>cor[item]!==undefined); }
     return q.choices.filter(c=>c).length === 4 && q.correct;
   }).length;
 

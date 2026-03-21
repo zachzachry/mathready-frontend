@@ -7,6 +7,106 @@ import { QUESTIONS as FALLBACK_QUESTIONS, START_SECS, LETTERS, S, T, pct, lvl, l
 import { buildWeightMap, updateSessionWeights, pickAdaptiveQuestion, ALL_STANDARDS } from "./adaptive";
 import PlotGrid from "./shared/PlotGrid";
 
+/* ── Drag-and-Drop Answer Component ─────────────────────── */
+function DragDropAnswer({ zones=[], items=[], value, onChange, revealed, correctMap }) {
+  // value is a JSON string mapping item→zoneIndex, e.g. {"Melting ice":0,"Burning wood":1}
+  const placement = (() => { try { return value ? JSON.parse(value) : {}; } catch { return {}; } })();
+  const [dragging, setDragging] = useState(null);
+
+  function handleDrop(zoneIdx) {
+    if (revealed || !dragging) return;
+    const next = { ...placement, [dragging]: zoneIdx };
+    onChange(JSON.stringify(next));
+    setDragging(null);
+  }
+
+  function removeItem(item) {
+    if (revealed) return;
+    const next = { ...placement };
+    delete next[item];
+    onChange(JSON.stringify(next));
+  }
+
+  const unplaced = items.filter(item => placement[item] === undefined);
+
+  return (
+    <div>
+      <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"0.75rem"}}>
+        DRAG ITEMS INTO THE CORRECT CATEGORY
+      </div>
+
+      {/* Unplaced items (drag source) */}
+      <div style={{display:"flex",flexWrap:"wrap",gap:"0.4rem",marginBottom:"1rem",minHeight:"40px",padding:"0.6rem",background:T.surface,borderRadius:T.xs,border:`1px dashed ${T.border}`}}>
+        {unplaced.length === 0 && !revealed && <span style={{fontSize:"0.75rem",color:T.textMuted,fontStyle:"italic"}}>All items placed</span>}
+        {unplaced.map(item => (
+          <div key={item}
+            draggable={!revealed}
+            onDragStart={() => setDragging(item)}
+            onTouchStart={() => setDragging(item)}
+            style={{background:T.midnight,color:T.white,borderRadius:T.xs,padding:"0.45rem 0.85rem",fontSize:"0.82rem",fontWeight:600,cursor:revealed?"default":"grab",userSelect:"none"}}>
+            <MathText text={item}/>
+          </div>
+        ))}
+      </div>
+
+      {/* Drop zones */}
+      <div style={{display:"grid",gridTemplateColumns:zones.length<=3?`repeat(${zones.length},1fr)`:"repeat(2,1fr)",gap:"0.6rem"}}>
+        {zones.map((zone, zIdx) => {
+          const zoneItems = items.filter(item => placement[item] === zIdx);
+          const isOver = dragging !== null;
+          return (
+            <div key={zIdx}
+              onDragOver={e => { e.preventDefault(); }}
+              onDrop={() => handleDrop(zIdx)}
+              onTouchEnd={() => { if (dragging) handleDrop(zIdx); }}
+              style={{border:`2px ${isOver?"dashed":"solid"} ${T.border}`,borderRadius:"6px",padding:"0.6rem",minHeight:"100px",background:T.white,transition:"border-color .15s"}}>
+              <div style={{fontSize:"0.68rem",fontWeight:700,letterSpacing:"0.08em",color:T.midnight,marginBottom:"0.5rem",textAlign:"center",borderBottom:`1px solid ${T.border}`,paddingBottom:"0.4rem"}}>
+                {zone}
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:"0.3rem"}}>
+                {zoneItems.map(item => {
+                  let bg = "#e3edf7", border = `1px solid ${T.midnight}33`, textColor = T.text;
+                  if (revealed && correctMap) {
+                    const isRight = correctMap[item] === zIdx;
+                    bg = isRight ? T.successBg : T.dangerBg;
+                    border = `1px solid ${isRight ? T.success : T.dangerText}`;
+                    textColor = isRight ? T.success : T.dangerText;
+                  }
+                  return (
+                    <div key={item} style={{display:"flex",alignItems:"center",gap:"0.4rem",background:bg,border,borderRadius:T.xs,padding:"0.35rem 0.6rem"}}>
+                      <span style={{flex:1,fontSize:"0.8rem",fontWeight:600,color:textColor}}><MathText text={item}/></span>
+                      {!revealed && <button onClick={() => removeItem(item)} style={{background:"none",border:"none",cursor:"pointer",color:T.textMuted,fontSize:"0.75rem",padding:"0 2px"}}>✕</button>}
+                      {revealed && correctMap && (
+                        <span style={{fontSize:"0.7rem",fontWeight:700}}>{correctMap[item]===zIdx?"✓":"✗"}</span>
+                      )}
+                    </div>
+                  );
+                })}
+                {zoneItems.length===0 && <div style={{fontSize:"0.72rem",color:T.textMuted,textAlign:"center",padding:"0.5rem",fontStyle:"italic"}}>Drop here</div>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Show misplaced items' correct zones after reveal */}
+      {revealed && correctMap && (() => {
+        const wrong = items.filter(item => placement[item] !== correctMap[item]);
+        if (wrong.length === 0) return null;
+        return (
+          <div style={{marginTop:"0.75rem",padding:"0.6rem",background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:T.xs}}>
+            <div style={{fontSize:"0.65rem",fontWeight:700,color:T.dangerText,marginBottom:"0.3rem"}}>CORRECTIONS:</div>
+            {wrong.map(item => (
+              <div key={item} style={{fontSize:"0.78rem",color:T.text}}>
+                <strong>{item}</strong> → {zones[correctMap[item]]}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
 
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
 
@@ -20,6 +120,7 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
   const [testInfo,   setTestInfo]   = useState(null);
   const [student,    setStudent]    = useState(null);
   const [cls,        setCls]        = useState(null);
+  const [studentAssignments, setStudentAssignments] = useState([]);
   // skip google step if credential already provided from home screen sign-in
   const [step, setStep] = useState(prefillCredential ? (prefillCode ? "code" : "choice") : "google");
   const googleBtnRef = useRef(null);
@@ -50,6 +151,29 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
       });
     }
   }, [step, googleReady]); // eslint-disable-line
+
+  // Fetch student assignments when reaching choice screen
+  useEffect(() => {
+    if (step !== "choice" || !credential) return;
+    (async () => {
+      try {
+        // First get student identity
+        const r = await fetch(`${API}/auth/google/drill`, {
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({ token: credential }),
+        });
+        const d = await r.json();
+        if (r.ok && d.student) {
+          setStudent(d.student);
+          setCls(d.cls);
+          // Then fetch their assignments
+          const ar = await fetch(`${API}/assignments/student/${d.student.id}`);
+          const ad = await ar.json();
+          setStudentAssignments(ad.assignments || []);
+        }
+      } catch {}
+    })();
+  }, [step, credential]);
 
   // Step 2 — validate test code + verify stored credential against roster
   async function checkCode() {
@@ -144,14 +268,35 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
               <div style={{fontSize:"0.8rem",color:T.textSecondary}}>3-min adaptive fact practice</div>
             </div>
           </button>
-          <button onClick={()=>{setErr(""); setStep("code");}} disabled={checking}
-            style={{background:T.white,border:`2px solid ${T.midnight}`,borderRadius:T.r,padding:"1.5rem 2rem",cursor:"pointer",display:"flex",alignItems:"center",gap:"1.25rem",boxShadow:"0 2px 8px rgba(0,0,0,.06)",textAlign:"left",opacity:checking?0.6:1}}>
-            <div style={{width:"52px",height:"52px",borderRadius:"50%",background:T.surfaceAlt,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.6rem",flexShrink:0}}>📝</div>
-            <div>
-              <div style={{fontSize:"1.1rem",fontWeight:700,color:T.midnight,marginBottom:"3px"}}>Take a Test</div>
-              <div style={{fontSize:"0.8rem",color:T.textSecondary}}>Enter the code from your teacher</div>
+          {/* Assigned tests */}
+          {studentAssignments.map(a => (
+            <button key={a.assignmentId} onClick={async () => {
+              setChecking(true); setErr("");
+              try {
+                setTestInfo({
+                  found: true, questions: a.questions, title: a.testTitle,
+                  adaptive: a.adaptive, untimed: a.untimed,
+                  timeLimitSecs: a.timeLimitSecs, warnSecs: a.warnSecs,
+                  oneAttempt: a.oneAttempt,
+                });
+                setCode(a.testCode);
+                setStep("confirm");
+              } catch { setErr("Failed to load test."); }
+              setChecking(false);
+            }} disabled={checking}
+              style={{background:T.white,border:`2px solid #2e7d32`,borderRadius:T.r,padding:"1.5rem 2rem",cursor:"pointer",display:"flex",alignItems:"center",gap:"1.25rem",boxShadow:"0 2px 8px rgba(0,0,0,.06)",textAlign:"left",opacity:checking?0.6:1}}>
+              <div style={{width:"52px",height:"52px",borderRadius:"50%",background:"#e8f5e9",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.6rem",flexShrink:0}}>📝</div>
+              <div>
+                <div style={{fontSize:"1.1rem",fontWeight:700,color:"#2e7d32",marginBottom:"3px"}}>{a.testTitle}</div>
+                <div style={{fontSize:"0.8rem",color:T.textSecondary}}>Assigned by your teacher — click to start</div>
+              </div>
+            </button>
+          ))}
+          {studentAssignments.length === 0 && (
+            <div style={{textAlign:"center",fontSize:"0.82rem",color:T.textSecondary,padding:"0.5rem",lineHeight:1.6}}>
+              No test assigned right now. Check with your teacher.
             </div>
-          </button>
+          )}
           {err && <div style={{...S.errBox}}>⚠ {err}</div>}
         </div>
       </div>
@@ -312,6 +457,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
       if (q.type === "plotpoint") return sel === JSON.stringify(Array.isArray(q.answer)?q.answer:(()=>{try{return JSON.parse(q.answer);}catch{return null;}})());
       if (q.type === "multiselect") { try { return JSON.stringify([...JSON.parse(sel)].sort())===JSON.stringify([...(Array.isArray(q.answer)?q.answer:[])].sort()); } catch { return false; } }
       if (q.type === "keypad") return String(q.answer??"").trim().toLowerCase()===String(sel).trim().toLowerCase();
+      if (q.type === "dragdrop") { try { const given=JSON.parse(sel); const correct=q.correct||q.answer||{}; return (q.items||[]).every(item=>given[item]===correct[item]); } catch { return false; } }
       return sel === q.correct;
     }
     const isCorrect = gradeIt(curQ, selected);
@@ -459,6 +605,23 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
                 </button>
               )}
             </div>
+          ) : q.type === "dragdrop" ? (
+            <div>
+              <DragDropAnswer
+                zones={q.zones||[]}
+                items={q.items||[]}
+                value={selected}
+                onChange={v => handleChoose(v)}
+                revealed={revealed}
+                correctMap={revealed ? (q.correct||q.answer||{}) : null}
+              />
+              {!revealed && selected && (
+                <button onClick={() => handleChoose(selected)}
+                  style={{background:T.midnight,color:T.white,border:"none",borderRadius:"4px",padding:"0.65rem 1.25rem",fontSize:"0.9rem",fontWeight:700,cursor:"pointer",marginTop:"0.75rem"}}>
+                  Submit →
+                </button>
+              )}
+            </div>
           ) : q.type === "multiselect" ? (
             <div style={{display:"flex",flexDirection:"column",gap:"0.6rem"}}>
               <div style={{fontSize:"0.7rem",color:T.textSecondary,marginBottom:"4px"}}>Select all that apply.</div>
@@ -528,14 +691,18 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
           {/* Feedback banner */}
           {revealed && (() => {
               let isOk;
-              if (q.type === "multiselect") {
+              if (q.type === "dragdrop") {
+                try { const g=JSON.parse(selected); const cm=q.correct||q.answer||{}; isOk=(q.items||[]).every(item=>g[item]===cm[item]); } catch { isOk=false; }
+              } else if (q.type === "multiselect") {
                 try { isOk = JSON.stringify([...JSON.parse(selected)].sort()) === correct; } catch { isOk = false; }
               } else if (q.type === "keypad") {
                 isOk = String(selected??"").trim().toLowerCase() === correct;
               } else {
                 isOk = selected === correct;
               }
-              const correctLabel = q.type==="multiselect"
+              const correctLabel = q.type==="dragdrop"
+                ? "See corrections above"
+                : q.type==="multiselect"
                 ? (Array.isArray(q.answer)?q.answer:[]).join(", ")
                 : q.type==="keypad" ? String(q.answer??"")
                 : correct;
@@ -557,7 +724,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
             <div style={{display:"flex",gap:"0.75rem"}}>
               <button onClick={handleNext}
                 style={{flex:1,background:T.midnight,border:"none",borderRadius:"6px",padding:"0.85rem",fontSize:"0.95rem",cursor:"pointer",color:T.white,fontWeight:700}}>
-                {(q.type==="plotpoint"||q.type==="keypad"||q.type==="multiselect") && !revealed ? "Submit Answer →" : "Next Question →"}
+                {(q.type==="plotpoint"||q.type==="keypad"||q.type==="multiselect"||q.type==="dragdrop") && !revealed ? "Submit Answer →" : "Next Question →"}
               </button>
               <button onClick={handleQuit}
                 style={{background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:"6px",padding:"0.85rem 1.25rem",fontSize:"0.85rem",cursor:"pointer",color:T.textSecondary,fontWeight:600}}>
@@ -651,7 +818,7 @@ function normalizeQuestion(q) {
                          typeof answer[0] === "number" && typeof answer[1] === "number";
   const type = (q.type === "plotpoint" || (isPlotAnswer && !hasRealChoices))
     ? "plotpoint"
-    : (["multiselect","keypad"].includes(q.type) ? q.type : "mcq");
+    : (["multiselect","keypad","dragdrop"].includes(q.type) ? q.type : "mcq");
   return { ...q, type, answer };
 }
 
@@ -987,6 +1154,9 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
     if (q.type === "keypad") {
       return String(q.answer ?? "").trim().toLowerCase() === String(given).trim().toLowerCase();
     }
+    if (q.type === "dragdrop") {
+      try { const g=JSON.parse(given); const correct=q.correct||q.answer||{}; return (q.items||[]).every(item=>g[item]===correct[item]); } catch { return false; }
+    }
     return given === q.correct;
   }
 
@@ -1205,6 +1375,15 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
                   {sel && <div style={{fontSize:"0.72rem",color:T.textSecondary}}>Your answer: <strong>{sel}</strong></div>}
                 </div>
               </>
+            ) : q.type === "dragdrop" ? (
+              <DragDropAnswer
+                zones={q.zones||[]}
+                items={q.items||[]}
+                value={sel}
+                onChange={v => { setAns(p=>({...p,[q.id]:v})); handleAdaptiveAnswer(q.id, v); }}
+                revealed={false}
+                correctMap={null}
+              />
             ) : q.type === "multiselect" ? (
               <>
                 <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"4px"}}>SELECT ALL CORRECT ANSWERS</div>
