@@ -449,7 +449,14 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
                       const oldVal=item; const newVal=e.target.value;
                       const it=[...(q.items||[])];it[i]=newVal;
                       const cor={...(typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{})};
-                      if(oldVal in cor){cor[newVal]=cor[oldVal];delete cor[oldVal];}
+                      // Check if THIS item exclusively owned the old key (no other item shares the name)
+                      const ownedOldKey=oldVal.trim() && !(q.items||[]).some((x,j)=>j!==i && x===oldVal);
+                      if(ownedOldKey && oldVal in cor) {
+                        const saved=cor[oldVal];
+                        delete cor[oldVal];
+                        // Only carry to new key if no other item already has that name
+                        if(newVal.trim() && !it.some((x,j)=>j!==i && x===newVal)) cor[newVal]=saved;
+                      }
                       onChange({...q,items:it,correct:cor});
                     }} placeholder={`Item ${i+1}`}/>
                   <select style={{flex:1,padding:"0.45rem 0.5rem",border:`1px solid ${T.border}`,borderRadius:T.xs,fontSize:"0.78rem",background:T.surface}}
