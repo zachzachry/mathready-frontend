@@ -296,17 +296,20 @@ export default function Dashboard({ teacher, readOnly }) {
   const [growthStudent, setGrowthStudent] = useState("all");
 
   const [bankQ, setBankQ] = useState(QUESTIONS);
+  const [savedTests, setSavedTests] = useState([]); // for code→name lookup
 
   const refresh = useCallback(async () => {
     try {
       const classFilter = teacher && teacher.classIds !== null && teacher.classIds.length > 0
         ? "?classIds="+teacher.classIds.join(",") : teacher && teacher.classIds !== null ? "?classIds=" : "";
-      const [s, r, q] = await Promise.all([
+      const [s, r, q, st] = await Promise.all([
         fetch(`${API}/sessions${classFilter}`).then(r=>r.json()),
         fetch(`${API}/roster${classFilter}`).then(r=>r.json()),
         fetch(`${API}/questions`).then(r=>r.json()).catch(()=>[]),
+        fetch(`${API}/tests/saved`).then(r=>r.json()).catch(()=>[]),
       ]);
       setSessions(Array.isArray(s) ? s : []);
+      if (Array.isArray(st)) setSavedTests(st);
       const rosterArr = Array.isArray(r) ? r : [];
       setRoster(rosterArr);
       if (Array.isArray(q) && q.length > 0) setBankQ(q);
@@ -363,13 +366,14 @@ export default function Dashboard({ teacher, readOnly }) {
   const drillSessions = sessions.filter(s => s.mode === "drill" || s.mode === "practice");
 
   // ── Overview stats (tests only) ──
-  // Build code→name map from sessions (testTitle stored alongside testCode)
+  // Build code→name map: primary source = saved test library, fallback = session's testTitle
   const testCodeNames = {};
+  savedTests.forEach(t => { if (t.code) testCodeNames[t.code] = t.name || t.title || t.code; });
   testSessions.forEach(s => {
     const code = s.testCode || s.code || "";
     if (code && !testCodeNames[code]) testCodeNames[code] = s.testTitle || s.testName || code;
   });
-  const testCodes = Object.keys(testCodeNames);
+  const testCodes = Object.keys(testCodeNames).filter(c => testSessions.some(s=>(s.testCode||s.code||"")===c));
   // Filter by selected test
   const filteredTestSessions = overviewTest === "all" ? testSessions
     : testSessions.filter(s=>(s.testCode||s.code||"")=== overviewTest);
@@ -494,18 +498,24 @@ export default function Dashboard({ teacher, readOnly }) {
             ))}
           </div>
           {testCodes.length > 0 && (
-            <div style={{display:"flex",alignItems:"center",gap:"0.5rem",flexWrap:"wrap"}}>
-              <span style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary}}>FILTER BY TEST:</span>
-              <select value={overviewTest} onChange={e=>{setOverviewTest(e.target.value);setSelected(null);}}
-                style={{fontSize:"0.78rem",padding:"0.3rem 0.5rem",border:`1px solid ${T.border}`,borderRadius:T.xs,background:T.white}}>
-                <option value="all">All Tests</option>
-                {testCodes.map(c=><option key={c} value={c}>{testCodeNames[c] !== c ? `${testCodeNames[c]} (${c})` : c}</option>)}
-              </select>
-              {overviewTest !== "all" && !readOnly && (
-                <button onClick={()=>setClearTestCode(overviewTest)}
-                  style={{fontSize:"0.68rem",fontWeight:700,color:"#8b1a1a",background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:T.xs,padding:"3px 10px",cursor:"pointer"}}>
-                  🗑 Clear "{testCodeNames[overviewTest]||overviewTest}" data
-                </button>
+            <div style={{display:"flex",alignItems:"flex-start",gap:"0.5rem",flexWrap:"wrap"}}>
+              <div style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
+                <span style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary}}>FILTER BY TEST:</span>
+                <select value={overviewTest} onChange={e=>{setOverviewTest(e.target.value);setSelected(null);}}
+                  style={{fontSize:"0.78rem",padding:"0.3rem 0.5rem",border:`1px solid ${T.border}`,borderRadius:T.xs,background:T.white}}>
+                  <option value="all">All Tests</option>
+                  {testCodes.map(c=><option key={c} value={c}>{testCodeNames[c] !== c ? `${testCodeNames[c]} (${c})` : c}</option>)}
+                </select>
+              </div>
+              {!readOnly && (
+                <div style={{display:"flex",flexWrap:"wrap",gap:"0.35rem"}}>
+                  {(overviewTest === "all" ? testCodes : [overviewTest]).map(c => (
+                    <button key={c} onClick={()=>setClearTestCode(c)}
+                      style={{fontSize:"0.65rem",fontWeight:600,color:"#8b1a1a",background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:T.xs,padding:"3px 9px",cursor:"pointer"}}>
+                      🗑 {testCodeNames[c]!==c ? testCodeNames[c] : c}
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
           )}
