@@ -284,6 +284,7 @@ export default function Dashboard({ teacher, readOnly }) {
   const [loading,  setLoading]  = useState(true);
   const [clearing, setClearing] = useState(false);
   const [clearModal, setClearModal] = useState(false);
+  const [clearTestCode, setClearTestCode] = useState(""); // for per-test clear
   const [roster,   setRoster]   = useState([]);
   const [fluencyReport, setFluencyReport] = useState([]);
   const [leaderboard,   setLeaderboard]   = useState([]);
@@ -329,6 +330,16 @@ export default function Dashboard({ teacher, readOnly }) {
   }, []);
 
   useEffect(() => { refresh(); const t=setInterval(refresh,3000); return()=>clearInterval(t); }, [refresh]);
+
+  async function handleClearByTest(code) {
+    setClearing(true); setClearTestCode("");
+    try {
+      await fetch(`${API}/sessions/test/${code}`, { method: "DELETE" });
+      setSessions(prev => prev.filter(s => (s.testCode||"").toUpperCase() !== code.toUpperCase()));
+      if (overviewTest === code) { setOverviewTest("all"); setSelected(null); }
+    } catch {}
+    setClearing(false);
+  }
 
   async function handleClearMode(mode) {
     setClearing(true); setClearModal(false);
@@ -482,14 +493,20 @@ export default function Dashboard({ teacher, readOnly }) {
               </div>
             ))}
           </div>
-          {testCodes.length > 1 && (
-            <div style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
+          {testCodes.length > 0 && (
+            <div style={{display:"flex",alignItems:"center",gap:"0.5rem",flexWrap:"wrap"}}>
               <span style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary}}>FILTER BY TEST:</span>
               <select value={overviewTest} onChange={e=>{setOverviewTest(e.target.value);setSelected(null);}}
                 style={{fontSize:"0.78rem",padding:"0.3rem 0.5rem",border:`1px solid ${T.border}`,borderRadius:T.xs,background:T.white}}>
                 <option value="all">All Tests</option>
                 {testCodes.map(c=><option key={c} value={c}>{testCodeNames[c] !== c ? `${testCodeNames[c]} (${c})` : c}</option>)}
               </select>
+              {overviewTest !== "all" && !readOnly && (
+                <button onClick={()=>setClearTestCode(overviewTest)}
+                  style={{fontSize:"0.68rem",fontWeight:700,color:"#8b1a1a",background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:T.xs,padding:"3px 10px",cursor:"pointer"}}>
+                  🗑 Clear "{testCodeNames[overviewTest]||overviewTest}" data
+                </button>
+              )}
             </div>
           )}
           <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,overflow:"hidden"}}>
@@ -1220,6 +1237,29 @@ export default function Dashboard({ teacher, readOnly }) {
     <div style={{display:"flex",flexDirection:"column",height:"100%",background:"#e8edf2",overflow:"hidden"}}>
 
       {/* Clear confirmation modal */}
+      {clearTestCode && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}>
+          <div style={{background:"#fff",borderRadius:"6px",maxWidth:"380px",width:"100%",overflow:"hidden",boxShadow:"0 8px 40px rgba(0,0,0,.3)"}}>
+            <div style={{background:"#7c3aed",color:"#fff",padding:"1.1rem 1.5rem"}}>
+              <div style={{fontWeight:700,fontSize:"1rem"}}>🗑 Clear Test Data</div>
+            </div>
+            <div style={{padding:"1.25rem 1.5rem",fontSize:"0.88rem",color:"#444",lineHeight:1.6}}>
+              Delete all sessions for <strong>{testCodeNames[clearTestCode]||clearTestCode}</strong> <span style={{fontFamily:"monospace",background:"#f0f4f8",padding:"1px 6px",borderRadius:"3px"}}>{clearTestCode}</span>?
+              <br/><br/>
+              <strong>{testSessions.filter(s=>(s.testCode||s.code||"").toUpperCase()===clearTestCode.toUpperCase()).length} session{testSessions.filter(s=>(s.testCode||s.code||"").toUpperCase()===clearTestCode.toUpperCase()).length!==1?"s":""}</strong> will be permanently removed. This cannot be undone.
+            </div>
+            <div style={{display:"flex",gap:"0.65rem",padding:"0.9rem 1.5rem",borderTop:"1px solid #eee"}}>
+              <button onClick={()=>setClearTestCode("")}
+                style={{flex:1,background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.55rem",fontSize:"0.85rem",cursor:"pointer",color:"#555",fontWeight:600}}>Cancel</button>
+              <button onClick={()=>handleClearByTest(clearTestCode)} disabled={clearing}
+                style={{flex:1,background:"#7c3aed",border:"none",borderRadius:"3px",padding:"0.55rem",fontSize:"0.85rem",cursor:"pointer",color:"#fff",fontWeight:700}}>
+                {clearing?"Clearing…":"🗑 Delete Sessions"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {clearModal && (
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}>
           <div style={{background:"#fff",borderRadius:"6px",maxWidth:"420px",width:"100%",overflow:"hidden",boxShadow:"0 8px 40px rgba(0,0,0,.3)"}}>
@@ -1231,11 +1271,12 @@ export default function Dashboard({ teacher, readOnly }) {
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:"0.5rem",padding:"0 1.5rem 1.25rem"}}>
               {[
-                ["tests",   "Clear Test Scores only",          `${testSessions.length} test session${testSessions.length!==1?"s":""}`,  T.midnight,"rgba(13,148,136,.1)"],
+                ...testCodes.map(c => [`test:${c}`, `Clear "${testCodeNames[c]||c}" (${c})`, `${testSessions.filter(s=>(s.testCode||s.code||"")===c).length} session${testSessions.filter(s=>(s.testCode||s.code||"")===c).length!==1?"s":""}`, "#7c3aed", "#f3f0ff"]),
+                ["tests",   "Clear All Test Scores",          `${testSessions.length} test session${testSessions.length!==1?"s":""}`,  T.midnight,"rgba(13,148,136,.1)"],
                 ["fluency", "Clear Fluency Drill Data",        "All fluency levels, streaks, and drill sessions",                      T.teal,    "rgba(13,148,136,.08)"],
                 ["all",     "Clear Everything",                "All test scores + all fluency data",                                   T.dangerText, T.dangerBg],
               ].map(([mode, label, sub, c, bg]) => (
-                <button key={mode} onClick={() => handleClearMode(mode)}
+                <button key={mode} onClick={() => { if (mode.startsWith("test:")) { setClearModal(false); setClearTestCode(mode.slice(5)); } else handleClearMode(mode); }}
                   style={{background:bg,border:`1px solid ${c}33`,borderRadius:"4px",padding:"0.75rem 1rem",textAlign:"left",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <div>
                     <div style={{fontWeight:700,fontSize:"0.85rem",color:c}}>{label}</div>
