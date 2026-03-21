@@ -280,6 +280,7 @@ export default function Dashboard({ teacher, readOnly }) {
   const [tab,      setTab]      = useState("overview");
   const [sessions, setSessions] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [overviewTest, setOverviewTest] = useState("all"); // filter overview by test code
   const [loading,  setLoading]  = useState(true);
   const [clearing, setClearing] = useState(false);
   const [clearModal, setClearModal] = useState(false);
@@ -351,18 +352,40 @@ export default function Dashboard({ teacher, readOnly }) {
   const drillSessions = sessions.filter(s => s.mode === "drill" || s.mode === "practice");
 
   // ── Overview stats (tests only) ──
-  const sorted  = [...testSessions].sort((a,b)=>b.pct - a.pct);
-  const sel     = testSessions.find(s => s.name===selected || s.studentName===selected);
-  const avgP    = testSessions.length ? Math.round(testSessions.reduce((a,s)=>a+s.pct,0)/testSessions.length) : 0;
-  const profC   = testSessions.filter(s=>s.pct>=80).length;
-  const devC    = testSessions.filter(s=>s.pct>=60&&s.pct<80).length;
-  const begC    = testSessions.filter(s=>s.pct<60).length;
+  // Unique test codes for filter dropdown
+  const testCodes = [...new Set(testSessions.map(s=>s.testCode||s.code||"").filter(Boolean))];
+  // Filter by selected test
+  const filteredTestSessions = overviewTest === "all" ? testSessions
+    : testSessions.filter(s=>(s.testCode||s.code||"")=== overviewTest);
+  // Deduplicate: keep only most recent session per student
+  const latestByStudent = (() => {
+    const map = {};
+    [...filteredTestSessions].sort((a,b)=>new Date(a.submitted)-new Date(b.submitted)).forEach(s => {
+      const key = s.studentId || s.studentName || s.name || "Unknown";
+      map[key] = s; // overwrite with newer
+    });
+    return Object.values(map);
+  })();
+  const sorted  = [...latestByStudent].sort((a,b)=>b.pct - a.pct);
+  const sel     = latestByStudent.find(s => s.name===selected || s.studentName===selected);
+  const avgP    = latestByStudent.length ? Math.round(latestByStudent.reduce((a,s)=>a+s.pct,0)/latestByStudent.length) : 0;
+  const profC   = latestByStudent.filter(s=>s.pct>=80).length;
+  const devC    = latestByStudent.filter(s=>s.pct>=60&&s.pct<80).length;
+  const begC    = latestByStudent.filter(s=>s.pct<60).length;
 
   // ── Item analysis (use live question ids if available) ──
-  const allQIds = [...new Set(testSessions.flatMap(s=>Object.keys(s.answers||{})))];
+  function gradeSessionAnswer(q, ans) {
+    if (!q || ans === undefined || ans === null) return false;
+    if (q.type === "multiselect") { try { return JSON.stringify([...JSON.parse(ans)].sort()) === JSON.stringify([...(Array.isArray(q.answer)?q.answer:[])].sort()); } catch { return false; } }
+    if (q.type === "keypad") return String(q.answer??"").trim().toLowerCase() === String(ans).trim().toLowerCase();
+    if (q.type === "plotpoint") { try { return ans === JSON.stringify(Array.isArray(q.answer)?q.answer:JSON.parse(q.answer)); } catch { return false; } }
+    if (q.type === "dragdrop") { try { const g=JSON.parse(ans); const cm=q.correct||q.answer||{}; return (q.items||[]).every(item=>{const c=cm[item]; if(c==="distractor") return g[item]===undefined; return g[item]===c;}); } catch { return false; } }
+    return ans === q.correct;
+  }
+  const allQIds = [...new Set(filteredTestSessions.flatMap(s=>Object.keys(s.answers||{})))];
   const itemData = bankQ.map(q => {
-    const correct = testSessions.filter(s=>s.answers?.[q.id]===q.correct).length;
-    const attempted = testSessions.filter(s=>q.id in (s.answers||{})).length;
+    const correct = filteredTestSessions.filter(s=>gradeSessionAnswer(q, s.answers?.[q.id])).length;
+    const attempted = filteredTestSessions.filter(s=>q.id in (s.answers||{})).length;
     return { ...q, correctCount:correct, attempted, pct: attempted ? Math.round((correct/attempted)*100) : 0 };
   }).filter(q => q.attempted > 0);
 
@@ -392,7 +415,7 @@ export default function Dashboard({ teacher, readOnly }) {
         if (!q) return;
         if (!map[q.standard]) map[q.standard] = { correct:0, total:0 };
         map[q.standard].total++;
-        if (ans === q.correct) map[q.standard].correct++;
+        if (gradeSessionAnswer(q, ans)) map[q.standard].correct++;
       });
     });
     return map;
@@ -446,7 +469,7 @@ export default function Dashboard({ teacher, readOnly }) {
               ["Proficient (≥80%)", profC, T.success],
               ["Developing (60–79%)", devC, T.warning],
               ["Beginning (<60%)", begC, T.danger],
-              ["Submitted", testSessions.length, T.teal],
+              ["Submitted", latestByStudent.length, T.teal],
             ].map(([lbl,val,c])=>(
               <div key={lbl} style={{background:T.white,border:`1px solid ${T.border}`,borderLeft:`3px solid ${c}`,borderRadius:T.xs,padding:"0.9rem 1.25rem",minWidth:"120px",flex:1}}>
                 <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"4px"}}>{lbl.toUpperCase()}</div>
@@ -454,9 +477,20 @@ export default function Dashboard({ teacher, readOnly }) {
               </div>
             ))}
           </div>
+          {testCodes.length > 1 && (
+            <div style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
+              <span style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary}}>FILTER BY TEST:</span>
+              <select value={overviewTest} onChange={e=>{setOverviewTest(e.target.value);setSelected(null);}}
+                style={{fontSize:"0.78rem",padding:"0.3rem 0.5rem",border:`1px solid ${T.border}`,borderRadius:T.xs,background:T.white}}>
+                <option value="all">All Tests</option>
+                {testCodes.map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          )}
           <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,overflow:"hidden"}}>
             <div style={{padding:"0.75rem 1rem",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary}}>
-              TEST SCORES — {sorted.length} submitted
+              TEST SCORES — {sorted.length} student{sorted.length!==1?"s":""}
+              {overviewTest !== "all" && <span style={{marginLeft:"0.5rem",fontFamily:"monospace",background:T.midnight,color:T.white,padding:"1px 6px",borderRadius:"3px"}}>{overviewTest}</span>}
             </div>
             {sorted.map((s,i)=>{
               const name = s.studentName||s.name; const p=s.pct;
@@ -493,7 +527,7 @@ export default function Dashboard({ teacher, readOnly }) {
                       if (!q) return;
                       if (!stdMap[q.standard]) stdMap[q.standard] = { correct:0, total:0 };
                       stdMap[q.standard].total++;
-                      if (ans===q.correct) stdMap[q.standard].correct++;
+                      if (gradeSessionAnswer(q, ans)) stdMap[q.standard].correct++;
                     });
                     const stds = Object.entries(stdMap).sort(([a],[b])=>a.localeCompare(b));
                     /* Look up full student history */
@@ -522,7 +556,7 @@ export default function Dashboard({ teacher, readOnly }) {
                       <div style={{display:"flex",flexWrap:"wrap",gap:"4px",marginBottom:"0.75rem"}}>
                         {Object.entries(s.answers||{}).map(([qid,ans])=>{
                           const q = bankQ.find(x=>x.id===qid);
-                          const ok = q && ans===q.correct;
+                          const ok = q && gradeSessionAnswer(q, ans);
                           return <div key={qid} title={q?`${q.standard} — ${ok?"Correct":"Incorrect"}`:`Q${qid}`}
                             style={{width:"26px",height:"26px",borderRadius:T.xs,background:ok?T.success:T.dangerText,display:"flex",alignItems:"center",justifyContent:"center"}}>
                             <span style={{color:T.white,fontSize:"0.65rem",fontWeight:700}}>{ok?"✓":"✗"}</span>
