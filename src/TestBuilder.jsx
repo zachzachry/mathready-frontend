@@ -211,17 +211,17 @@ function EditModal({ question, onSave, onClose }) {
 }
 
 // ── Save Test Modal ────────────────────────────────────────
-function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose }) {
-  const [name,      setName]      = useState(currentTitle || "");
-  const [code,      setCode]      = useState(genCode());
+function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose, editing }) {
+  const [name,      setName]      = useState(editing?.name || currentTitle || "");
+  const [code,      setCode]      = useState(editing?.code || genCode());
   const [saving,    setSaving]    = useState(false);
   const [codeErr,   setCodeErr]   = useState("");
-  const [adaptive,  setAdaptive]  = useState(false);
+  const [adaptive,  setAdaptive]  = useState(editing?.adaptive || false);
   const [overwriteWarning, setOverwriteWarning] = useState(false);
-  const [untimed,        setUntimed]        = useState(false);
-  const [timeMins,       setTimeMins]       = useState(30);
-  const [warnMins,       setWarnMins]       = useState(5);
-  const [oneAttempt,     setOneAttempt]     = useState(false);
+  const [untimed,        setUntimed]        = useState(editing?.untimed || false);
+  const [timeMins,       setTimeMins]       = useState(editing?.timeLimitSecs ? Math.round(editing.timeLimitSecs/60) : 30);
+  const [warnMins,       setWarnMins]       = useState(editing?.warnSecs ? Math.round(editing.warnSecs/60) : 5);
+  const [oneAttempt,     setOneAttempt]     = useState(editing?.oneAttempt || false);
   const [classes,        setClasses]        = useState([]);
   const [assignedClassIds, setAssignedClassIds] = useState([]);
 
@@ -264,7 +264,7 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose }
       <div style={{background:T.white,borderRadius:"6px",width:"100%",maxWidth:"420px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.25)"}}>
         <div style={{background:T.midnight,color:T.white,padding:"0.9rem 1.25rem"}}>
           <div style={{fontSize:"0.6rem",opacity:.65,letterSpacing:"0.14em"}}>TEST LIBRARY</div>
-          <div style={{fontSize:"1rem",fontWeight:700}}>Save Test</div>
+          <div style={{fontSize:"1rem",fontWeight:700}}>{editing?"Edit Test":"Save Test"}</div>
         </div>
         <div style={{padding:"1.25rem",display:"flex",flexDirection:"column",gap:"0.85rem"}}>
           <div><label style={S.lbl}>TEST NAME</label>
@@ -360,7 +360,7 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose }
           <button onClick={()=>{ setOverwriteWarning(false); onClose(); }} style={{flex:1,background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600,color:T.text}}>Cancel</button>
           <button onClick={handleSave} disabled={saving||!name.trim()||code.length<4}
             style={{flex:1,background:(!name.trim()||code.length<4)?T.border:overwriteWarning?"#b8860b":T.teal,border:"none",borderRadius:T.xs,padding:"0.65rem",fontSize:"0.85rem",cursor:(!name.trim()||code.length<4)?"not-allowed":"pointer",color:T.white,fontWeight:700}}>
-            {saving?"Saving…":overwriteWarning?"Save Anyway →":"💾 Save"}
+            {saving?"Saving…":overwriteWarning?"Save Anyway →":editing?"💾 Update":"💾 Save"}
           </button>
         </div>
       </div>
@@ -549,6 +549,7 @@ export default function TestBuilder({ teacher, readOnly }) {
   const [libSort,   setLibSort]       = useState("newest");
   const [rightTab, setRightTab]       = useState("current");
   const [testAssignments, setTestAssignments] = useState([]);
+  const [editingTestId, setEditingTestId]   = useState(null); // non-null = editing existing test
 
   const [subject,    setSubject]    = useState("math");
   const [filterStd,  setFilterStd]  = useState("");
@@ -646,23 +647,29 @@ export default function TestBuilder({ teacher, readOnly }) {
 
   async function saveTest(name, code, adaptive=false, timerCfg={}) {
     try {
-      const r = await fetch(`${API}/tests/saved`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,code,title:testTitle,questions:selectedQuestions,adaptive,subject,...timerCfg})});
+      const body = {name,code,title:testTitle,questions:selectedQuestions,adaptive,subject,...timerCfg};
+      const url = editingTestId ? `${API}/tests/saved/${editingTestId.id}` : `${API}/tests/saved`;
+      const method = editingTestId ? "PUT" : "POST";
+      const r = await fetch(url,{method,headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
       const data = await r.json();
       if (r.status===400) return data.detail || "Code already in use";
       await loadSavedTests();
-      setSavedMsg(`Saved! Code: ${data.code}`);
+      setSavedMsg(editingTestId ? `Updated! Code: ${data.code}` : `Saved! Code: ${data.code}`);
+      setEditingTestId(null);
       setTimeout(()=>setSavedMsg(""),5000);
       setShowSaveModal(false);
     } catch { return "Save failed"; }
   }
 
 
-  async function loadSavedTest(id) {
+  async function loadSavedTest(id, forEdit=false) {
     try {
       const r=await fetch(`${API}/tests/saved/${id}`); const t=await r.json();
       setSelected((t.questions||[]).map(q=>q.id));
       setTestTitle(t.title||t.name||"");
       setRightTab("current");
+      if (forEdit) setEditingTestId({id, name:t.name, code:t.code, adaptive:!!t.adaptive, untimed:!!t.untimed, timeLimitSecs:t.timeLimitSecs, warnSecs:t.warnSecs, oneAttempt:!!t.oneAttempt});
+      else setEditingTestId(null);
     } catch {}
   }
 
@@ -785,6 +792,12 @@ export default function TestBuilder({ teacher, readOnly }) {
         {rightTab==="current"&&(
           <>
             <div style={{background:"#fff",borderBottom:"1px solid #c8d3dd",padding:"0.75rem 1rem",flexShrink:0}}>
+              {editingTestId && (
+                <div style={{background:"#e3f2fd",border:"1px solid #90caf9",borderRadius:T.xs,padding:"0.4rem 0.65rem",marginBottom:"0.5rem",display:"flex",alignItems:"center",gap:"0.5rem"}}>
+                  <span style={{fontSize:"0.72rem",fontWeight:700,color:"#1565c0"}}>✏️ Editing: {editingTestId.name}</span>
+                  <span style={{fontSize:"0.62rem",color:"#1565c0",fontFamily:"monospace"}}>({editingTestId.code})</span>
+                </div>
+              )}
               <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.midnight,marginBottom:"0.4rem"}}>CURRENT SELECTION</div>
               <input style={{...S.inp,fontWeight:600}} value={testTitle} onChange={e=>setTestTitle(e.target.value)} placeholder="Test title…"/>
               <div style={{fontSize:"0.7rem",color:"#888",marginTop:"4px"}}>
@@ -827,9 +840,15 @@ export default function TestBuilder({ teacher, readOnly }) {
 
             <div style={{padding:"0.85rem 1rem",borderTop:"2px solid #c8d3dd",background:"#fff",flexShrink:0}}>
               <button onClick={()=>setShowSaveModal(true)} disabled={selected.length===0}
-                style={{width:"100%",background:selected.length===0?"#c8d3dd":T.teal,border:"none",borderRadius:"4px",padding:"0.8rem",fontSize:"0.95rem",fontWeight:700,color:"#fff",cursor:selected.length===0?"not-allowed":"pointer"}}>
-                💾 Save to Library & Get Code
+                style={{width:"100%",background:selected.length===0?"#c8d3dd":editingTestId?T.midnight:T.teal,border:"none",borderRadius:"4px",padding:"0.8rem",fontSize:"0.95rem",fontWeight:700,color:"#fff",cursor:selected.length===0?"not-allowed":"pointer"}}>
+                {editingTestId ? "💾 Update Test" : "💾 Save to Library & Get Code"}
               </button>
+              {editingTestId && (
+                <button onClick={()=>setEditingTestId(null)}
+                  style={{width:"100%",marginTop:"0.35rem",background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:"4px",padding:"0.5rem",fontSize:"0.78rem",fontWeight:600,color:T.textSecondary,cursor:"pointer"}}>
+                  Cancel Editing — start fresh
+                </button>
+              )}
               {selected.length>0&&(
                 <div style={{fontSize:"0.7rem",color:"#888",textAlign:"center",marginTop:"5px"}}>
                   Students use the code to access this test
@@ -904,8 +923,8 @@ export default function TestBuilder({ teacher, readOnly }) {
                         <button onClick={()=>setAssigningTest(t)} title="Assign to students"
                           style={{...S.smBtn,background:(testAssignments||[]).some(a=>a.testId===t.id)?"#2e7d32":"#e65100",color:"#fff",borderColor:(testAssignments||[]).some(a=>a.testId===t.id)?"#2e7d32":"#e65100",padding:"5px 12px",fontWeight:700}}>
                           {(testAssignments||[]).some(a=>a.testId===t.id)?"📋 Assigned":"📋 Assign"}</button>
-                        <button onClick={()=>loadSavedTest(t.id)} title="Load into editor"
-                          style={{...S.smBtn,background:T.teal,color:"#fff",borderColor:T.teal,padding:"5px 12px"}}>Load</button>
+                        <button onClick={()=>loadSavedTest(t.id,true)} title="Edit test"
+                          style={{...S.smBtn,background:T.teal,color:"#fff",borderColor:T.teal,padding:"5px 12px"}}>✏️ Edit</button>
                         <button onClick={()=>duplicateSavedTest(t.id)} title="Duplicate test"
                           style={{...S.smBtn,padding:"5px 8px",background:T.surfaceAlt,borderColor:T.border,color:T.text}}>📄</button>
                         <button onClick={()=>setConfirmDeleteTest(t)} title="Delete test"
@@ -944,8 +963,8 @@ export default function TestBuilder({ teacher, readOnly }) {
                           <div style={{flex:1,height:"4px",background:"#c8e6c9",borderRadius:"2px",overflow:"hidden"}}>
                             <div style={{width:`${a.totalStudents?(a.completedCount||0)/a.totalStudents*100:0}%`,height:"100%",background:"#2e7d32",borderRadius:"2px"}}/>
                           </div>
-                          <button onClick={()=>deleteAssignment(a.id)} title="Remove assignment"
-                            style={{border:"none",background:"none",cursor:"pointer",fontSize:"0.65rem",color:"#8b1a1a",padding:"0 2px"}}>✕</button>
+                          <button onClick={()=>{if(window.confirm(`Unassign from ${a.className}?`))deleteAssignment(a.id);}} title="Remove assignment"
+                            style={{border:`1px solid #f0b8b8`,background:"#fdf2f2",cursor:"pointer",fontSize:"0.62rem",fontWeight:600,color:"#8b1a1a",padding:"2px 8px",borderRadius:"3px"}}>Unassign</button>
                         </div>
                       ));
                     })()}
@@ -961,7 +980,7 @@ export default function TestBuilder({ teacher, readOnly }) {
 
       {/* Modals */}
       {editingQ&&<EditModal question={editingQ} onSave={handleSaveEdit} onClose={()=>setEditingQ(null)}/>}
-      {showSaveModal&&<SaveTestModal count={selected.length} currentTitle={testTitle} savedTests={savedTests} onSave={saveTest} onClose={()=>setShowSaveModal(false)}/>}
+      {showSaveModal&&<SaveTestModal count={selected.length} currentTitle={testTitle} savedTests={savedTests} onSave={saveTest} onClose={()=>setShowSaveModal(false)} editing={editingTestId}/>}
       {assigningTest&&<AssignTestModal test={assigningTest} teacher={teacher} existingAssignments={testAssignments}
         onDone={()=>{setAssigningTest(null);loadAssignments();}} onClose={()=>setAssigningTest(null)}/>}
 
