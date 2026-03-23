@@ -1,5 +1,5 @@
 // ── App constants ──────────────────────────────────────────
-export const API          = process.env.REACT_APP_API_URL || "http://localhost:8001";
+export const API          = process.env.REACT_APP_API_URL || "https://mathready-backend-production.up.railway.app";
 export const TOTAL        = 10;
 export const START_SECS   = 30 * 60;
 export const LETTERS      = ["A", "B", "C", "D"];
