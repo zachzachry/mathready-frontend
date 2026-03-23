@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import { QUESTIONS, lvl, lvlC, lvlBg, lvlBd, loadSessions, clearSessions, API, T } from "./shared/constants";
 import { generateClassReport } from "./generateReport";
 import ParentReport from "./ParentReport";
+import TestParentReport from "./TestParentReport";
+import StudentDiagnostic from "./StudentDiagnostic";
 
 const ALL_TABS = [
   ["overview",  "📊 Overview",       false, false],
@@ -288,12 +290,15 @@ export default function Dashboard({ teacher, readOnly }) {
   const [roster,   setRoster]   = useState([]);
   const [fluencyReport, setFluencyReport] = useState([]);
   const [leaderboard,   setLeaderboard]   = useState([]);
-  const [parentReportId, setParentReportId] = useState(null); // student ID for parent report modal
+  const [parentReportId,   setParentReportId]   = useState(null); // student ID for fluency parent report
+  const [testReportData,   setTestReportData]   = useState(null); // {session, fullStudent, stds, className} for test report
+  const [diagStudentId,    setDiagStudentId]    = useState(null); // {id, name}
   const [adminData, setAdminData] = useState(null);
 
   // Growth filters
-  const [growthClass,   setGrowthClass]   = useState("all");
-  const [growthStudent, setGrowthStudent] = useState("all");
+  const [growthClass,      setGrowthClass]      = useState("all");
+  const [growthStudent,    setGrowthStudent]    = useState("all");
+  const [growthTestCodes,  setGrowthTestCodes]  = useState([]); // ordered selection for comparison
 
   const [bankQ, setBankQ] = useState(QUESTIONS);
   const [savedTests, setSavedTests] = useState([]); // for code→name lookup
@@ -302,11 +307,19 @@ export default function Dashboard({ teacher, readOnly }) {
     try {
       const classFilter = teacher && teacher.classIds !== null && teacher.classIds.length > 0
         ? "?classIds="+teacher.classIds.join(",") : teacher && teacher.classIds !== null ? "?classIds=" : "";
+      const roleParam = teacher?.teacherRole ? `&role=${teacher.teacherRole}` : "";
+      const tidParam  = teacher?.teacherId   ? `&teacherId=${teacher.teacherId}` : "";
+      const sessionParam = classFilter
+        ? `${classFilter}${roleParam}${tidParam}`
+        : (roleParam||tidParam) ? `?${(roleParam+tidParam).slice(1)}` : "";
+      const savedParam = teacher?.teacherId
+        ? `?teacherId=${teacher.teacherId}&role=${teacher.teacherRole||"teacher"}`
+        : "";
       const [s, r, q, st] = await Promise.all([
-        fetch(`${API}/sessions${classFilter}`).then(r=>r.json()),
+        fetch(`${API}/sessions${sessionParam}`).then(r=>r.json()),
         fetch(`${API}/roster${classFilter}`).then(r=>r.json()),
         fetch(`${API}/questions`).then(r=>r.json()).catch(()=>[]),
-        fetch(`${API}/tests/saved`).then(r=>r.json()).catch(()=>[]),
+        fetch(`${API}/tests/saved${savedParam}`).then(r=>r.json()).catch(()=>[]),
       ]);
       setSessions(Array.isArray(s) ? s : []);
       if (Array.isArray(st)) setSavedTests(st);
@@ -583,18 +596,6 @@ export default function Dashboard({ teacher, readOnly }) {
                           );
                         })}
                       </div>
-                      {/* Item detail row */}
-                      <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"0.4rem"}}>ITEM DETAIL</div>
-                      <div style={{display:"flex",flexWrap:"wrap",gap:"4px",marginBottom:"0.75rem"}}>
-                        {Object.entries(s.answers||{}).map(([qid,ans])=>{
-                          const q = bankQ.find(x=>x.id===qid);
-                          const ok = q && gradeSessionAnswer(q, ans);
-                          return <div key={qid} title={q?`${q.standard} — ${ok?"Correct":"Incorrect"}`:`Q${qid}`}
-                            style={{width:"26px",height:"26px",borderRadius:T.xs,background:ok?T.success:T.dangerText,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                            <span style={{color:T.white,fontSize:"0.65rem",fontWeight:700}}>{ok?"✓":"✗"}</span>
-                          </div>;
-                        })}
-                      </div>
                       {/* Action buttons */}
                       <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap"}}>
                         {hasHistory && (
@@ -603,7 +604,11 @@ export default function Dashboard({ teacher, readOnly }) {
                             📈 View Growth History ({fullStudent.sessions.length} sessions)
                           </button>
                         )}
-                        <button onClick={(e)=>{e.stopPropagation(); setParentReportId(s.studentId||s.studentName||s.name);}}
+                        <button onClick={(e)=>{e.stopPropagation(); setDiagStudentId({id:s.studentId||s.id, name:s.studentName||s.name});}}
+                          style={{background:"#1565c0",color:T.white,border:"none",borderRadius:T.xs,padding:"5px 12px",fontSize:"0.72rem",fontWeight:600,cursor:"pointer"}}>
+                          🔍 Diagnose
+                        </button>
+                        <button onClick={(e)=>{e.stopPropagation(); setTestReportData({session:s, fullStudent, stds, className:s.className||""});}}
                           style={{background:T.teal,color:T.white,border:"none",borderRadius:T.xs,padding:"5px 12px",fontSize:"0.72rem",fontWeight:600,cursor:"pointer"}}>
                           📋 Parent Report
                         </button>
@@ -721,55 +726,139 @@ export default function Dashboard({ teacher, readOnly }) {
           </div>
         </div>
       );
+      {/* ── helpers scoped to growth tab ── */}
+      {(() => {
+        // First session date per code — used for default chronological sort when adding
+        const codeFirstDate = {};
+        testSessions.forEach(s => {
+          const c = s.testCode || "";
+          if (c && (!codeFirstDate[c] || s.submitted < codeFirstDate[c])) codeFirstDate[c] = s.submitted;
+        });
+
+        function toggleGrowthCode(code) {
+          setGrowthTestCodes(prev => {
+            if (prev.includes(code)) return prev.filter(c => c !== code);
+            // Insert in chronological order
+            const next = [...prev, code];
+            next.sort((a, b) => (codeFirstDate[a]||"").localeCompare(codeFirstDate[b]||""));
+            return next;
+          });
+        }
+        function moveCode(idx, dir) {
+          setGrowthTestCodes(prev => {
+            const arr = [...prev];
+            const swap = idx + dir;
+            if (swap < 0 || swap >= arr.length) return prev;
+            [arr[idx], arr[swap]] = [arr[swap], arr[idx]];
+            return arr;
+          });
+        }
+
+        // Active codes: if teacher has selected some, use those; else use all (sorted by first date)
+        const activeCodes = growthTestCodes.length > 0
+          ? growthTestCodes
+          : [...testCodes].sort((a,b) => (codeFirstDate[a]||"").localeCompare(codeFirstDate[b]||""));
+
+        // Per-student sessions filtered + ordered by activeCodes
+        const growthStudentMap = {};
+        Object.entries(studentMap).forEach(([key, st]) => {
+          const sessMap = {};
+          st.sessions.forEach(s => { const c = s.testCode||""; if (!sessMap[c] || s.submitted > sessMap[c].submitted) sessMap[c] = s; });
+          const ordered = activeCodes.map(c => sessMap[c] || null);
+          growthStudentMap[key] = { ...st, ordered, sessMap };
+        });
+
       return (
         <div style={{maxWidth:"960px"}}>
-          <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"0.85rem 1.25rem",marginBottom:"1rem",display:"flex",gap:"0.75rem",flexWrap:"wrap",alignItems:"center"}}>
-            <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.12em",color:"#555"}}>FILTER</div>
-            <select style={{padding:"0.4rem 0.65rem",border:"1px solid #c8d3dd",borderRadius:"3px",fontSize:"0.8rem",background:"#fafbfc"}}
-              value={growthClass} onChange={e=>{setGrowthClass(e.target.value);setGrowthStudent("all");}}>
-              <option value="all">All Classes</option>
-              {sessionClasses.map(c=><option key={c} value={c}>{c}</option>)}
-            </select>
-            <select style={{padding:"0.4rem 0.65rem",border:"1px solid #c8d3dd",borderRadius:"3px",fontSize:"0.8rem",background:"#fafbfc"}}
-              value={growthStudent} onChange={e=>setGrowthStudent(e.target.value)}>
-              <option value="all">All Students</option>
-              {filteredStudents.map(([key,st])=><option key={key} value={key}>{st.name}</option>)}
-            </select>
-            {growthStudent!=="all"&&<button onClick={()=>setGrowthStudent("all")} style={{fontSize:"0.72rem",background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"4px 10px",cursor:"pointer"}}>✕ Clear</button>}
+          {/* Filter bar */}
+          <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",padding:"0.85rem 1.25rem",marginBottom:"1rem",display:"flex",flexDirection:"column",gap:"0.75rem"}}>
+            <div style={{display:"flex",gap:"0.75rem",flexWrap:"wrap",alignItems:"center"}}>
+              <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.12em",color:"#555"}}>FILTER</div>
+              <select style={{padding:"0.4rem 0.65rem",border:"1px solid #c8d3dd",borderRadius:"3px",fontSize:"0.8rem",background:"#fafbfc"}}
+                value={growthClass} onChange={e=>{setGrowthClass(e.target.value);setGrowthStudent("all");}}>
+                <option value="all">All Classes</option>
+                {sessionClasses.map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
+              <select style={{padding:"0.4rem 0.65rem",border:"1px solid #c8d3dd",borderRadius:"3px",fontSize:"0.8rem",background:"#fafbfc"}}
+                value={growthStudent} onChange={e=>setGrowthStudent(e.target.value)}>
+                <option value="all">All Students</option>
+                {filteredStudents.map(([key,st])=><option key={key} value={key}>{st.name}</option>)}
+              </select>
+              {growthStudent!=="all"&&<button onClick={()=>setGrowthStudent("all")} style={{fontSize:"0.72rem",background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"4px 10px",cursor:"pointer"}}>✕ Clear</button>}
+            </div>
+            {/* Test picker */}
+            <div>
+              <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"0.4rem"}}>
+                TESTS TO COMPARE <span style={{fontWeight:400,opacity:.7}}>— select and order the tests that define this growth window</span>
+              </div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:"0.4rem",marginBottom:"0.5rem"}}>
+                {testCodes.map(c => {
+                  const on = growthTestCodes.includes(c);
+                  return (
+                    <button key={c} onClick={()=>toggleGrowthCode(c)}
+                      style={{padding:"3px 10px",border:`1px solid ${on?"#1565c0":"#c8d3dd"}`,borderRadius:"20px",
+                        background:on?"#1565c0":"#fff",color:on?"#fff":T.textSecondary,
+                        fontSize:"0.72rem",fontWeight:on?700:400,cursor:"pointer",transition:"all .15s"}}>
+                      {on && <span style={{marginRight:"4px",fontSize:"0.65rem"}}>✓</span>}
+                      {testCodeNames[c]!==c ? `${testCodeNames[c]}` : c}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Ordered selection with arrows */}
+              {growthTestCodes.length > 0 && (
+                <div style={{display:"flex",gap:"0.4rem",alignItems:"center",flexWrap:"wrap"}}>
+                  <span style={{fontSize:"0.6rem",color:T.textSecondary,fontWeight:600}}>ORDER →</span>
+                  {growthTestCodes.map((c, i) => (
+                    <div key={c} style={{display:"flex",alignItems:"center",gap:"2px",background:"#e3f2fd",border:"1px solid #90caf9",borderRadius:"4px",padding:"2px 6px"}}>
+                      <span style={{fontSize:"0.68rem",fontWeight:700,color:"#1565c0"}}>{i+1}. {testCodeNames[c]!==c?testCodeNames[c]:c}</span>
+                      <button onClick={()=>moveCode(i,-1)} disabled={i===0} style={{background:"none",border:"none",cursor:i===0?"not-allowed":"pointer",color:"#1565c0",fontSize:"0.65rem",padding:"0 2px",opacity:i===0?0.3:1}}>◀</button>
+                      <button onClick={()=>moveCode(i,1)} disabled={i===growthTestCodes.length-1} style={{background:"none",border:"none",cursor:i===growthTestCodes.length-1?"not-allowed":"pointer",color:"#1565c0",fontSize:"0.65rem",padding:"0 2px",opacity:i===growthTestCodes.length-1?0.3:1}}>▶</button>
+                      <button onClick={()=>toggleGrowthCode(c)} style={{background:"none",border:"none",cursor:"pointer",color:"#888",fontSize:"0.6rem",padding:"0 1px"}}>✕</button>
+                    </div>
+                  ))}
+                  <button onClick={()=>setGrowthTestCodes([])} style={{fontSize:"0.65rem",color:T.textSecondary,background:"none",border:"1px solid #ddd",borderRadius:"3px",padding:"2px 8px",cursor:"pointer"}}>Clear all</button>
+                </div>
+              )}
+            </div>
           </div>
-          {/* Cross-test comparison — only show in overview mode when multiple test codes exist */}
-          {!focusStudent && (() => {
-            const byCode = {};
+
+          {/* Cross-test comparison */}
+          {!focusStudent && activeCodes.length >= 2 && (() => {
             const filtSess = growthClass === "all" ? testSessions : testSessions.filter(s => s.className === growthClass);
+            const byCode = {};
             filtSess.forEach(s => {
-              const code = s.testCode || "Unknown";
-              if (!byCode[code]) byCode[code] = { scores: [], count: 0 };
-              byCode[code].scores.push(s.pct);
-              byCode[code].count++;
+              const c = s.testCode || "";
+              if (!activeCodes.includes(c)) return;
+              if (!byCode[c]) byCode[c] = { scores: [], count: 0 };
+              byCode[c].scores.push(s.pct);
+              byCode[c].count++;
             });
-            const codes = Object.entries(byCode).map(([code, d]) => ({
-              code, count: d.count,
-              avg: Math.round(d.scores.reduce((a,b) => a+b, 0) / d.scores.length),
+            const codes = activeCodes.filter(c => byCode[c]).map((c, i) => ({
+              code: c, name: testCodeNames[c]||c, count: byCode[c].count,
+              avg: Math.round(byCode[c].scores.reduce((a,b)=>a+b,0)/byCode[c].scores.length),
             }));
             if (codes.length < 2) return null;
             return (
               <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,overflow:"hidden",marginBottom:"0.5rem"}}>
                 <div style={{padding:"0.75rem 1rem",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary}}>
-                  TEST-BY-TEST COMPARISON
+                  {growthTestCodes.length > 0 ? "SELECTED TEST COMPARISON" : "TEST-BY-TEST COMPARISON"}
                 </div>
-                <div style={{display:"flex",gap:"0.75rem",padding:"0.75rem 1rem",flexWrap:"wrap"}}>
+                <div style={{display:"flex",gap:"0",padding:"0",flexWrap:"nowrap",overflowX:"auto"}}>
                   {codes.map((c, i) => {
                     const prev = i > 0 ? codes[i-1].avg : null;
                     const delta = prev != null ? c.avg - prev : null;
                     return (
-                      <div key={c.code} style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"0.65rem 1rem",minWidth:"100px",textAlign:"center",flex:1}}>
-                        <div style={{fontSize:"0.58rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"4px"}}>{c.code}</div>
-                        <div style={{fontSize:"1.3rem",fontWeight:700,color:lvlC(c.avg)}}>{c.avg}%</div>
-                        <div style={{fontSize:"0.6rem",color:T.textMuted}}>{c.count} submissions</div>
+                      <div key={c.code} style={{flex:1,minWidth:"90px",textAlign:"center",padding:"0.85rem 0.65rem",borderRight:i<codes.length-1?`1px solid ${T.border}`:"none",position:"relative"}}>
+                        {i > 0 && <div style={{position:"absolute",left:0,top:"50%",transform:"translateY(-50%)",fontSize:"0.75rem",color:T.border}}>→</div>}
+                        <div style={{fontSize:"0.58rem",fontWeight:700,letterSpacing:"0.08em",color:T.textSecondary,marginBottom:"2px"}}>{c.name !== c.code ? c.name : c.code}</div>
+                        <div style={{fontSize:"0.5rem",color:T.textMuted,marginBottom:"4px",fontFamily:"monospace"}}>{c.code}</div>
+                        <div style={{fontSize:"1.5rem",fontWeight:700,color:lvlC(c.avg)}}>{c.avg}%</div>
+                        <div style={{fontSize:"0.58rem",color:T.textMuted}}>{c.count} students</div>
                         {delta != null && (
-                          <div style={{fontSize:"0.65rem",fontWeight:700,marginTop:"2px",
+                          <div style={{fontSize:"0.68rem",fontWeight:700,marginTop:"3px",
                             color:delta>0?T.success:delta<0?T.dangerText:T.textMuted}}>
-                            {delta>0?"+":""}{delta}% vs prev
+                            {delta>0?"▲":delta<0?"▼":"—"}{Math.abs(delta)}%
                           </div>
                         )}
                       </div>
@@ -785,41 +874,69 @@ export default function Dashboard({ teacher, readOnly }) {
           ) : (
             <div style={{display:"flex",flexDirection:"column",gap:"0.5rem"}}>
               <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,overflow:"hidden"}}>
-                <div style={{padding:"0.75rem 1rem",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary}}>
-                  STUDENT GROWTH OVERVIEW — {filteredStudents.length} students
-                </div>
+                {/* Column headers when tests are selected */}
+                {growthTestCodes.length > 0 && (
+                  <div style={{display:"grid",gridTemplateColumns:`1fr 120px ${growthTestCodes.map(()=>"64px").join(" ")} 56px 48px`,gap:0,padding:"0.5rem 1rem 0.5rem 1.25rem",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,fontSize:"0.58rem",fontWeight:700,letterSpacing:"0.08em",color:T.textSecondary,alignItems:"end"}}>
+                    <div>STUDENT GROWTH — {filteredStudents.length} students</div>
+                    <div style={{textAlign:"center"}}>TREND</div>
+                    {growthTestCodes.map((c,i)=>(
+                      <div key={c} style={{textAlign:"center",lineHeight:1.2}}>
+                        <div style={{color:T.midnight}}>T{i+1}</div>
+                        <div style={{fontWeight:400,opacity:.7,fontSize:"0.52rem",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"60px"}}>{testCodeNames[c]!==c?testCodeNames[c]:c}</div>
+                      </div>
+                    ))}
+                    <div style={{textAlign:"center"}}>ΔGROWTH</div>
+                    <div style={{textAlign:"center"}}>AVG</div>
+                  </div>
+                )}
+                {!growthTestCodes.length && (
+                  <div style={{padding:"0.75rem 1rem",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary}}>
+                    STUDENT GROWTH OVERVIEW — {filteredStudents.length} students
+                  </div>
+                )}
                 {filteredStudents.map(([key, st])=>{
-                  const scores = st.sessions.map(s=>s.pct);
-                  const first  = scores[0]; const last = scores[scores.length-1];
-                  const delta  = scores.length>=2 ? last-first : null;
-                  const avg    = Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
+                  const gst = growthStudentMap[key];
+                  // Scores to use: if tests selected, use ordered (non-null only for sparkline); else all sessions
+                  const orderedScores = growthTestCodes.length > 0
+                    ? (gst?.ordered||[]).map(s=>s?s.pct:null)
+                    : st.sessions.map(s=>s.pct);
+                  const validScores = orderedScores.filter(v=>v!=null);
+                  const first = validScores[0]; const last = validScores[validScores.length-1];
+                  const delta = validScores.length>=2 ? last-first : null;
+                  const avg = validScores.length ? Math.round(validScores.reduce((a,b)=>a+b,0)/validScores.length) : 0;
                   const mastery = standardMastery(st.sessions);
                   const weakStds = Object.entries(mastery).filter(([,v])=>v.total>=2&&v.correct/v.total<0.6).map(([std])=>std);
                   return (
                     <div key={key} style={{borderBottom:`1px solid ${T.surfaceAlt}`}}>
                     <div onClick={()=>setGrowthStudent(key)}
-                      style={{padding:"0.75rem 1rem 0.75rem 1.25rem",display:"flex",alignItems:"center",gap:"1rem",cursor:"pointer",background:"#fff"}}>
+                      style={{padding:"0.65rem 1rem 0.65rem 1.25rem",display:"flex",alignItems:"center",gap:"1rem",cursor:"pointer",background:"#fff"}}>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:"0.88rem",fontWeight:700,color:T.text}}>{st.name}</div>
                         {st.className&&<div style={{fontSize:"0.65rem",color:T.textMuted}}>{st.className}</div>}
                       </div>
-                      <div style={{flexShrink:0}}>
-                        <LineChart points={scores} width={120} height={36} color={delta>0?T.success:delta<0?T.dangerText:T.textMuted}/>
+                      <div style={{flexShrink:0,width:"120px"}}>
+                        <LineChart points={validScores} width={120} height={36} color={delta>0?T.success:delta<0?T.dangerText:T.textMuted}/>
                       </div>
-                      <div style={{display:"flex",gap:"0.75rem",flexShrink:0}}>
-                        <div style={{textAlign:"center",minWidth:"36px"}}>
-                          <div style={{fontSize:"0.55rem",color:T.textMuted}}>AVG</div>
-                          <div style={{fontSize:"0.9rem",fontWeight:700,color:lvlC(avg)}}>{avg}%</div>
+                      {/* Per-test score cells when tests selected */}
+                      {growthTestCodes.length > 0 && (gst?.ordered||[]).map((s,i)=>(
+                        <div key={i} style={{width:"64px",textAlign:"center",flexShrink:0}}>
+                          {s ? (
+                            <div style={{fontSize:"0.82rem",fontWeight:700,color:lvlC(s.pct)}}>{s.pct}%</div>
+                          ) : (
+                            <div style={{fontSize:"0.72rem",color:T.textMuted}}>—</div>
+                          )}
                         </div>
+                      ))}
+                      <div style={{display:"flex",gap:"0.6rem",flexShrink:0}}>
                         {delta!==null&&(
-                          <div style={{textAlign:"center",minWidth:"40px"}}>
-                            <div style={{fontSize:"0.55rem",color:T.textMuted}}>ΔGROWTH</div>
+                          <div style={{textAlign:"center",minWidth:"44px"}}>
+                            {growthTestCodes.length===0&&<div style={{fontSize:"0.55rem",color:T.textMuted}}>ΔGROWTH</div>}
                             <div style={{fontSize:"0.9rem",fontWeight:700,color:delta>0?T.success:delta<0?T.dangerText:T.textMuted}}>{delta>0?"+":""}{delta}%</div>
                           </div>
                         )}
-                        <div style={{textAlign:"center",minWidth:"28px"}}>
-                          <div style={{fontSize:"0.55rem",color:T.textMuted}}>TESTS</div>
-                          <div style={{fontSize:"0.9rem",fontWeight:700,color:T.midnight}}>{st.sessions.length}</div>
+                        <div style={{textAlign:"center",minWidth:"36px"}}>
+                          {growthTestCodes.length===0&&<div style={{fontSize:"0.55rem",color:T.textMuted}}>AVG</div>}
+                          <div style={{fontSize:"0.9rem",fontWeight:700,color:lvlC(avg)}}>{avg}%</div>
                         </div>
                       </div>
                       <span style={{color:T.borderDark,fontSize:"0.8rem"}}>▶</span>
@@ -840,6 +957,7 @@ export default function Dashboard({ teacher, readOnly }) {
           )}
         </div>
       );
+      })()}
     }
 
     if (tab === "drills") {
@@ -953,7 +1071,7 @@ export default function Dashboard({ teacher, readOnly }) {
                     <div style={{padding:"0.45rem 0.15rem",textAlign:"center",borderBottom:`1px solid ${T.surfaceAlt}`,fontSize:"0.85rem"}}>
                       {s.trend === "improving" ? "📈" : s.trend === "declining" ? "📉" : "➡️"}
                     </div>
-                    <div style={{padding:"0.3rem 0.15rem",textAlign:"center",borderBottom:`1px solid ${T.surfaceAlt}`}}>
+                    <div style={{padding:"0.3rem 0.15rem",textAlign:"center",borderBottom:`1px solid ${T.surfaceAlt}`,display:"flex",flexDirection:"column",gap:"2px",alignItems:"center"}}>
                       <button
                         onClick={() => setParentReportId(s.student.id)}
                         title="Open parent report"
@@ -965,6 +1083,17 @@ export default function Dashboard({ teacher, readOnly }) {
                         }}
                       >
                         📄
+                      </button>
+                      <button
+                        onClick={() => setDiagStudentId({id:s.student.id, name:s.student.name})}
+                        title="Diagnose student"
+                        style={{
+                          background:"#e3f2fd", border:"1px solid #90caf9",
+                          borderRadius:6, padding:"2px 6px", cursor:"pointer",
+                          fontSize:"0.6rem", fontWeight:700, color:"#1565c0",
+                        }}
+                      >
+                        🔍
                       </button>
                     </div>
                     <div style={{padding:"0.3rem 0.15rem",textAlign:"center",borderBottom:`1px solid ${T.surfaceAlt}`}}>
@@ -1335,12 +1464,30 @@ export default function Dashboard({ teacher, readOnly }) {
         {renderTab()}
       </div>
 
-      {/* Parent report modal */}
+      {/* Fluency parent report modal (Drills tab) */}
       {parentReportId && (
         <ParentReport
           studentId={typeof parentReportId === "string" ? parentReportId : undefined}
           classId={typeof parentReportId === "object" ? parentReportId.classId : undefined}
           onClose={() => setParentReportId(null)}
+        />
+      )}
+      {/* Test score parent report modal (Overview tab) */}
+      {testReportData && (
+        <TestParentReport
+          session={testReportData.session}
+          fullStudent={testReportData.fullStudent}
+          stds={testReportData.stds}
+          className={testReportData.className}
+          teacherName={teacher?.name || ""}
+          onClose={() => setTestReportData(null)}
+        />
+      )}
+      {diagStudentId && (
+        <StudentDiagnostic
+          studentId={diagStudentId.id}
+          studentName={diagStudentId.name}
+          onClose={() => setDiagStudentId(null)}
         />
       )}
     </div>

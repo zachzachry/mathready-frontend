@@ -213,6 +213,254 @@ function DragDropAnswer({ zones=[], items=[], value, onChange, revealed, correct
   );
 }
 
+/* ── Hotspot Answer Component (click-to-select + drag-to-snap) ── */
+export function HotspotAnswer({ questionImage, snapPoints=[], assets=[], assetType="tile", assetReuse=true, assetSize="md", value, onChange, revealed, answer }) {
+  const isDot = assetType === "dot" || assetType === "pin";
+  const imgContainerRef = useRef(null);
+
+  // All placements stored as [ {x, y, val} ] — val is "●" for dots, the tile value for tiles
+  const placements = (() => {
+    try { return value ? JSON.parse(value) : []; }
+    catch { return []; }
+  })();
+  const pts = Array.isArray(placements) ? placements : [];
+
+  const maxItems = snapPoints.length || 1;
+
+  // Remaining assets in tray
+  const trayAssets = (() => {
+    if (isDot) return ["●"]; // dots always available
+    if (assetReuse) return [...assets];
+    const placed = pts.map(p => p.val);
+    const remaining = [...assets];
+    placed.forEach(v => { const idx = remaining.indexOf(v); if (idx >= 0) remaining.splice(idx, 1); });
+    return remaining;
+  })();
+
+  // ── Drag from tray onto image ──
+  const [dragState, setDragState] = useState(null); // {val, x, y} while dragging
+
+  function startDrag(assetVal, e) {
+    if (revealed) return;
+    e.preventDefault();
+    const cx = e.touches ? e.touches[0].clientX : e.clientX;
+    const cy = e.touches ? e.touches[0].clientY : e.clientY;
+    setDragState({ val: assetVal, x: cx, y: cy });
+
+    function onMove(ev) {
+      const mx = ev.touches ? ev.touches[0].clientX : ev.clientX;
+      const my = ev.touches ? ev.touches[0].clientY : ev.clientY;
+      setDragState(prev => prev ? { ...prev, x: mx, y: my } : null);
+      ev.preventDefault();
+    }
+    function onEnd(ev) {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onEnd);
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onEnd);
+      const fx = ev.changedTouches ? ev.changedTouches[0].clientX : ev.clientX;
+      const fy = ev.changedTouches ? ev.changedTouches[0].clientY : ev.clientY;
+      const img = imgContainerRef.current?.querySelector("img");
+      if (!img) { setDragState(null); return; }
+      const rect = img.getBoundingClientRect();
+      const x = Math.round(((fx - rect.left) / rect.width) * 1000) / 10;
+      const y = Math.round(((fy - rect.top) / rect.height) * 1000) / 10;
+      setDragState(null);
+      if (x < 0 || x > 100 || y < 0 || y > 100) return;
+      let next = [...pts];
+      // For dots: replace oldest if at max; for tiles with reuse: replace oldest if at max
+      if (isDot) {
+        if (next.length >= maxItems) next = next.slice(1);
+        next.push({ x, y, val: assetVal });
+      } else {
+        // For unique tiles, remove any existing placement of this value first
+        if (!assetReuse) next = next.filter(p => p.val !== assetVal);
+        if (next.length >= maxItems) next = next.slice(1);
+        next.push({ x, y, val: assetVal });
+      }
+      onChange(JSON.stringify(next));
+    }
+    document.addEventListener("mousemove", onMove, { passive: false });
+    document.addEventListener("mouseup", onEnd);
+    document.addEventListener("touchmove", onMove, { passive: false });
+    document.addEventListener("touchend", onEnd);
+  }
+
+  function removePoint(idx) {
+    if (revealed) return;
+    const next = pts.filter((_, i) => i !== idx);
+    onChange(JSON.stringify(next));
+  }
+
+  // ── Grading helpers ──
+  const correctMap = answer || {};
+  const TOLERANCE = 2.5; // % of image — how close a placed item must be
+
+  function pointResult(pt) {
+    if (!revealed) return null;
+    for (const sp of snapPoints) {
+      if (correctMap[sp.id]) {
+        const d = Math.sqrt((sp.x - pt.x) ** 2 + (sp.y - pt.y) ** 2);
+        if (d <= TOLERANCE) {
+          // For dots (all same asset): just check proximity
+          if (isDot) return "correct";
+          // For tiles: check proximity AND correct value
+          if (pt.val === correctMap[sp.id]) return "correct";
+        }
+      }
+    }
+    return "wrong";
+  }
+
+  function chipStyle(val, small, correct, wrong) {
+    const sz = small ? "12px" : "19px";
+    const fs = small ? "0.35rem" : "0.5rem";
+    if (isDot) return {
+      width: sz, height: sz, borderRadius: "50%",
+      background: correct ? T.success : wrong ? "#888" : "#e53e3e",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      color: "#fff", fontSize: fs, fontWeight: 700, boxShadow: "0 2px 6px rgba(0,0,0,0.3)", userSelect: "none",
+    };
+    const sizeMap = {xs:"0.55rem",sm:"0.7rem",md:"0.9rem",lg:"1.15rem",xl:"1.4rem"};
+    const padMap = {xs:"0px 2px",sm:"1px 3px",md:"2px 6px",lg:"3px 8px",xl:"4px 10px"};
+    const fSize = sizeMap[assetSize] || sizeMap.md;
+    const fPad = padMap[assetSize] || padMap.md;
+    return {
+      display: "inline-block",
+      background: correct ? "#d1fae5" : wrong ? "#fee2e2" : "transparent",
+      color: correct ? T.success : wrong ? T.dangerText : "#0f0f0f",
+      borderRadius: "3px", padding: small ? fPad : fPad,
+      fontSize: fSize, fontWeight: 600, fontFamily: "Georgia, serif",
+      border: correct ? `1px solid ${T.successBd}` : wrong ? `1px solid ${T.dangerBd}` : "1px solid transparent",
+      userSelect: "none", whiteSpace: "nowrap", textAlign: "center",
+    };
+  }
+
+  function chipLabel(val) { return isDot ? "●" : val; }
+
+  return (
+    <div>
+      <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"0.5rem"}}>
+        {pts.length < maxItems
+          ? `DRAG ${isDot ? "THE DOT" : "A VALUE"} ONTO THE IMAGE (${pts.length}/${maxItems})`
+          : `${maxItems} ITEM${maxItems>1?"S":""} PLACED — DRAG TO REPOSITION`}
+      </div>
+
+      {/* Image + placed items */}
+      <div ref={imgContainerRef} style={{position:"relative",display:"inline-block",maxWidth:500,width:"100%"}}>
+        <img src={questionImage} alt="diagram" style={{width:"100%",display:"block",borderRadius:"6px",pointerEvents:"none"}}/>
+
+        {/* Placed items on image */}
+        {pts.map((pt, i) => {
+          const res = pointResult(pt);
+          const isRight = res === "correct";
+          const isWrong = res === "wrong";
+          return (
+            <div key={i}
+              onClick={() => removePoint(i)}
+              style={{
+                position:"absolute", left:`${pt.x}%`, top:`${pt.y}%`,
+                transform:"translate(-50%,-50%)", zIndex:3,
+                cursor: revealed ? "default" : "pointer",
+              }}>
+              <span style={chipStyle(pt.val, true, isRight, isWrong)}>
+                {isDot ? "●" : pt.val}
+              </span>
+            </div>
+          );
+        })}
+
+        {/* Correct locations shown after reveal (green markers for missed points) */}
+        {revealed && snapPoints.filter(sp => correctMap[sp.id]).map(sp => {
+          const matchedPt = pts.find(pt => {
+            const d = Math.sqrt((sp.x - pt.x)**2 + (sp.y - pt.y)**2);
+            if (d > TOLERANCE) return false;
+            if (isDot) return true;
+            return pt.val === correctMap[sp.id];
+          });
+          if (matchedPt) return null;
+          return (
+            <div key={sp.id} style={{
+              position:"absolute", left:`${sp.x}%`, top:`${sp.y}%`,
+              transform:"translate(-50%,-50%)", zIndex:2,
+            }}>
+              {isDot ? (
+                <div style={{width:14, height:14, borderRadius:"50%", border:`2px dashed ${T.success}`, background:`${T.success}22`, display:"flex", alignItems:"center", justifyContent:"center"}}>
+                  <span style={{fontSize:"0.5rem",color:T.success,fontWeight:700}}>✓</span>
+                </div>
+              ) : (
+                <span style={{fontSize:"0.82rem",fontFamily:"Georgia,serif",color:T.success,fontWeight:700,background:"#d1fae5",padding:"1px 6px",borderRadius:"3px",border:`1px solid ${T.successBd}`}}>
+                  {correctMap[sp.id]}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Asset tray — drag from here onto the image */}
+      {!revealed && (
+        <div style={{
+          display:"flex",flexWrap:"wrap",alignItems:"center",gap:"0.75rem",marginTop:"0.75rem",
+          padding:"0.6rem 0.75rem",background:T.surface,borderRadius:"6px",
+          border:`1px dashed ${T.border}`,
+        }}>
+          {trayAssets.map((asset, i) => (
+            <div key={`${asset}-${i}`}
+              onMouseDown={e => startDrag(asset, e)}
+              onTouchStart={e => startDrag(asset, e)}
+              style={{ cursor:"grab", userSelect:"none" }}>
+              {isDot ? (
+                <div style={{width:19,height:19,borderRadius:"50%",background:"#e53e3e",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:"0.5rem",fontWeight:700,boxShadow:"0 2px 8px rgba(229,62,62,0.4)"}}>●</div>
+              ) : (
+                <span style={chipStyle(asset, false, false, false)}>{asset}</span>
+              )}
+            </div>
+          ))}
+          <span style={{fontSize:"0.75rem",color:T.textSecondary,fontWeight:600,marginLeft:"auto"}}>
+            ← Drag onto image{pts.length > 0 ? ` · ${pts.length} placed (tap to remove)` : ""}
+          </span>
+        </div>
+      )}
+
+      {/* Ghost follows cursor during drag */}
+      {dragState && (
+        <div style={{position:"fixed",left:dragState.x,top:dragState.y,transform:"translate(-50%,-50%)",pointerEvents:"none",zIndex:9999,opacity:0.85}}>
+          {isDot ? (
+            <div style={{width:19,height:19,borderRadius:"50%",background:"#e53e3e",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:"0.5rem",fontWeight:700,boxShadow:"0 2px 8px rgba(229,62,62,0.4)"}}>●</div>
+          ) : (
+            <span style={{...chipStyle(dragState.val, false, false, false), boxShadow:"0 4px 12px rgba(0,0,0,0.15)"}}>{dragState.val}</span>
+          )}
+        </div>
+      )}
+
+      {/* Corrections after reveal */}
+      {revealed && (() => {
+        const correctSps = snapPoints.filter(sp => correctMap[sp.id]);
+        const matched = correctSps.filter(sp => pts.some(pt => {
+          const d = Math.sqrt((sp.x-pt.x)**2+(sp.y-pt.y)**2);
+          if (d > TOLERANCE) return false;
+          return isDot || pt.val === correctMap[sp.id];
+        }));
+        const missed = correctSps.length - matched.length;
+        const extra = pts.filter(pt => !correctSps.some(sp => {
+          const d = Math.sqrt((sp.x-pt.x)**2+(sp.y-pt.y)**2);
+          if (d > TOLERANCE) return false;
+          return isDot || pt.val === correctMap[sp.id];
+        })).length;
+        if (missed === 0 && extra === 0) return null;
+        return (
+          <div style={{marginTop:"0.5rem",padding:"0.5rem 0.75rem",background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:"6px"}}>
+            <div style={{fontSize:"0.65rem",fontWeight:700,color:T.dangerText,marginBottom:"0.3rem"}}>CORRECTIONS:</div>
+            {missed > 0 && <div style={{fontSize:"0.78rem",color:T.text}}>Missing {missed} correct placement{missed>1?"s":""} (shown in green)</div>}
+            {extra > 0 && <div style={{fontSize:"0.78rem",color:T.text}}>{extra} item{extra>1?"s":""} placed incorrectly</div>}
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
 
 // ── Student Login ──────────────────────────────────────────
@@ -364,7 +612,7 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
       </div>
       <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem 1rem",width:"100%"}}>
         <div style={{display:"flex",flexDirection:"column",gap:"1rem",width:"100%",maxWidth:"360px"}}>
-          <div style={{textAlign:"center",fontSize:"0.85rem",color:T.textSecondary,marginBottom:"0.25rem"}}>Signed in. What would you like to do?</div>
+          {student && <div style={{textAlign:"center",fontSize:"0.85rem",color:T.textSecondary}}>Hi, <strong>{student.name}</strong> — what would you like to do?</div>}
           <button onClick={async () => {
             setChecking(true); setErr("");
             try {
@@ -405,16 +653,23 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
               <div style={{width:"52px",height:"52px",borderRadius:"50%",background:"#e8f5e9",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.6rem",flexShrink:0}}>📝</div>
               <div>
                 <div style={{fontSize:"1.1rem",fontWeight:700,color:"#2e7d32",marginBottom:"3px"}}>{a.testTitle}</div>
-                <div style={{fontSize:"0.8rem",color:T.textSecondary}}>Assigned by your teacher — click to start</div>
+                <div style={{fontSize:"0.8rem",color:T.textSecondary}}>Assigned by your teacher</div>
               </div>
             </button>
           ))}
           {studentAssignments.length === 0 && (
             <div style={{textAlign:"center",fontSize:"0.82rem",color:T.textSecondary,padding:"0.5rem",lineHeight:1.6}}>
-              No test assigned right now. Check with your teacher.
+              No test assigned right now.
             </div>
           )}
           {err && <div style={{...S.errBox}}>⚠ {err}</div>}
+          {/* Escape hatch — code entry */}
+          <div style={{textAlign:"center",marginTop:"0.25rem"}}>
+            <button onClick={()=>{setErr("");setStep("code");}}
+              style={{background:"none",border:"none",color:T.textSecondary,fontSize:"0.75rem",cursor:"pointer",textDecoration:"underline",padding:"4px"}}>
+              Have a code from your teacher?
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -575,6 +830,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
       if (q.type === "multiselect") { try { return JSON.stringify([...JSON.parse(sel)].sort())===JSON.stringify([...(Array.isArray(q.answer)?q.answer:[])].sort()); } catch { return false; } }
       if (q.type === "keypad") return String(q.answer??"").trim().toLowerCase()===String(sel).trim().toLowerCase();
       if (q.type === "dragdrop") { try { const given=JSON.parse(sel); const correct=q.correct||q.answer||{}; return (q.items||[]).every(item=>{const c=correct[item]; if(c==="distractor") return given[item]===undefined; return given[item]===c;}); } catch { return false; } }
+      if (q.type === "hotspot") { try { const g=JSON.parse(sel); const c=q.answer||{}; const sps=q.snapPoints||[]; const correctSps=sps.filter(sp=>c[sp.id]); const isDot=q.assetType==="dot"||q.assetType==="pin"; const TOL=2.5; if(!Array.isArray(g)||g.length!==correctSps.length) return false; const matched=correctSps.filter(sp=>g.some(pt=>{const d=Math.sqrt((sp.x-pt.x)**2+(sp.y-pt.y)**2); return d<=TOL&&(isDot||pt.val===c[sp.id]);})); return matched.length===correctSps.length; } catch { return false; } }
       return sel === q.correct;
     }
     const isCorrect = gradeIt(curQ, selected);
@@ -643,6 +899,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
     if (q.type === "multiselect") return JSON.stringify([...(Array.isArray(q.answer)?q.answer:[])].sort());
     if (q.type === "keypad") return String(q.answer??"").trim().toLowerCase();
     if (q.type === "dragdrop") return JSON.stringify(q.correct||q.answer||{});
+    if (q.type === "hotspot") return JSON.stringify(q.answer||{});
     return q.correct;
   })();
   const streak  = (() => { let s=0; for(let i=history.length-1;i>=0;i--){ if(history[i].correct) s++; else break; } return s; })();
@@ -741,6 +998,27 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
                 </button>
               )}
             </div>
+          ) : q.type === "hotspot" ? (
+            <div>
+              <HotspotAnswer
+                questionImage={q.questionImage}
+                snapPoints={q.snapPoints||[]}
+                assets={q.items||[]}
+                assetType={q.assetType||"tile"}
+                assetReuse={q.assetReuse!==false}
+                assetSize={q.assetSize||"md"}
+                value={selected}
+                onChange={v => { if (!revealed) setSelected(v); }}
+                revealed={revealed}
+                answer={revealed ? (q.answer||{}) : null}
+              />
+              {!revealed && selected && (
+                <button onClick={() => handleChoose(selected)}
+                  style={{background:T.midnight,color:T.white,border:"none",borderRadius:"4px",padding:"0.65rem 1.25rem",fontSize:"0.9rem",fontWeight:700,cursor:"pointer",marginTop:"0.75rem"}}>
+                  Submit →
+                </button>
+              )}
+            </div>
           ) : q.type === "multiselect" ? (
             <div style={{display:"flex",flexDirection:"column",gap:"0.6rem"}}>
               <div style={{fontSize:"0.7rem",color:T.textSecondary,marginBottom:"4px"}}>Select all that apply.</div>
@@ -816,10 +1094,14 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
                 try { isOk = JSON.stringify([...JSON.parse(selected)].sort()) === correct; } catch { isOk = false; }
               } else if (q.type === "keypad") {
                 isOk = String(selected??"").trim().toLowerCase() === correct;
+              } else if (q.type === "hotspot") {
+                try { const g=JSON.parse(selected); const c=q.answer||{}; const sps=q.snapPoints||[]; const correctSps=sps.filter(sp=>c[sp.id]); const isDot=q.assetType==="dot"||q.assetType==="pin"; const TOL=2.5; if(!Array.isArray(g)||g.length!==correctSps.length){isOk=false;}else{const matched=correctSps.filter(sp=>g.some(pt=>{const d=Math.sqrt((sp.x-pt.x)**2+(sp.y-pt.y)**2); return d<=TOL&&(isDot||pt.val===c[sp.id]);})); isOk=matched.length===correctSps.length;}} catch { isOk=false; }
               } else {
                 isOk = selected === correct;
               }
               const correctLabel = q.type==="dragdrop"
+                ? "See corrections above"
+                : q.type==="hotspot"
                 ? "See corrections above"
                 : q.type==="multiselect"
                 ? (Array.isArray(q.answer)?q.answer:[]).join(", ")
@@ -839,11 +1121,11 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
               ); })()}
 
           {/* Next button */}
-          {(revealed || (q.type==="plotpoint" && selected)) && (
+          {(revealed || ((q.type==="plotpoint"||q.type==="hotspot") && selected)) && (
             <div style={{display:"flex",gap:"0.75rem"}}>
               <button onClick={handleNext}
                 style={{flex:1,background:T.midnight,border:"none",borderRadius:"6px",padding:"0.85rem",fontSize:"0.95rem",cursor:"pointer",color:T.white,fontWeight:700}}>
-                {(q.type==="plotpoint"||q.type==="keypad"||q.type==="multiselect"||q.type==="dragdrop") && !revealed ? "Submit Answer →" : "Next Question →"}
+                {(q.type==="plotpoint"||q.type==="keypad"||q.type==="multiselect"||q.type==="dragdrop"||q.type==="hotspot") && !revealed ? "Submit Answer →" : "Next Question →"}
               </button>
               <button onClick={handleQuit}
                 style={{background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:"6px",padding:"0.85rem 1.25rem",fontSize:"0.85rem",cursor:"pointer",color:T.textSecondary,fontWeight:600}}>
@@ -947,7 +1229,7 @@ function normalizeQuestion(q) {
                          typeof answer[0] === "number" && typeof answer[1] === "number";
   const type = (q.type === "plotpoint" || (isPlotAnswer && !hasRealChoices))
     ? "plotpoint"
-    : (["multiselect","keypad","dragdrop"].includes(q.type) ? q.type : "mcq");
+    : (["multiselect","keypad","dragdrop","hotspot"].includes(q.type) ? q.type : "mcq");
   return { ...q, type, answer };
 }
 
@@ -992,6 +1274,10 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
   const [modal, setModal] = useState(false);
   const [nav,   setNav]   = useState(window.innerWidth > 640);
 
+  const qTimeRef    = useRef({});   // {questionId: accumulatedMs}
+  const prevCurRef  = useRef(cur);
+  const qEnteredRef = useRef(Date.now());
+
   // Auto-submit if restored endTime is already in the past
   useEffect(() => {
     if (restored.current && !untimed && endTimeRef.current && endTimeRef.current <= Date.now()) {
@@ -1010,6 +1296,18 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
     } catch (e) { console.warn("Could not persist test state to sessionStorage:", e); }
   }, [ans, cur, flg, sessionKey]);
 
+  // Track time spent per question as cur changes
+  useEffect(() => {
+    const prevCur = prevCurRef.current;
+    const elapsed = Date.now() - qEnteredRef.current;
+    const prevQId = questions[prevCur]?.id;
+    if (prevQId) {
+      qTimeRef.current[prevQId] = (qTimeRef.current[prevQId] || 0) + elapsed;
+    }
+    prevCurRef.current = cur;
+    qEnteredRef.current = Date.now();
+  }, [cur]); // eslint-disable-line
+
   // Adaptive: fetch student history and seed weights
   useEffect(() => {
     if (!adaptive) return;
@@ -1026,7 +1324,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
     seedWeights();
   }, [adaptive, studentId]);  // eslint-disable-line
 
-  // Grade a single answer — handles all question types (MCQ, multiselect, keypad, plotpoint)
+  // Grade a single answer — handles all question types (MCQ, multiselect, keypad, plotpoint, hotspot)
   function gradeOne(q, given) {
     if (!given) return false;
     if (q.type === "plotpoint") {
@@ -1043,6 +1341,19 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
     }
     if (q.type === "keypad") {
       return String(q.answer ?? "").trim().toLowerCase() === String(given).trim().toLowerCase();
+    }
+    if (q.type === "hotspot") {
+      try {
+        const g = JSON.parse(given); const c = q.answer || {};
+        const sps = q.snapPoints || []; const correctSps = sps.filter(sp => c[sp.id]);
+        const isDot = q.assetType === "dot" || q.assetType === "pin"; const TOL = 2.5;
+        if (!Array.isArray(g) || g.length !== correctSps.length) return false;
+        const matched = correctSps.filter(sp => g.some(pt => {
+          const d = Math.sqrt((sp.x-pt.x)**2+(sp.y-pt.y)**2);
+          return d <= TOL && (isDot || pt.val === c[sp.id]);
+        }));
+        return matched.length === correctSps.length;
+      } catch { return false; }
     }
     return given === q.correct;
   }
@@ -1286,6 +1597,19 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
     if (q.type === "dragdrop") {
       try { const g=JSON.parse(given); const correct=q.correct||q.answer||{}; return (q.items||[]).every(item=>{const c=correct[item]; if(c==="distractor") return g[item]===undefined; return g[item]===c;}); } catch { return false; }
     }
+    if (q.type === "hotspot") {
+      try {
+        const g = JSON.parse(given); const c = q.answer || {};
+        const sps = q.snapPoints || []; const correctSps = sps.filter(sp => c[sp.id]);
+        const isDot = q.assetType === "dot" || q.assetType === "pin"; const TOL = 2.5;
+        if (!Array.isArray(g) || g.length !== correctSps.length) return false;
+        const matched = correctSps.filter(sp => g.some(pt => {
+          const d = Math.sqrt((sp.x-pt.x)**2+(sp.y-pt.y)**2);
+          return d <= TOL && (isDot || pt.val === c[sp.id]);
+        }));
+        return matched.length === correctSps.length;
+      } catch { return false; }
+    }
     return given === q.correct;
   }
 
@@ -1298,7 +1622,20 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
       const given = ans[q.id] ?? null;
       return a + (gradeAnswer(q, given) ? 1 : 0);
     }, 0);
-    const session = { score, total:TOTAL, pct:pct(score,TOTAL), submitted:now(), timeUsed:untimed ? fmtTime(0) : fmtTime(timeLimitSecs-secs), answers:{...ans}, violations, violationLog };
+    // Finalize time on current question
+    const finalElapsed = Date.now() - qEnteredRef.current;
+    const curQId = questions[cur]?.id;
+    if (curQId) qTimeRef.current[curQId] = (qTimeRef.current[curQId] || 0) + finalElapsed;
+
+    const questionTimes = questions.map(q => ({
+      qId:      q.id,
+      standard: q.standard || "",
+      dok:      q.dok || null,
+      timeSecs: Math.round((qTimeRef.current[q.id] || 0) / 1000),
+      correct:  gradeAnswer(q, ans[q.id] ?? null),
+    }));
+
+    const session = { score, total:TOTAL, pct:pct(score,TOTAL), submitted:now(), timeUsed:untimed ? fmtTime(0) : fmtTime(timeLimitSecs-secs), answers:{...ans}, violations, violationLog, questionTimes };
     onFinish(session);
   }
 
@@ -1472,7 +1809,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
           <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"1.25rem 1.5rem"}}>
             <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"0.65rem"}}>QUESTION</div>
             <p style={{fontSize:"1.05rem",fontFamily:"Georgia,serif",color:"#0f0f0f",lineHeight:1.72,margin:0}}><MathText text={q.question}/></p>
-            {q.questionImage&&<img src={q.questionImage} alt="diagram" style={{maxWidth:"100%",maxHeight:"200px",marginTop:"0.75rem",borderRadius:T.xs,display:"block"}}/>}
+            {q.questionImage&&q.type!=="hotspot"&&<img src={q.questionImage} alt="diagram" style={{maxWidth:"100%",maxHeight:"200px",marginTop:"0.75rem",borderRadius:T.xs,display:"block"}}/>}
           </div>
           <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"1.1rem 1.5rem"}}>
             {q.type === "plotpoint" ? (
@@ -1513,6 +1850,19 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
                 revealed={false}
                 correctMap={null}
                 ddLayout={q.ddLayout||"categories"}
+              />
+            ) : q.type === "hotspot" ? (
+              <HotspotAnswer
+                questionImage={q.questionImage}
+                snapPoints={q.snapPoints||[]}
+                assets={q.items||[]}
+                assetType={q.assetType||"tile"}
+                assetReuse={q.assetReuse!==false}
+                assetSize={q.assetSize||"md"}
+                value={sel}
+                onChange={v => { setAns(p=>({...p,[q.id]:v})); handleAdaptiveAnswer(q.id, v); }}
+                revealed={false}
+                answer={null}
               />
             ) : q.type === "multiselect" ? (
               <>
@@ -2476,6 +2826,9 @@ function StudentResults({ session, questions, onReset }) {
                   try { const ga = JSON.parse(given); return JSON.stringify([...ga].sort())===JSON.stringify([...correct].sort()); } catch { return false; }
                 }
                 if (q.type === "keypad") return String(q.answer??"").trim().toLowerCase()===String(given).trim().toLowerCase();
+                if (q.type === "hotspot") {
+                  try { const g=JSON.parse(given); const c=q.answer||{}; const v=Object.values(c); if(v.length>0&&new Set(v).size===1) return JSON.stringify(Object.keys(g).sort())===JSON.stringify(Object.keys(c).sort()); return JSON.stringify(g)===JSON.stringify(c); } catch { return false; }
+                }
                 return given === q.correct;
               }
               const ok = gradeAns(q, a);
@@ -2485,6 +2838,7 @@ function StudentResults({ session, questions, onReset }) {
                 if (q.type === "multiselect") { const arr = Array.isArray(q.answer)?q.answer:[]; return arr.join(", ") || "?"; }
                 if (q.type === "keypad") return String(q.answer ?? "");
                 if (q.type === "dragdrop") return (q.items||[]).filter(it=>(q.correct||{})[it]!=="distractor").map(it=>`${it} → ${(q.zones||[])[(q.correct||q.answer||{})[it]]||"?"}`).join(", ");
+                if (q.type === "hotspot") { const c=q.answer||{}; const sps=(q.snapPoints||[]).filter(sp=>c[sp.id]); return `${sps.length} correct placement${sps.length!==1?"s":""}`;}
                 return q.correct;
               })();
               // Human-readable student answer
@@ -2493,6 +2847,7 @@ function StudentResults({ session, questions, onReset }) {
                 if (q.type === "plotpoint") { try { const arr=JSON.parse(a); return `(${arr[0]}, ${arr[1]})`; } catch { return a; } }
                 if (q.type === "multiselect") { try { return JSON.parse(a).join(", "); } catch { return a; } }
                 if (q.type === "dragdrop") { try { const g=JSON.parse(a); return Object.entries(g).map(([item,zi])=>`${item} → ${(q.zones||[])[zi]||"?"}`).join(", "); } catch { return a; } }
+                if (q.type === "hotspot") { try { const g=JSON.parse(a); return Array.isArray(g) ? `${g.length} item${g.length!==1?"s":""} placed` : a; } catch { return a; } }
                 return a;
               })();
               return <div key={q.id} style={{display:"flex",gap:"0.75rem",marginBottom:"0.6rem",padding:"0.7rem 0.85rem",background:ok?T.successBg:T.dangerBg,border:`1px solid ${ok?T.successBd:T.dangerBd}`,borderRadius:T.xs}}>

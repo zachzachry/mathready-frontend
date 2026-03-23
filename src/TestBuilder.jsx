@@ -88,6 +88,12 @@ function EditModal({ question, onSave, onClose }) {
       if ((q.zones||[]).length<2 || (q.items||[]).filter(x=>x.trim()).length<2) return;
       const correctMap = typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{};
       if ((q.items||[]).some(item=>correctMap[item]===undefined)) return;
+    } else if (q.type === "hotspot") {
+      if (!q.questionImage || (q.snapPoints||[]).length < 1 || (q.items||[]).length < 1 || !q.answer || Object.keys(q.answer).length < 1) return;
+    } else if (q.type === "keypad") {
+      if (q.answer == null || String(q.answer).trim() === "") return;
+    } else if (q.type === "plotpoint") {
+      if (!Array.isArray(q.answer) || q.answer.length !== 2) return;
     } else {
       if ((q.choices||[]).filter(c=>c.trim()).length < 4 || !(typeof q.correct==="string"&&q.correct.trim())) return;
     }
@@ -211,9 +217,9 @@ function EditModal({ question, onSave, onClose }) {
 }
 
 // ── Save Test Modal ────────────────────────────────────────
-function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose, editing }) {
+function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose, editing, teacher }) {
+  const isAdmin = teacher && (teacher.teacherRole === "super_admin" || teacher.teacherRole === "school_admin");
   const [name,      setName]      = useState(editing?.name || currentTitle || "");
-  const [code,      setCode]      = useState(editing?.code || genCode());
   const [saving,    setSaving]    = useState(false);
   const [codeErr,   setCodeErr]   = useState("");
   const [adaptive,  setAdaptive]  = useState(editing?.adaptive || false);
@@ -224,10 +230,22 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose, 
   const [oneAttempt,     setOneAttempt]     = useState(editing?.oneAttempt || false);
   const [classes,        setClasses]        = useState([]);
   const [assignedClassIds, setAssignedClassIds] = useState([]);
+  // Visibility / GMAS fields
+  const [visibility,      setVisibility]      = useState(editing?.visibility || "private");
+  const [adminScoresOnly, setAdminScoresOnly] = useState(editing?.adminScoresOnly || false);
+  const [closeDate,       setCloseDate]       = useState(editing?.closeDate || "");
+  const [sharedWith,      setSharedWith]      = useState(editing?.sharedWith || []);
+  const [allTeachers,     setAllTeachers]     = useState([]);
 
   useEffect(() => {
     fetch(`${API}/roster`).then(r=>r.json()).then(d=>setClasses(Array.isArray(d)?d:[])).catch(()=>{});
   }, []);
+
+  useEffect(() => {
+    if (visibility === "grade") {
+      fetch(`${API}/teachers`).then(r=>r.json()).then(d=>setAllTeachers(Array.isArray(d)?d:[])).catch(()=>{});
+    }
+  }, [visibility]);
 
   function toggleClass(id) {
     setAssignedClassIds(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev, id]);
@@ -237,15 +255,8 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose, 
     t.name?.trim().toLowerCase() === name.trim().toLowerCase() && (!editing || t.id !== editing.id)
   );
 
-  function handleCodeChange(val) {
-    const clean = val.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,8);
-    setCode(clean);
-    setCodeErr(clean.length < 4 ? "Code must be at least 4 characters" : "");
-  }
-
   async function handleSave() {
     if (!name.trim()) { setCodeErr("Test name is required"); return; }
-    if (code.length < 4) { setCodeErr("Code must be at least 4 characters"); return; }
     if (duplicate && !overwriteWarning) { setOverwriteWarning(true); return; }
     setSaving(true);
     const timerCfg = {
@@ -254,36 +265,27 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose, 
       warnSecs:      untimed ? 0 : Math.max(1, warnMins) * 60,
       oneAttempt,
       classIds: assignedClassIds,
+      visibility,
+      sharedWith: visibility === "grade" ? sharedWith : [],
+      adminScoresOnly: visibility === "global" ? adminScoresOnly : false,
+      closeDate: (visibility === "global" && adminScoresOnly && closeDate) ? closeDate : null,
     };
-    const err = await onSave(name.trim(), code, adaptive, timerCfg);
+    const err = await onSave(name.trim(), editing?.code || "", adaptive, timerCfg);
     if (err) { setCodeErr(err); setSaving(false); setOverwriteWarning(false); }
   }
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
-      <div style={{background:T.white,borderRadius:"6px",width:"100%",maxWidth:"420px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.25)"}}>
-        <div style={{background:T.midnight,color:T.white,padding:"0.9rem 1.25rem"}}>
+      <div style={{background:T.white,borderRadius:"6px",width:"100%",maxWidth:"440px",maxHeight:"92vh",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.25)",display:"flex",flexDirection:"column"}}>
+        <div style={{background:T.midnight,color:T.white,padding:"0.9rem 1.25rem",flexShrink:0}}>
           <div style={{fontSize:"0.6rem",opacity:.65,letterSpacing:"0.14em"}}>TEST LIBRARY</div>
           <div style={{fontSize:"1rem",fontWeight:700}}>{editing?"Edit Test":"Save Test"}</div>
         </div>
-        <div style={{padding:"1.25rem",display:"flex",flexDirection:"column",gap:"0.85rem"}}>
+        <div style={{padding:"1.25rem",display:"flex",flexDirection:"column",gap:"0.85rem",overflowY:"auto",flex:1}}>
           <div><label style={S.lbl}>TEST NAME</label>
             <input style={S.inp} value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Chapter 3 Fractions Quiz" autoFocus/>
           </div>
-          <div>
-            <label style={S.lbl}>STUDENT CODE — students enter this to access the test</label>
-            <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
-              <input style={{...S.inp,...S.code,flex:1}} value={code} onChange={e=>handleCodeChange(e.target.value)} maxLength={8} placeholder="e.g. FRACTIONS"/>
-              <button onClick={()=>setCode(genCode())} style={{...S.smBtn,flexShrink:0,padding:"0.5rem 0.75rem"}}>🔀 New</button>
-            </div>
-            {codeErr
-              ? <div style={{fontSize:"0.7rem",color:T.dangerText,marginTop:"4px"}}>⚠ {codeErr}</div>
-              : <div style={{fontSize:"0.7rem",color:T.textSecondary,marginTop:"4px"}}>4–8 characters, letters and numbers only</div>
-            }
-          </div>
-          <div style={{background:T.surfaceAlt,borderRadius:T.xs,padding:"0.65rem 0.85rem",fontSize:"0.78rem",color:T.textSecondary}}>
-            Students log in and enter <strong style={S.code}>{code||"—"}</strong> to take this {count}-question test.
-          </div>
+          {codeErr && <div style={{fontSize:"0.78rem",color:T.dangerText,background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:T.xs,padding:"0.5rem 0.75rem"}}>⚠ {codeErr}</div>}
           <div>
             <label style={{display:"flex",alignItems:"center",gap:"0.75rem",cursor:"pointer",padding:"0.65rem 0.85rem",background:adaptive?T.successBg:T.surface,border:`1px solid ${adaptive?T.successBd:T.border}`,borderRadius:T.xs}}>
               <div onClick={()=>setAdaptive(a=>!a)}
@@ -345,6 +347,53 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose, 
             </div>
           </label>
         </div>
+        {/* Visibility */}
+        <div style={{borderTop:"1px solid #eef1f4",paddingTop:"0.85rem"}}>
+          <label style={S.lbl}>VISIBILITY</label>
+          <div style={{display:"flex",gap:"0.5rem"}}>
+            {[["private","🔒 Private","Only you can see and use this test"],["grade","👥 Grade","Share with specific teachers in your school"],isAdmin&&["global","🌐 Global","Available to all teachers (admin only)"]].filter(Boolean).map(([val,label,desc])=>(
+              <button key={val} onClick={()=>setVisibility(val)} style={{flex:1,padding:"0.55rem 0.4rem",border:`2px solid ${visibility===val?"#1565c0":"#c8d3dd"}`,borderRadius:T.xs,background:visibility===val?"#e3f2fd":"#fff",cursor:"pointer",textAlign:"left"}}>
+                <div style={{fontSize:"0.72rem",fontWeight:700,color:visibility===val?"#1565c0":T.text}}>{label}</div>
+                <div style={{fontSize:"0.58rem",color:T.textSecondary,marginTop:"1px"}}>{desc}</div>
+              </button>
+            ))}
+          </div>
+          {/* Grade: teacher picker */}
+          {visibility==="grade" && allTeachers.length > 0 && (
+            <div style={{marginTop:"0.6rem"}}>
+              <label style={S.lbl}>SHARE WITH TEACHERS</label>
+              <div style={{maxHeight:"100px",overflowY:"auto",border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"0.35rem 0.5rem",display:"flex",flexDirection:"column",gap:"3px"}}>
+                {allTeachers.filter(t=>t.id !== teacher?.teacherId).map(t=>(
+                  <label key={t.id} style={{display:"flex",alignItems:"center",gap:"0.5rem",cursor:"pointer",fontSize:"0.78rem"}}>
+                    <input type="checkbox" checked={sharedWith.includes(t.id)} onChange={()=>setSharedWith(prev=>prev.includes(t.id)?prev.filter(x=>x!==t.id):[...prev,t.id])}/>
+                    {t.name} <span style={{fontSize:"0.65rem",color:T.textSecondary}}>({t.email||t.id})</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Global: GMAS Simulator options */}
+          {visibility==="global" && isAdmin && (
+            <div style={{marginTop:"0.6rem",background:"#fafafa",border:"1px solid #ddd",borderRadius:T.xs,padding:"0.65rem 0.85rem"}}>
+              <label style={{display:"flex",alignItems:"center",gap:"0.75rem",cursor:"pointer"}} onClick={()=>setAdminScoresOnly(a=>!a)}>
+                <div style={{width:"32px",height:"18px",borderRadius:"9px",background:adminScoresOnly?"#7b1fa2":"#bbb",position:"relative",flexShrink:0,transition:"background .2s"}}>
+                  <div style={{position:"absolute",top:"2px",left:adminScoresOnly?"14px":"2px",width:"14px",height:"14px",borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+                </div>
+                <div>
+                  <div style={{fontSize:"0.78rem",fontWeight:700,color:adminScoresOnly?"#7b1fa2":T.text}}>🎯 GMAS Simulator {adminScoresOnly?"ON":"OFF"}</div>
+                  <div style={{fontSize:"0.65rem",color:T.textSecondary}}>Scores visible to admin only — teachers see no results</div>
+                </div>
+              </label>
+              {adminScoresOnly && (
+                <div style={{marginTop:"0.55rem"}}>
+                  <label style={S.lbl}>CLOSE DATE (students blocked after this date)</label>
+                  <input type="date" value={closeDate} onChange={e=>setCloseDate(e.target.value)}
+                    style={{...S.inp,fontFamily:"monospace"}}/>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         </div>
         {overwriteWarning && (
           <div style={{padding:"0.75rem 1.25rem",background:T.warningBg,borderTop:`1px solid ${T.warningBd}`}}>
@@ -358,8 +407,8 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose, 
         )}
         <div style={{display:"flex",gap:"0.65rem",padding:"0.9rem 1.25rem",borderTop:`1px solid ${T.border}`}}>
           <button onClick={()=>{ setOverwriteWarning(false); onClose(); }} style={{flex:1,background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600,color:T.text}}>Cancel</button>
-          <button onClick={handleSave} disabled={saving||!name.trim()||code.length<4}
-            style={{flex:1,background:(!name.trim()||code.length<4)?T.border:overwriteWarning?"#b8860b":T.teal,border:"none",borderRadius:T.xs,padding:"0.65rem",fontSize:"0.85rem",cursor:(!name.trim()||code.length<4)?"not-allowed":"pointer",color:T.white,fontWeight:700}}>
+          <button onClick={handleSave} disabled={saving||!name.trim()}
+            style={{flex:1,background:!name.trim()?T.border:overwriteWarning?"#b8860b":T.teal,border:"none",borderRadius:T.xs,padding:"0.65rem",fontSize:"0.85rem",cursor:!name.trim()?"not-allowed":"pointer",color:T.white,fontWeight:700}}>
             {saving?"Saving…":overwriteWarning?"Save Anyway →":editing?"💾 Update":"💾 Save"}
           </button>
         </div>
@@ -532,6 +581,7 @@ function AssignTestModal({ test, onDone, onClose, teacher, existingAssignments }
 
 // ── Main TestBuilder ───────────────────────────────────────
 export default function TestBuilder({ teacher, readOnly }) {
+  const isAdmin = teacher && (teacher.teacherRole === "super_admin" || teacher.teacherRole === "school_admin");
   const [bank, setBank]               = useState([]);
   const [selected, setSelected]       = useState([]);
   const [loading, setLoading]         = useState(true);
@@ -574,9 +624,12 @@ export default function TestBuilder({ teacher, readOnly }) {
   }, []);
 
   const loadSavedTests = useCallback(async () => {
-    try { const r=await fetch(`${API}/tests/saved`); setSavedTests(await r.json()); }
-    catch { setSavedTests([]); }
-  }, []);
+    try {
+      const p = teacher?.teacherId ? `?teacherId=${teacher.teacherId}&role=${teacher.teacherRole||"teacher"}` : "";
+      const r = await fetch(`${API}/tests/saved${p}`);
+      setSavedTests(await r.json());
+    } catch { setSavedTests([]); }
+  }, [teacher]);
 
   const loadAssignments = useCallback(async () => {
     try {
@@ -647,8 +700,15 @@ export default function TestBuilder({ teacher, readOnly }) {
 
   async function saveTest(name, code, adaptive=false, timerCfg={}) {
     try {
-      const body = {name,code,title:testTitle,questions:selectedQuestions,adaptive,subject,...timerCfg};
-      const url = editingTestId ? `${API}/tests/saved/${editingTestId.id}` : `${API}/tests/saved`;
+      const tParams = teacher?.teacherId ? `?teacherId=${teacher.teacherId}&role=${teacher.teacherRole||"teacher"}` : "";
+      const body = {
+        name, code, title:testTitle, questions:selectedQuestions, adaptive, subject, ...timerCfg,
+        createdBy:     editingTestId ? (editingTestId.createdBy || teacher?.teacherId || "") : (teacher?.teacherId || ""),
+        createdByName: editingTestId ? (editingTestId.createdByName || teacher?.teacherName || "") : (teacher?.teacherName || ""),
+      };
+      const url = editingTestId
+        ? `${API}/tests/saved/${editingTestId.id}${tParams}`
+        : `${API}/tests/saved${tParams}`;
       const method = editingTestId ? "PUT" : "POST";
       const r = await fetch(url,{method,headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
       if (!r.ok) { const err = await r.json().catch(()=>({})); return err.detail || `Server error (${r.status})`; }
@@ -664,11 +724,19 @@ export default function TestBuilder({ teacher, readOnly }) {
 
   async function loadSavedTest(id, forEdit=false) {
     try {
-      const r=await fetch(`${API}/tests/saved/${id}`); const t=await r.json();
+      const p = teacher?.teacherId ? `?teacherId=${teacher.teacherId}&role=${teacher.teacherRole||"teacher"}` : "";
+      const r = await fetch(`${API}/tests/saved/${id}${p}`);
+      const t = await r.json();
       setSelected((t.questions||[]).map(q=>q.id));
       setTestTitle(t.title||t.name||"");
       setRightTab("current");
-      if (forEdit) setEditingTestId({id, name:t.name, code:t.code, adaptive:!!t.adaptive, untimed:!!t.untimed, timeLimitSecs:t.timeLimitSecs, warnSecs:t.warnSecs, oneAttempt:!!t.oneAttempt});
+      if (forEdit) setEditingTestId({
+        id, name:t.name, code:t.code, adaptive:!!t.adaptive, untimed:!!t.untimed,
+        timeLimitSecs:t.timeLimitSecs, warnSecs:t.warnSecs, oneAttempt:!!t.oneAttempt,
+        visibility:t.visibility||"private", sharedWith:t.sharedWith||[],
+        adminScoresOnly:!!t.adminScoresOnly, closeDate:t.closeDate||"",
+        createdBy:t.createdBy||"", createdByName:t.createdByName||"",
+      });
       else setEditingTestId(null);
     } catch {}
   }
@@ -679,18 +747,28 @@ export default function TestBuilder({ teacher, readOnly }) {
   }
 
   async function deleteSavedTest(id) {
-    try { await fetch(`${API}/tests/saved/${id}`,{method:"DELETE"}); setSavedTests(s=>s.filter(t=>t.id!==id)); }
-    catch {}
+    try {
+      const p = teacher?.teacherId ? `?teacherId=${teacher.teacherId}&role=${teacher.teacherRole||"teacher"}` : "";
+      await fetch(`${API}/tests/saved/${id}${p}`,{method:"DELETE"});
+      setSavedTests(s=>s.filter(t=>t.id!==id));
+    } catch {}
   }
 
   async function duplicateSavedTest(id) {
     try {
-      const r = await fetch(`${API}/tests/saved/${id}`);
+      const p = teacher?.teacherId ? `?teacherId=${teacher.teacherId}&role=${teacher.teacherRole||"teacher"}` : "";
+      const r = await fetch(`${API}/tests/saved/${id}${p}`);
       const t = await r.json();
-      const body = { name: `${t.name} (copy)`, questions: t.questions||[], title: t.title||"",
+      const body = {
+        name: `${t.name} (copy)`, questions: t.questions||[], title: t.title||"",
         adaptive: t.adaptive||false, untimed: t.untimed||false, timeLimitSecs: t.timeLimitSecs||1800,
-        warnSecs: t.warnSecs||300, oneAttempt: t.oneAttempt||false, classIds: [], subject: t.subject||"math" };
-      await fetch(`${API}/tests/saved`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+        warnSecs: t.warnSecs||300, oneAttempt: t.oneAttempt||false, classIds: [],
+        subject: t.subject||"math",
+        createdBy: teacher?.teacherId||"", createdByName: teacher?.teacherName||"",
+        visibility: "private", sharedWith: [], adminScoresOnly: false, closeDate: null,
+      };
+      const cp = teacher?.teacherId ? `?teacherId=${teacher.teacherId}&role=${teacher.teacherRole||"teacher"}` : "";
+      await fetch(`${API}/tests/saved${cp}`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
       await loadSavedTests();
     } catch {}
   }
@@ -907,37 +985,51 @@ export default function TestBuilder({ teacher, readOnly }) {
                   /* Extract unique standards from the full test via the question bank */
                   const testStds = [...new Set((bank||[]).filter(bq=>(t.questionIds||[]).includes(bq.id)||(savedTests.find(x=>x.id===t.id)?.questions||[]).some(sq=>sq.id===bq.id)).map(bq=>bq.standard).filter(Boolean))].sort();
                   const classNames = (t.classIds||[]).map(id=>allClasses.find(c=>c.id===id)?.name).filter(Boolean);
+                  const canEdit = !t.createdBy || t.createdBy === teacher?.teacherId || isAdmin;
+                  const canDupe = t.visibility !== "global" || isAdmin;
+                  const vis = t.visibility || "private";
+                  const visBadge = vis==="global"
+                    ? (t.adminScoresOnly ? {icon:"🎯",label:"GMAS Sim",bg:"#f3e5f5",color:"#7b1fa2",bd:"#ce93d8"}
+                                        : {icon:"🌐",label:"Global",bg:"#e8f5e9",color:"#2e7d32",bd:"#a5d6a7"})
+                    : vis==="grade"
+                    ? {icon:"👥",label:"Grade",bg:"#e3f2fd",color:"#1565c0",bd:"#90caf9"}
+                    : {icon:"🔒",label:"Private",bg:T.surfaceAlt,color:T.textSecondary,bd:T.border};
                   return (
                   <div key={t.id} style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:"6px",padding:"0.85rem 1rem",marginBottom:"0.6rem",transition:"box-shadow .15s",boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
                     <div style={{display:"flex",alignItems:"flex-start",gap:"0.75rem"}}>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:"0.9rem",fontWeight:700,color:T.text}}>{t.name||"Untitled"}</div>
+                        <div style={{display:"flex",alignItems:"center",gap:"0.5rem",flexWrap:"wrap"}}>
+                          <span style={{fontSize:"0.9rem",fontWeight:700,color:T.text}}>{t.name||"Untitled"}</span>
+                          <span style={{fontSize:"0.58rem",fontWeight:700,background:visBadge.bg,color:visBadge.color,border:`1px solid ${visBadge.bd}`,borderRadius:"3px",padding:"1px 6px"}}>{visBadge.icon} {visBadge.label}</span>
+                          {t.createdByName&&<span style={{fontSize:"0.58rem",color:T.textSecondary}}>by {t.createdByName}</span>}
+                        </div>
                         <div style={{fontSize:"0.7rem",color:T.textSecondary,marginTop:"2px"}}>
                           {t.count} Q{t.count!==1?"s":""} · {t.saved_at}
                           {t.oneAttempt&&<span style={{marginLeft:"6px",background:"#fff3e0",color:"#e65100",borderRadius:"3px",padding:"0px 5px",fontSize:"0.6rem",fontWeight:600}}>1 attempt</span>}
                           {t.untimed&&<span style={{marginLeft:"4px",background:"#e8f5e9",color:"#2e7d32",borderRadius:"3px",padding:"0px 5px",fontSize:"0.6rem",fontWeight:600}}>untimed</span>}
                           {t.adaptive&&<span style={{marginLeft:"4px",background:"#e3f2fd",color:"#1565c0",borderRadius:"3px",padding:"0px 5px",fontSize:"0.6rem",fontWeight:600}}>adaptive</span>}
+                          {t.closeDate&&<span style={{marginLeft:"4px",background:"#fce4ec",color:"#c62828",borderRadius:"3px",padding:"0px 5px",fontSize:"0.6rem",fontWeight:600}}>closes {t.closeDate}</span>}
                         </div>
                       </div>
                       <div style={{display:"flex",gap:"0.35rem",flexShrink:0}}>
                         <button onClick={()=>setAssigningTest(t)} title="Assign to students"
                           style={{...S.smBtn,background:(testAssignments||[]).some(a=>a.testId===t.id)?"#2e7d32":"#e65100",color:"#fff",borderColor:(testAssignments||[]).some(a=>a.testId===t.id)?"#2e7d32":"#e65100",padding:"5px 12px",fontWeight:700}}>
                           {(testAssignments||[]).some(a=>a.testId===t.id)?"📋 Assigned":"📋 Assign"}</button>
-                        <button onClick={()=>loadSavedTest(t.id,true)} title="Edit test"
-                          style={{...S.smBtn,background:T.teal,color:"#fff",borderColor:T.teal,padding:"5px 12px"}}>✏️ Edit</button>
-                        <button onClick={()=>duplicateSavedTest(t.id)} title="Duplicate test"
-                          style={{...S.smBtn,padding:"5px 8px",background:T.surfaceAlt,borderColor:T.border,color:T.text}}>📄</button>
-                        <button onClick={()=>setConfirmDeleteTest(t)} title="Delete test"
-                          style={{...S.smBtn,color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",padding:"5px 8px"}}>🗑</button>
+                        {canEdit&&<button onClick={()=>loadSavedTest(t.id,true)} title="Edit test"
+                          style={{...S.smBtn,background:T.teal,color:"#fff",borderColor:T.teal,padding:"5px 12px"}}>✏️ Edit</button>}
+                        {canDupe&&<button onClick={()=>duplicateSavedTest(t.id)} title="Duplicate test"
+                          style={{...S.smBtn,padding:"5px 8px",background:T.surfaceAlt,borderColor:T.border,color:T.text}}>📄</button>}
+                        {canEdit&&<button onClick={()=>setConfirmDeleteTest(t)} title="Delete test"
+                          style={{...S.smBtn,color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",padding:"5px 8px"}}>🗑</button>}
                       </div>
                     </div>
-                    {/* Code + Copy */}
+                    {/* Direct link (backup access) */}
                     {t.code&&(
                       <div style={{marginTop:"0.5rem",display:"flex",alignItems:"center",gap:"0.5rem",background:T.surface,borderRadius:"4px",padding:"0.4rem 0.65rem"}}>
-                        <span style={{fontSize:"0.58rem",color:T.textSecondary,fontWeight:700,letterSpacing:"0.1em"}}>CODE</span>
-                        <span style={{...S.code,fontSize:"0.95rem",letterSpacing:"0.2em",color:T.midnight}}>{t.code}</span>
+                        <span style={{fontSize:"0.58rem",color:T.textSecondary,fontWeight:700,letterSpacing:"0.1em"}}>DIRECT LINK</span>
+                        <span style={{fontSize:"0.65rem",color:T.textSecondary,fontFamily:"monospace",opacity:0.6}}>{t.code}</span>
                         <button onClick={()=>navigator.clipboard.writeText(`${window.location.origin}/?code=${t.code}`)}
-                          style={{...S.smBtn,marginLeft:"auto",padding:"2px 8px",fontSize:"0.65rem"}}>📋 Copy Link</button>
+                          style={{...S.smBtn,marginLeft:"auto",padding:"2px 8px",fontSize:"0.65rem"}}>📋 Copy</button>
                       </div>
                     )}
                     {/* Standards tags */}
@@ -980,7 +1072,7 @@ export default function TestBuilder({ teacher, readOnly }) {
 
       {/* Modals */}
       {editingQ&&<EditModal question={editingQ} onSave={handleSaveEdit} onClose={()=>setEditingQ(null)}/>}
-      {showSaveModal&&<SaveTestModal count={selected.length} currentTitle={testTitle} savedTests={savedTests} onSave={saveTest} onClose={()=>setShowSaveModal(false)} editing={editingTestId}/>}
+      {showSaveModal&&<SaveTestModal count={selected.length} currentTitle={testTitle} savedTests={savedTests} onSave={saveTest} onClose={()=>setShowSaveModal(false)} editing={editingTestId} teacher={teacher}/>}
       {assigningTest&&<AssignTestModal test={assigningTest} teacher={teacher} existingAssignments={testAssignments}
         onDone={()=>{setAssigningTest(null);loadAssignments();}} onClose={()=>setAssigningTest(null)}/>}
 

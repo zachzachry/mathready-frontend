@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import MathText from "./shared/MathText";
 import PlotGrid from "./shared/PlotGrid";
 import { API, QUESTIONS as BUILTIN_QUESTIONS, T } from "./shared/constants";
+import { HotspotAnswer } from "./MathTest";
 
 
 // ── Math snippet toolbar ───────────────────────────────────
@@ -195,7 +196,8 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
   const isMulti    = q.type === "multiselect";
   const isKeypad   = q.type === "keypad";
   const isDragDrop = q.type === "dragdrop";
-  const isMCQ      = !isPlot && !isMulti && !isKeypad && !isDragDrop;
+  const isHotspot  = q.type === "hotspot";
+  const isMCQ      = !isPlot && !isMulti && !isKeypad && !isDragDrop && !isHotspot;
 
   function update(field, value)  { onChange({ ...q, [field]: value }); }
   function updateChoice(i, val)  { const c=[...q.choices]; c[i]=val; update("choices",c); }
@@ -214,6 +216,7 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
     if (isKeypad)   return q.answer != null && String(q.answer).trim() !== "";
     if (isMulti)    return Array.isArray(q.answer) && q.answer.length >= 2 && q.choices.filter(c=>c).length >= 4;
     if (isDragDrop) { const fi=(q.items||[]).filter(x=>x.trim()); const cor=typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{}; const hasReal=fi.some(item=>typeof cor[item]==="number"); const noDupes=new Set(fi.map(x=>x.trim())).size===fi.length; return (q.zones||[]).length>=2 && fi.length>=2 && fi.every(item=>cor[item]!==undefined) && hasReal && noDupes; }
+    if (isHotspot) return !!q.questionImage && (q.snapPoints||[]).length >= 1 && (q.items||[]).length >= 1 && q.answer && Object.keys(q.answer).length >= 1;
     return q.choices.filter(c=>c).length === 4 && !!q.correct;
   })();
 
@@ -297,9 +300,10 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
           {/* Question type toggle */}
           <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
             <span style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary}}>QUESTION TYPE</span>
-            {[["mcq","📝 Multiple Choice"],["multiselect","☑ Multi-Select"],["keypad","🔢 Numeric Answer"],["plotpoint","📍 Plot a Point"],["dragdrop","🔀 Drag & Drop"]].map(([t,lbl2])=>(
+            {[["mcq","📝 Multiple Choice"],["multiselect","☑ Multi-Select"],["keypad","🔢 Numeric Answer"],["plotpoint","📍 Plot a Point"],["dragdrop","🔀 Drag & Drop"],["hotspot","🎯 Hotspot"]].map(([t,lbl2])=>(
               <button key={t} onClick={()=>{
                 if(t==="dragdrop") onChange({...q,type:t,zones:q.zones||["Category 1","Category 2"],items:q.items||[""],correct:(typeof q.correct==="object"&&!Array.isArray(q.correct))?q.correct:{}});
+                else if(t==="hotspot") onChange({...q,type:t,snapPoints:q.snapPoints||[],items:q.items&&q.items.length?q.items:[""],answer:q.answer||{},assetType:q.assetType||"tile",assetReuse:q.assetReuse!==false?true:false});
                 else update("type",t);
               }}
                 style={{padding:"5px 12px",borderRadius:T.xs,border:`2px solid ${q.type===t?T.teal:T.border}`,background:q.type===t?T.teal:T.surface,color:q.type===t?T.white:T.textSecondary,fontSize:"0.78rem",fontWeight:700,cursor:"pointer"}}>
@@ -480,6 +484,155 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
           </div>
           )}
 
+          {/* Answer — Hotspot */}
+          {isHotspot && (
+          <div>
+            <label style={lbl}>HOTSPOT CONFIGURATION</label>
+            {/* Asset config */}
+            <div style={{display:"flex",gap:"0.75rem",flexWrap:"wrap",marginBottom:"1rem",alignItems:"center"}}>
+              <div>
+                <div style={{fontSize:"0.6rem",fontWeight:700,color:T.textSecondary,marginBottom:"3px"}}>ASSET TYPE</div>
+                <select value={q.assetType||"tile"} onChange={e=>{
+                  const t=e.target.value;
+                  if(t==="dot") onChange({...q,assetType:t,items:["●"],assetReuse:false});
+                  else if(t==="pin") onChange({...q,assetType:t,items:["📍"],assetReuse:false});
+                  else onChange({...q,assetType:t,items:(q.items||[]).length&&q.items[0]!=="●"&&q.items[0]!=="📍"?q.items:[""],assetReuse:true});
+                }}
+                  style={{padding:"0.4rem 0.6rem",border:`1px solid ${T.border}`,borderRadius:T.xs,fontSize:"0.82rem",background:T.surface}}>
+                  <option value="dot">● Dot / Point</option>
+                  <option value="pin">📍 Pin Marker</option>
+                  <option value="tile">🔢 Number Tiles</option>
+                  <option value="custom">🏷 Custom Labels</option>
+                </select>
+              </div>
+              <label style={{display:"flex",alignItems:"center",gap:"0.4rem",fontSize:"0.78rem",color:T.textSecondary,cursor:"pointer",userSelect:"none"}}>
+                <input type="checkbox" checked={q.assetReuse!==false} onChange={e=>update("assetReuse",e.target.checked)} />
+                Reusable (tile stays in tray after placing)
+              </label>
+              {q.assetType !== "dot" && q.assetType !== "pin" && (
+                <div style={{display:"flex",alignItems:"center",gap:"0.4rem"}}>
+                  <span style={{fontSize:"0.65rem",fontWeight:700,color:T.textSecondary}}>SIZE:</span>
+                  {["xs","sm","md","lg","xl"].map(sz => (
+                    <button key={sz} onClick={()=>update("assetSize",sz)}
+                      style={{
+                        padding:"2px 8px",fontSize:"0.7rem",fontWeight:600,border:`1px solid ${(q.assetSize||"md")===sz?T.teal:T.border}`,
+                        borderRadius:T.xs,cursor:"pointer",background:(q.assetSize||"md")===sz?"#ddeaf7":T.white,color:(q.assetSize||"md")===sz?T.teal:"#555",
+                      }}>{sz}</button>
+                  ))}
+                  <span style={{fontSize:"0.68rem",color:T.textMuted,marginLeft:"0.3rem"}}>
+                    preview: <span style={{fontSize:{xs:"0.55rem",sm:"0.7rem",md:"0.9rem",lg:"1.15rem",xl:"1.4rem"}[q.assetSize||"md"],fontFamily:"Georgia,serif",fontWeight:600}}>{(q.items||["123"])[0]||"123"}</span>
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Asset list */}
+            <div style={{marginBottom:"1rem"}}>
+              <div style={{fontSize:"0.6rem",fontWeight:700,color:T.textSecondary,marginBottom:"4px"}}>
+                {(q.assetType==="dot"||q.assetType==="pin") ? "HOW MANY?" : "ASSET VALUES"}
+              </div>
+              {(q.assetType==="dot"||q.assetType==="pin") ? (
+                <div style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
+                  <input type="number" min="1" max="20" value={Math.max(1,(q.items||[]).length)}
+                    onChange={e=>{const n=Math.max(1,Math.min(20,parseInt(e.target.value)||1)); const sym=q.assetType==="pin"?"📍":"●"; update("items",Array(n).fill(sym));}}
+                    style={{width:"60px",padding:"0.4rem",border:`1px solid ${T.border}`,borderRadius:T.xs,fontSize:"0.9rem",textAlign:"center"}}/>
+                  <span style={{fontSize:"0.75rem",color:T.textMuted}}>assets to drag</span>
+                </div>
+              ) : (
+                <div style={{display:"flex",flexDirection:"column",gap:"0.3rem"}}>
+                  {(q.items||[""]).map((item,i)=>(
+                    <div key={i} style={{display:"flex",gap:"0.4rem",alignItems:"center"}}>
+                      <input value={item} onChange={e=>{const items=[...(q.items||[""])]; items[i]=e.target.value; update("items",items);}}
+                        placeholder={q.assetType==="tile"?`Number ${i+1} (e.g. 24)`:`Label ${i+1}`}
+                        style={{flex:1,padding:"0.4rem 0.6rem",border:`1px solid ${T.border}`,borderRadius:T.xs,fontSize:"0.85rem",fontFamily:q.assetType==="tile"?"monospace":"inherit"}}/>
+                      {(q.items||[]).length>1 && <button onClick={()=>{const items=(q.items||[]).filter((_,j)=>j!==i); update("items",items);}}
+                        style={{border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"3px 8px",cursor:"pointer",fontSize:"0.7rem",color:"#8b1a1a",background:"#fdf2f2"}}>✕</button>}
+                    </div>
+                  ))}
+                  <button onClick={()=>update("items",[...(q.items||[]),""])}
+                    style={{alignSelf:"flex-start",border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"4px 12px",cursor:"pointer",fontSize:"0.75rem",fontWeight:600,background:T.surfaceAlt,color:T.text}}>+ Add Value</button>
+                </div>
+              )}
+            </div>
+
+            {/* Snap point editor — click on image */}
+            {q.questionImage ? (
+              <div>
+                <div style={{fontSize:"0.6rem",fontWeight:700,color:T.textSecondary,marginBottom:"4px"}}>
+                  SNAP POINTS — click on the image to add drop zones
+                </div>
+                <div style={{position:"relative",display:"inline-block",maxWidth:500,width:"100%",cursor:"crosshair",marginBottom:"0.75rem"}}
+                  onClick={e=>{
+                    const img = e.currentTarget.querySelector("img");
+                    const rect = img.getBoundingClientRect();
+                    const x = Math.round(((e.clientX-rect.left)/rect.width)*100);
+                    const y = Math.round(((e.clientY-rect.top)/rect.height)*100);
+                    const id = "sp"+Date.now().toString(36);
+                    const sps = [...(q.snapPoints||[]),{id,x,y}];
+                    update("snapPoints",sps);
+                  }}>
+                  <img src={q.questionImage} alt="diagram" style={{width:"100%",display:"block",borderRadius:T.xs,pointerEvents:"none"}}/>
+                  {(q.snapPoints||[]).map((sp,i)=>{
+                    const isCorrect = q.answer && q.answer[sp.id] !== undefined;
+                    return (
+                      <div key={sp.id} style={{
+                        position:"absolute",left:`${sp.x}%`,top:`${sp.y}%`,transform:"translate(-50%,-50%)",
+                        width:28,height:28,borderRadius:"50%",
+                        background:isCorrect?T.success+"33":"rgba(255,255,255,0.7)",
+                        border:`3px solid ${isCorrect?T.success:T.midnight}`,
+                        display:"flex",alignItems:"center",justifyContent:"center",
+                        fontSize:"0.6rem",fontWeight:800,color:isCorrect?T.success:T.midnight,
+                        cursor:"default",zIndex:3,
+                      }} onClick={e=>e.stopPropagation()} title={`Snap point ${i+1} (${sp.x}%, ${sp.y}%)`}>
+                        {i+1}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Snap point table */}
+                {(q.snapPoints||[]).length > 0 && (
+                  <div style={{border:`1px solid ${T.border}`,borderRadius:T.xs,overflow:"hidden",marginBottom:"0.5rem"}}>
+                    <div style={{display:"grid",gridTemplateColumns:"40px 1fr 1fr 40px",gap:0,padding:"6px 10px",background:T.surfaceAlt,fontSize:"0.58rem",fontWeight:700,color:T.textSecondary,letterSpacing:"0.08em"}}>
+                      <div>#</div><div>LABEL</div><div>CORRECT ASSET</div><div></div>
+                    </div>
+                    {(q.snapPoints||[]).map((sp,i)=>(
+                      <div key={sp.id} style={{display:"grid",gridTemplateColumns:"40px 1fr 1fr 40px",gap:0,padding:"5px 10px",borderTop:`1px solid ${T.surfaceAlt}`,alignItems:"center",fontSize:"0.78rem"}}>
+                        <div style={{fontWeight:700,color:T.midnight}}>{i+1}</div>
+                        <div>
+                          <input value={sp.label||""} placeholder="optional label"
+                            onChange={e=>{const sps=[...(q.snapPoints||[])]; sps[i]={...sp,label:e.target.value}; update("snapPoints",sps);}}
+                            style={{width:"100%",padding:"3px 6px",border:`1px solid ${T.border}`,borderRadius:"3px",fontSize:"0.78rem"}}/>
+                        </div>
+                        <div>
+                          <select value={(q.answer||{})[sp.id]??""}
+                            onChange={e=>{const ans={...(q.answer||{})}; if(e.target.value==="") delete ans[sp.id]; else ans[sp.id]=e.target.value; update("answer",ans);}}
+                            style={{width:"100%",padding:"3px 6px",border:`1px solid ${T.border}`,borderRadius:"3px",fontSize:"0.78rem",background:T.surface}}>
+                            <option value="">— not a correct target —</option>
+                            {(q.items||[]).filter(x=>x).length===0 && <option disabled>⚠ Add assets above first</option>}
+                            {[...new Set((q.items||[]).filter(x=>x))].map((item,j)=><option key={j} value={item}>{item}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <button onClick={()=>{
+                            const sps=(q.snapPoints||[]).filter((_,j)=>j!==i);
+                            const ans={...(q.answer||{})}; delete ans[sp.id];
+                            onChange({...q,snapPoints:sps,answer:ans});
+                          }} style={{border:"none",background:"none",cursor:"pointer",fontSize:"0.75rem",color:"#8b1a1a"}}>✕</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{padding:"1rem",background:T.warningBg,border:`1px solid ${T.warningBd}`,borderRadius:T.xs,fontSize:"0.8rem",color:"#78350f"}}>
+                ⚠ Paste a question diagram first — snap points are placed on the image.
+              </div>
+            )}
+          </div>
+          )}
+
           {/* Live preview */}
           {(q.question || q.questionImage) && (
             <div style={{ borderTop: "1px solid #eef1f4", paddingTop: "1rem" }}>
@@ -521,6 +674,8 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
                       </div>
                     )}
                   </div>
+                ) : isHotspot ? (
+                  <HotspotPreview q={q} />
                 ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                   {q.choices.map((c, i) => {
@@ -546,6 +701,51 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Hotspot Student Preview ────────────────────────────────
+function HotspotPreview({ q }) {
+  const [previewVal, setPreviewVal] = useState(null);
+  const [previewRevealed, setPreviewRevealed] = useState(false);
+  const isDotPin = q.assetType === "dot" || q.assetType === "pin";
+
+  return (
+    <div style={{marginTop:"0.5rem"}}>
+      <div style={{display:"flex",alignItems:"center",gap:"0.5rem",marginBottom:"0.5rem"}}>
+        <span style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.1em",color:T.teal}}>👁 STUDENT PREVIEW</span>
+        <button onClick={() => { setPreviewVal(null); setPreviewRevealed(false); }}
+          style={{border:`1px solid ${T.border}`,background:T.surface,borderRadius:T.xs,padding:"3px 10px",fontSize:"0.68rem",fontWeight:600,cursor:"pointer",color:"#555"}}>
+          Reset
+        </button>
+        <button onClick={() => setPreviewRevealed(true)} disabled={previewRevealed}
+          style={{border:`1px solid ${T.teal}`,background:previewRevealed?"#ddeaf7":T.white,borderRadius:T.xs,padding:"3px 10px",fontSize:"0.68rem",fontWeight:600,cursor:previewRevealed?"default":"pointer",color:T.teal}}>
+          {previewRevealed ? "✓ Revealed" : "Check Answer"}
+        </button>
+      </div>
+      {q.questionImage && (q.snapPoints||[]).length > 0 ? (
+        <HotspotAnswer
+          questionImage={q.questionImage}
+          snapPoints={q.snapPoints||[]}
+          assets={q.items||[]}
+          assetType={q.assetType||"tile"}
+          assetReuse={q.assetReuse!==false}
+          assetSize={q.assetSize||"md"}
+          value={previewVal}
+          onChange={v => { if (!previewRevealed) setPreviewVal(v); }}
+          revealed={previewRevealed}
+          answer={q.answer}
+        />
+      ) : (
+        <div style={{fontSize:"0.78rem",color:T.textMuted,fontStyle:"italic"}}>
+          Add an image and at least one snap point to preview.
+        </div>
+      )}
+      <div style={{marginTop:"0.5rem",fontSize:"0.65rem",color:T.textSecondary}}>
+        {isDotPin ? "Students will click directly on the image (no visible targets)" : "Students will drag tiles to the labeled drop zones"}
+        {" · "}{(q.snapPoints||[]).length} snap point{(q.snapPoints||[]).length!==1?"s":""} · {Object.keys(q.answer||{}).length} correct target{Object.keys(q.answer||{}).length!==1?"s":""}
+      </div>
     </div>
   );
 }
@@ -585,6 +785,7 @@ export default function QuestionBuilder() {
       choices: q.choices,
       ...(q.choiceImages?.some(c=>c) ? { choiceImages: q.choiceImages } : {}),
       correct: q.correct,
+      ...(q.type==="hotspot" ? { snapPoints:q.snapPoints, items:q.items, assetType:q.assetType, assetReuse:q.assetReuse, assetSize:q.assetSize, answer:q.answer } : {}),
     }));
     navigator.clipboard.writeText(JSON.stringify(out, null, 2));
     setCopied(true); setTimeout(()=>setCopied(false), 2500);
@@ -600,6 +801,7 @@ export default function QuestionBuilder() {
       if (q.type === "keypad")    return q.answer != null && String(q.answer).trim() !== "";
       if (q.type === "multiselect") return Array.isArray(q.answer) && q.answer.length >= 2 && q.choices.filter(c=>c).length >= 4;
       if (q.type === "dragdrop") { const fi=(q.items||[]).filter(x=>x.trim()); const cor=typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{}; const hasReal=fi.some(item=>typeof cor[item]==="number"); const noDupes=new Set(fi.map(x=>x.trim())).size===fi.length; return (q.zones||[]).length>=2 && fi.length>=2 && fi.every(item=>cor[item]!==undefined) && hasReal && noDupes; }
+      if (q.type === "hotspot") { return !!q.questionImage && (q.snapPoints||[]).length >= 1 && (q.items||[]).length >= 1 && q.answer && Object.keys(q.answer).length >= 1; }
       return q.choices.filter(c=>c).length === 4 && q.correct;
     });
     if (complete_qs.length === 0) return;
@@ -610,16 +812,17 @@ export default function QuestionBuilder() {
         // Ensure type is correct before saving
         const toSave = {
           ...q,
-          type: (Array.isArray(q.answer) && q.answer.length === 2 && q.choices.filter(c=>c).length === 0)
+          type: (Array.isArray(q.answer) && q.answer.length === 2 && (q.choices||[]).filter(c=>c).length === 0)
             ? "plotpoint"
-          : (["multiselect","keypad","plotpoint","dragdrop","mcq"].includes(q.type) ? q.type : "mcq")
+          : (["multiselect","keypad","plotpoint","dragdrop","hotspot","mcq"].includes(q.type) ? q.type : "mcq")
         };
-        await fetch(`${API}/questions`, {
+        const resp = await fetch(`${API}/questions`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(toSave),
         });
-        count++;
+        if (!resp.ok) { console.error("Save failed:", resp.status); }
+        else count++;
       } catch {}
     }
     setSaving(false);
@@ -767,6 +970,7 @@ export default function QuestionBuilder() {
     if (q.type === "keypad")    return q.answer != null && String(q.answer).trim() !== "";
     if (q.type === "multiselect") return Array.isArray(q.answer) && q.answer.length >= 2 && q.choices.filter(c=>c).length >= 4;
     if (q.type === "dragdrop") { const fi=(q.items||[]).filter(x=>x.trim()); const cor=typeof q.correct==="object"&&!Array.isArray(q.correct)?q.correct:{}; const hasReal=fi.some(item=>typeof cor[item]==="number"); const noDupes=new Set(fi.map(x=>x.trim())).size===fi.length; return (q.zones||[]).length>=2 && fi.length>=2 && fi.every(item=>cor[item]!==undefined) && hasReal && noDupes; }
+    if (q.type === "hotspot") return !!q.questionImage && (q.snapPoints||[]).length >= 1 && (q.items||[]).length >= 1 && q.answer && Object.keys(q.answer).length >= 1;
     return q.choices.filter(c=>c).length === 4 && q.correct;
   }).length;
 
