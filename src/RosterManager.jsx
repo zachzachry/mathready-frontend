@@ -861,29 +861,52 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
                 </div>
               </div>
               {!readOnly && (
-                <label style={{display:"flex",alignItems:"center",gap:"0.5rem",fontSize:"0.78rem",color:T.textSecondary,cursor:"pointer",userSelect:"none"}}>
-                  <span>Hide drill timer</span>
-                  <div onClick={async () => {
-                    const newVal = !(activeClassData.hideTimer ?? true);
-                    try {
-                      await fetch(`${API}/roster/class/${activeClassData.id}`, {
-                        method:"PUT", headers:{"Content-Type":"application/json"},
-                        body: JSON.stringify({ hideTimer: newVal })
-                      });
-                      load();
-                    } catch (e) { console.warn("Failed to update hideTimer:", e); }
-                  }} style={{
-                    width:36,height:20,borderRadius:10,
-                    background:(activeClassData.hideTimer ?? true) ? T.teal : T.borderDark,
-                    position:"relative",cursor:"pointer",transition:"background 0.2s"
-                  }}>
-                    <div style={{
-                      width:16,height:16,borderRadius:8,background:T.white,position:"absolute",top:2,
-                      left:(activeClassData.hideTimer ?? true) ? 18 : 2,transition:"left 0.2s",
-                      boxShadow:"0 1px 3px rgba(0,0,0,0.3)"
-                    }}/>
-                  </div>
-                </label>
+                <div style={{display:"flex",alignItems:"center",gap:"1.25rem"}}>
+                  <label style={{display:"flex",alignItems:"center",gap:"0.5rem",fontSize:"0.78rem",color:T.textSecondary,cursor:"pointer",userSelect:"none"}}>
+                    <span>Hide drill timer</span>
+                    <div onClick={async () => {
+                      const newVal = !(activeClassData.hideTimer ?? true);
+                      try {
+                        await fetch(`${API}/roster/class/${activeClassData.id}`, {
+                          method:"PUT", headers:{"Content-Type":"application/json"},
+                          body: JSON.stringify({ hideTimer: newVal })
+                        });
+                        load();
+                      } catch (e) { console.warn("Failed to update hideTimer:", e); }
+                    }} style={{
+                      width:36,height:20,borderRadius:10,
+                      background:(activeClassData.hideTimer ?? true) ? T.teal : T.borderDark,
+                      position:"relative",cursor:"pointer",transition:"background 0.2s"
+                    }}>
+                      <div style={{
+                        width:16,height:16,borderRadius:8,background:T.white,position:"absolute",top:2,
+                        left:(activeClassData.hideTimer ?? true) ? 18 : 2,transition:"left 0.2s",
+                        boxShadow:"0 1px 3px rgba(0,0,0,0.3)"
+                      }}/>
+                    </div>
+                  </label>
+                  <label style={{display:"flex",alignItems:"center",gap:"0.4rem",fontSize:"0.78rem",color:T.textSecondary}}>
+                    <span>Drill time</span>
+                    <select value={activeClassData.drillDuration || 180} onChange={async (e) => {
+                      const dur = parseInt(e.target.value);
+                      try {
+                        await fetch(`${API}/roster/class/${activeClassData.id}`, {
+                          method:"PUT", headers:{"Content-Type":"application/json"},
+                          body: JSON.stringify({ drillDuration: dur })
+                        });
+                        load();
+                      } catch (e) { console.warn("Failed to update drillDuration:", e); }
+                    }} style={{
+                      padding:"2px 6px",fontSize:"0.78rem",borderRadius:4,
+                      border:`1px solid ${T.borderDark}`,background:T.white,cursor:"pointer"
+                    }}>
+                      <option value={60}>1 min</option>
+                      <option value={120}>2 min</option>
+                      <option value={180}>3 min</option>
+                      <option value={300}>5 min</option>
+                    </select>
+                  </label>
+                </div>
               )}
             </div>
 

@@ -854,6 +854,142 @@ export default function QuestionBuilder() {
   const [csvImporting, setCsvImporting] = useState(false);
   const [csvResult,  setCsvResult]  = useState(null);
 
+  // ── JSON Import ─────────────────────────────────────────
+  const jsonRef = useRef();
+  const [jsonPanel,     setJsonPanel]     = useState(false);
+  const [jsonPreview,   setJsonPreview]   = useState(null);   // { rows:[], errs:[] }
+  const [jsonErr,       setJsonErr]       = useState("");
+  const [jsonImporting, setJsonImporting] = useState(false);
+  const [jsonResult,    setJsonResult]    = useState(null);
+  const [jsonChecked,   setJsonChecked]   = useState({});     // { idx: bool } for select/deselect
+  const [importMenu,    setImportMenu]    = useState(false);
+  const [importSubject, setImportSubject] = useState("math");
+
+  const VALID_TYPES = ["mcq","multiselect","keypad","plotpoint","dragdrop","hotspot"];
+  const [aiPromptCopied, setAiPromptCopied] = useState(false);
+
+  const SCIENCE_STANDARD_LIST = [
+    "S5E1.a — Water Cycle","S5E1.b — Weather & Climate","S5E1.c — Earth's Surface Changes",
+    "S5P1.a — Physical & Chemical Changes","S5P1.b — Mixtures & Solutions","S5P1.c — Properties of Matter",
+    "S5P2.a — Force & Motion","S5P2.b — Simple Machines","S5P2.c — Gravity & Friction",
+    "S5P3.a — Light & Sound","S5P3.b — Electricity & Magnetism",
+    "S5L1.a — Cell Structure","S5L1.b — Microorganisms",
+    "S5L2.a — Food Webs & Chains","S5L2.b — Decomposers",
+    "S5L3.a — Animal Classification","S5L3.b — Inherited Traits","S5L3.c — Adaptations",
+    "S5L4.a — Ecosystems","S5L4.b — Human Impact on Environment",
+  ];
+
+  function copyAIPrompt() {
+    const isMath = importSubject === "math";
+    const standards = isMath
+      ? Object.entries(STANDARD_MAP).map(([k,v])=>`${k} — ${v.short}`).join("\n")
+      : SCIENCE_STANDARD_LIST.join("\n");
+    const example = isMath
+      ? `    "question": "What is 1/2 + 1/4?",\n    "choices": ["3/4", "1/3", "2/4", "1/2"],\n    "correct": "3/4",\n    "standard": "5.NR.3.3",\n    "dok": 2`
+      : `    "question": "Which process causes water to change from liquid to gas?",\n    "choices": ["Condensation", "Evaporation", "Precipitation", "Freezing"],\n    "correct": "Evaporation",\n    "standard": "S5E1.a",\n    "dok": 1`;
+    const mathTip = isMath ? `\n- Use LaTeX in dollar signs for math: $\\frac{1}{2}$, $10^{2}$, $\\sqrt{x}$` : "";
+    const prompt = `Create 20 Georgia Milestones 5th grade ${isMath?"math":"science"} multiple-choice questions. Return ONLY a JSON array, no other text.
+
+Format:
+[
+  {
+${example}
+  }
+]
+
+Rules:
+- Every question needs exactly 4 choices
+- "correct" must exactly match one of the 4 choices
+- dok: 1=recall, 2=skill/concept, 3=strategic reasoning, 4=extended thinking
+- Mix dok levels (mostly 1-2, some 3)${mathTip}
+- If a question would need a picture or diagram, add "needsImage": true
+
+Available standards:
+${standards}`;
+    navigator.clipboard.writeText(prompt);
+    setAiPromptCopied(true);
+    setTimeout(()=>setAiPromptCopied(false), 3000);
+  }
+
+  function validateJsonQuestion(q, idx) {
+    const errs = [];
+    if (!q.question?.trim()) errs.push("missing question text");
+    if (!q.standard?.trim()) errs.push("missing standard");
+    if (!q.dok || isNaN(parseInt(q.dok)) || q.dok < 1 || q.dok > 4) errs.push("dok must be 1–4");
+    const type = VALID_TYPES.includes(q.type) ? q.type : "mcq";
+    if (type === "mcq") {
+      if (!Array.isArray(q.choices) || q.choices.filter(c=>c?.trim()).length < 4) errs.push("need 4 choices");
+      if (!q.correct?.trim()) errs.push("missing correct answer");
+    }
+    if (type === "multiselect") {
+      if (!Array.isArray(q.choices) || q.choices.filter(c=>c?.trim()).length < 4) errs.push("need 4 choices");
+      if (!Array.isArray(q.answer) || q.answer.length < 2) errs.push("need at least 2 answers");
+    }
+    if (type === "keypad") {
+      if (q.answer == null || String(q.answer).trim() === "") errs.push("missing answer");
+    }
+    if (type === "plotpoint") {
+      if (!Array.isArray(q.answer) || q.answer.length !== 2) errs.push("answer must be [x, y]");
+    }
+    if (type === "hotspot") {
+      if (!(q.snapPoints||[]).length) errs.push("missing snapPoints");
+      if (!(q.items||[]).length) errs.push("missing items");
+    }
+    return errs;
+  }
+
+  function handleJSONFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setJsonErr(""); setJsonPreview(null); setJsonResult(null); setJsonChecked({});
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        let data = JSON.parse(ev.target.result);
+        if (!Array.isArray(data)) data = [data]; // wrap single question
+        const rows = [], errs = [];
+        data.forEach((q, i) => {
+          const qErrs = validateJsonQuestion(q, i);
+          if (qErrs.length) { errs.push(`Q${i+1}: ${qErrs.join(", ")}`); }
+          else {
+            const type = VALID_TYPES.includes(q.type) ? q.type : "mcq";
+            const short = q.short || STANDARD_MAP[q.standard]?.short || "";
+            rows.push({ ...q, type, short, _idx: i, needsImage: !!q.needsImage || (q.questionImage === undefined && ["hotspot","plotpoint"].includes(type)) });
+          }
+        });
+        if (!rows.length && errs.length) { setJsonErr(errs.join(" · ")); return; }
+        const checked = {};
+        rows.forEach((_, i) => { checked[i] = true; });
+        setJsonChecked(checked);
+        setJsonPreview({ rows, errs });
+      } catch { setJsonErr("Invalid JSON file. Check syntax and try again."); }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }
+
+  async function importJSONQuestions() {
+    if (!jsonPreview?.rows?.length) return;
+    const selected = jsonPreview.rows.filter((_, i) => jsonChecked[i]);
+    if (!selected.length) return;
+    setJsonImporting(true); setJsonErr("");
+    try {
+      const toUpload = selected.map(r => {
+        const { _idx, needsImage, ...rest } = r;
+        return { ...rest, subject: importSubject, ...(needsImage ? { needsImage: true } : {}) };
+      });
+      const resp = await fetch(`${API}/questions/seed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(toUpload),
+      });
+      const d = await resp.json();
+      setJsonResult(d);
+      if (!d.pendingDuplicates) setJsonPreview(null);
+    } catch { setJsonErr("Upload failed. Check your connection."); }
+    setJsonImporting(false);
+  }
+
   const CSV_COLS = ["id","standard","short","dok","question","choiceA","choiceB","choiceC","choiceD","correct"];
 
   function downloadTemplate() {
@@ -985,10 +1121,28 @@ export default function QuestionBuilder() {
         </div>
         <div style={{ display: "flex", gap: "0.65rem", alignItems: "center" }}>
           <span style={{ fontSize: "0.75rem", opacity: .75 }}>{complete}/{questions.length} complete</span>
-          <button onClick={()=>{setCsvPanel(p=>!p);setCsvPreview(null);setCsvErr("");setCsvResult(null);}}
-            style={{ background:"#4a7fa5", border:"none", borderRadius:T.xs, padding:"6px 14px", fontSize:"0.78rem", fontWeight:700, color:T.white, cursor:"pointer" }}>
-            📥 Import CSV
-          </button>
+          <div style={{position:"relative",display:"inline-block"}}>
+            <button onClick={()=>setImportMenu(p=>!p)}
+              style={{ background:"#4a7fa5", border:"none", borderRadius:T.xs, padding:"6px 14px", fontSize:"0.78rem", fontWeight:700, color:T.white, cursor:"pointer" }}>
+              📥 Import ▾
+            </button>
+            {importMenu && (
+              <div style={{position:"absolute",top:"100%",left:0,marginTop:"4px",background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",boxShadow:"0 4px 12px rgba(0,0,0,.15)",zIndex:10,minWidth:"140px",overflow:"hidden"}}>
+                <div onClick={()=>{setJsonPanel(true);setJsonPreview(null);setJsonErr("");setJsonResult(null);setJsonChecked({});setCsvPanel(false);setImportMenu(false);}}
+                  style={{padding:"8px 14px",fontSize:"0.78rem",fontWeight:600,cursor:"pointer",borderBottom:"1px solid #eee"}}
+                  onMouseEnter={e=>e.currentTarget.style.background="#f0f4f8"}
+                  onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
+                  📄 JSON
+                </div>
+                <div onClick={()=>{setCsvPanel(true);setCsvPreview(null);setCsvErr("");setCsvResult(null);setJsonPanel(false);setImportMenu(false);}}
+                  style={{padding:"8px 14px",fontSize:"0.78rem",fontWeight:600,cursor:"pointer"}}
+                  onMouseEnter={e=>e.currentTarget.style.background="#f0f4f8"}
+                  onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
+                  📊 CSV
+                </div>
+              </div>
+            )}
+          </div>
           <button onClick={seedBank} disabled={saving}
             style={{ background:T.warning, border:"none", borderRadius:T.xs, padding:"6px 14px", fontSize:"0.78rem", fontWeight:700, color:T.white, cursor:"pointer", opacity:saving?0.6:1 }}
             title="Re-load the 100 built-in questions into the bank">
@@ -1123,6 +1277,137 @@ export default function QuestionBuilder() {
                   Done
                 </button>
               )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* JSON Import Panel */}
+      {jsonPanel && (
+        <div style={{background:"#fff",border:"1px solid #c5b8f0",borderRadius:"6px",padding:"1.25rem",marginBottom:"1rem",boxShadow:"0 2px 12px rgba(107,92,231,.08)"}}>
+          <div style={{marginBottom:"1rem"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"8px"}}>
+              <div style={{fontSize:"0.95rem",fontWeight:700,color:"#6b5ce7"}}>Import Questions from JSON</div>
+              <div style={{display:"flex",gap:"0",border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden"}}>
+                {[["math","Math"],["science","Science"]].map(([key,label])=>(
+                  <button key={key} onClick={()=>setImportSubject(key)}
+                    style={{padding:"4px 14px",fontSize:"0.75rem",fontWeight:700,border:"none",cursor:"pointer",
+                      background:importSubject===key?"#1a3a5c":"#fff",color:importSubject===key?"#fff":"#555"}}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div style={{fontSize:"0.75rem",color:T.textSecondary}}>
+                Copy prompt → Paste into ChatGPT/Claude → Upload the JSON
+              </div>
+              <button onClick={copyAIPrompt}
+                style={{background:aiPromptCopied?"#d4edda":"#6b5ce7",border:"none",borderRadius:T.xs,padding:"6px 14px",fontSize:"0.78rem",fontWeight:600,cursor:"pointer",color:aiPromptCopied?"#1a6e2e":"#fff",whiteSpace:"nowrap",flexShrink:0}}>
+                {aiPromptCopied ? "✓ Copied!" : "🤖 Copy AI Prompt"}
+              </button>
+            </div>
+          </div>
+
+          {/* Upload area */}
+          <input ref={jsonRef} type="file" accept=".json" onChange={handleJSONFile} style={{display:"none"}}/>
+          <div onClick={()=>jsonRef.current?.click()}
+            style={{border:"2px dashed #c5b8f0",borderRadius:"6px",padding:"1.5rem",textAlign:"center",cursor:"pointer",background:"#faf9ff",marginBottom:"1rem"}}
+            onDragOver={e=>{e.preventDefault();e.currentTarget.style.background="#eeebfa";}}
+            onDragLeave={e=>{e.currentTarget.style.background="#faf9ff";}}
+            onDrop={e=>{e.preventDefault();e.currentTarget.style.background="#faf9ff";const f=e.dataTransfer.files[0];if(f){const dt=new DataTransfer();dt.items.add(f);jsonRef.current.files=dt.files;handleJSONFile({target:{files:[f],value:""}})}}}>
+            <div style={{fontSize:"1.5rem",marginBottom:"6px"}}>{ }</div>
+            <div style={{fontSize:"0.85rem",fontWeight:600,color:"#6b5ce7"}}>Click to choose a JSON file</div>
+            <div style={{fontSize:"0.72rem",color:"#aaa",marginTop:"4px"}}>or drag and drop here</div>
+          </div>
+
+          {/* Errors */}
+          {jsonErr && (
+            <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"4px",padding:"0.65rem 0.9rem",fontSize:"0.78rem",color:"#8b1a1a",marginBottom:"0.75rem"}}>
+              ⚠ {jsonErr}
+            </div>
+          )}
+
+          {/* Row-level warnings */}
+          {jsonPreview?.errs?.length > 0 && (
+            <div style={{background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"4px",padding:"0.65rem 0.9rem",fontSize:"0.75rem",color:"#7a4e00",marginBottom:"0.75rem"}}>
+              <strong>⚠ {jsonPreview.errs.length} question{jsonPreview.errs.length!==1?"s":""} skipped:</strong>
+              <ul style={{margin:"4px 0 0",paddingLeft:"1.25rem"}}>
+                {jsonPreview.errs.map((e,i)=><li key={i}>{e}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {/* Preview with checkboxes */}
+          {jsonPreview?.rows?.length > 0 && !jsonResult && (
+            <div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
+                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.1em",color:"#555"}}>
+                  REVIEW — {Object.values(jsonChecked).filter(Boolean).length} of {jsonPreview.rows.length} selected
+                </div>
+                <div style={{display:"flex",gap:"6px"}}>
+                  <button onClick={()=>{const c={};jsonPreview.rows.forEach((_,i)=>{c[i]=true});setJsonChecked(c);}}
+                    style={{...smBtn,fontSize:"0.65rem"}}>Select All</button>
+                  <button onClick={()=>setJsonChecked({})}
+                    style={{...smBtn,fontSize:"0.65rem"}}>Deselect All</button>
+                </div>
+              </div>
+              <div style={{border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden",marginBottom:"0.85rem"}}>
+                <div style={{display:"grid",gridTemplateColumns:"28px 80px 60px 30px 1fr 70px 50px",background:"#f5f3ff",padding:"0.4rem 0.75rem",gap:"0.5rem",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.08em",color:"#555"}}>
+                  <span></span><span>STANDARD</span><span>TYPE</span><span>DOK</span><span>QUESTION</span><span>ANSWER</span><span></span>
+                </div>
+                <div style={{maxHeight:"320px",overflowY:"auto"}}>
+                  {jsonPreview.rows.map((r,i)=>(
+                    <div key={i} style={{display:"grid",gridTemplateColumns:"28px 80px 60px 30px 1fr 70px 50px",padding:"0.5rem 0.75rem",gap:"0.5rem",fontSize:"0.78rem",borderTop:"1px solid #eef1f4",alignItems:"center",background:jsonChecked[i]?"#fff":"#f8f8f8",opacity:jsonChecked[i]?1:0.5}}>
+                      <input type="checkbox" checked={!!jsonChecked[i]} onChange={()=>setJsonChecked(c=>({...c,[i]:!c[i]}))} style={{cursor:"pointer"}}/>
+                      <span style={{color:T.midnight,fontWeight:700,fontSize:"0.68rem"}}>{r.standard}</span>
+                      <span style={{fontSize:"0.65rem",color:"#6b5ce7",fontWeight:600,textTransform:"uppercase"}}>{r.type}</span>
+                      <span style={{color:T.textSecondary,textAlign:"center"}}>{r.dok}</span>
+                      <span style={{color:"#1a1a1a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.question}</span>
+                      <span style={{color:"#1a6e2e",fontWeight:600,fontSize:"0.68rem",overflow:"hidden",textOverflow:"ellipsis"}}>
+                        {r.type==="mcq"?r.correct:r.type==="keypad"?r.answer:r.type==="plotpoint"?`(${r.answer})`:"✓"}
+                      </span>
+                      <span>{r.needsImage && <span title="Needs an image" style={{fontSize:"0.72rem",cursor:"help"}}>🖼️</span>}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Needs-image summary */}
+              {jsonPreview.rows.some(r=>r.needsImage && jsonChecked[jsonPreview.rows.indexOf(r)]) && (
+                <div style={{background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"4px",padding:"0.6rem 0.9rem",fontSize:"0.75rem",color:"#7a4e00",marginBottom:"0.75rem",display:"flex",alignItems:"center",gap:"8px"}}>
+                  🖼️ <span><strong>{jsonPreview.rows.filter((r,i)=>r.needsImage&&jsonChecked[i]).length} question{jsonPreview.rows.filter((r,i)=>r.needsImage&&jsonChecked[i]).length!==1?"s":""}</strong> flagged as needing an image. You can add images later in the Question Builder.</span>
+                </div>
+              )}
+
+              <button onClick={importJSONQuestions} disabled={jsonImporting || !Object.values(jsonChecked).some(Boolean)}
+                style={{background:"#1a6e2e",color:"#fff",border:"none",borderRadius:"4px",padding:"0.65rem 1.5rem",fontSize:"0.85rem",fontWeight:700,cursor:"pointer",opacity:jsonImporting||!Object.values(jsonChecked).some(Boolean)?0.5:1,width:"100%"}}>
+                {jsonImporting ? "Importing…" : `✓ Add ${Object.values(jsonChecked).filter(Boolean).length} Question${Object.values(jsonChecked).filter(Boolean).length!==1?"s":""} to Bank`}
+              </button>
+            </div>
+          )}
+
+          {/* Result */}
+          {jsonResult && (
+            <div>
+              {jsonResult.added > 0 && (
+                <div style={{background:"#f0faf2",border:"1px solid #b3dfc0",borderRadius:"4px",padding:"0.75rem 1rem",marginBottom:"0.75rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+                  <span style={{fontSize:"1.3rem"}}>✅</span>
+                  <div>
+                    <div style={{fontWeight:700,color:"#1a6e2e",fontSize:"0.9rem"}}>{jsonResult.added} question{jsonResult.added!==1?"s":""} added to bank</div>
+                    <div style={{fontSize:"0.72rem",color:T.textSecondary}}>Bank now has {jsonResult.total} total questions</div>
+                  </div>
+                </div>
+              )}
+              {jsonResult.duplicate_count > 0 && (
+                <div style={{background:"#fff8e1",border:"1px solid #ffd166",borderRadius:"4px",padding:"0.65rem 0.9rem",fontSize:"0.75rem",color:"#7a4e00",marginBottom:"0.75rem"}}>
+                  ⚠ {jsonResult.duplicate_count} duplicate ID{jsonResult.duplicate_count!==1?"s":""} skipped: {(jsonResult.duplicates||[]).join(", ")}
+                </div>
+              )}
+              <button onClick={()=>{ setJsonPanel(false); setJsonResult(null); setJsonPreview(null); }}
+                style={{width:"100%",background:"#1a6e2e",color:"#fff",border:"none",borderRadius:"3px",padding:"7px",cursor:"pointer",fontSize:"0.82rem",fontWeight:700}}>
+                Done
+              </button>
             </div>
           )}
         </div>

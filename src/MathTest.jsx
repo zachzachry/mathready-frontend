@@ -2222,15 +2222,18 @@ const STAR_LABELS = ["", "Keep going! 📚", "Nice work! 👍", "Good job! ✨",
 
 // ── Drill session ───────────────────────────────────────────────────────────
 function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drillNumber = 1 }) {
+  const drillSecs = cls?.drillDuration || DRILL_SECS;
+  const drillMins = drillSecs / 60;
   const [phase,    setPhase]    = useState("loading");
   const [levels,   setLevels]   = useState({ add:1, sub:1, mul:1, div:1 });
   const [problem,  setProblem]  = useState(null);
   const [inputVal, setInputVal] = useState("");
   const [newBest,  setNewBest]  = useState(null); // {accuracy: bool, ppm: bool}
+  const [countdownNum, setCountdownNum] = useState(3);
   const [lastInput,setLastInput]= useState("");
   const [feedback, setFeedback] = useState(null); // {correct, correctAnswer}
   const [log,      setLog]      = useState([]);
-  const [timeLeft, setTimeLeft] = useState(DRILL_SECS);
+  const [timeLeft, setTimeLeft] = useState(drillSecs);
 
   const levelsRef         = useRef({ add:1, sub:1, mul:1, div:1 });
   const streaksRef        = useRef({ add:0, sub:0, mul:0, div:0 });
@@ -2241,6 +2244,7 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
   const drillEndTime      = useRef(null); // Date.now() + DRILL_SECS*1000
   const personalBestsRef  = useRef({ bestAccuracy: 0, bestPPM: 0 });
   const sessionHistoryRef = useRef([]);
+  const [dayStreak, setDayStreak] = useState(0);
 
   // Load saved levels and start drill
   useEffect(() => {
@@ -2259,6 +2263,7 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
             };
             if (d.personalBests) personalBestsRef.current = d.personalBests;
             if (d.sessions) sessionHistoryRef.current = d.sessions;
+            if (d.streakDays) setDayStreak(d.streakDays);
           }
         } catch (e) { console.warn("Could not load drill progress, starting from level 1:", e); }
       }
@@ -2266,11 +2271,22 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
       setLevels(lv);
       const op = pickDrillOp(lv, {});
       setProblem(genDrillProblem(op, lv[op]));
-      drillEndTime.current = Date.now() + DRILL_SECS * 1000;
-      setPhase("active");
+      setPhase("countdown");
     }
     init();
   }, []); // eslint-disable-line
+
+  // 3-2-1 countdown before drill starts
+  useEffect(() => {
+    if (phase !== "countdown") return;
+    if (countdownNum <= 0) {
+      drillEndTime.current = Date.now() + drillSecs * 1000;
+      setPhase("active");
+      return;
+    }
+    const t = setTimeout(() => setCountdownNum(n => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [phase, countdownNum]);
 
   // Countdown timer — uses Date.now() to avoid drift
   useEffect(() => {
@@ -2307,16 +2323,22 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
     sessionHistRef.current = [
       ...priorHistory,
       { n: drillNumber, accuracy: totalP ? Math.round(correctP / totalP * 100) : 0,
-        correct: correctP, total: totalP, ppm: parseFloat((totalP / 3).toFixed(1)) },
+        correct: correctP, total: totalP, ppm: parseFloat((totalP / drillMins).toFixed(1)) },
     ];
 
-    // Check personal bests locally before server round-trip
+    // Check personal bests — skip first drill (beating 0 doesn't count)
     const accuracy = totalP ? Math.round(correctP / totalP * 100) : 0;
-    const ppm = parseFloat((totalP / 3).toFixed(1));
+    const ppm = parseFloat((totalP / drillMins).toFixed(1));
     const pb = personalBestsRef.current;
-    const isBestAcc = accuracy > (pb.bestAccuracy || 0);
-    const isBestPPM = ppm > (pb.bestPPM || 0);
+    const hasHistory = (pb.bestAccuracy || 0) > 0 || (pb.bestPPM || 0) > 0;
+    const isBestAcc = hasHistory && accuracy > (pb.bestAccuracy || 0);
+    const isBestPPM = hasHistory && ppm > (pb.bestPPM || 0);
     if (isBestAcc || isBestPPM) setNewBest({ accuracy: isBestAcc, ppm: isBestPPM });
+    // Update ref so back-to-back drills compare against latest bests
+    personalBestsRef.current = {
+      bestAccuracy: Math.max(pb.bestAccuracy || 0, accuracy),
+      bestPPM: Math.max(pb.bestPPM || 0, ppm),
+    };
 
     setPhase("summary");
     const _acc   = totalP ? Math.round(correctP / totalP * 100) : 0;
@@ -2333,7 +2355,10 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
         log:         logRef.current,
         submitted:   now(),
         stars:       _stars,
+        drillDuration: drillSecs,
       }),
+    }).then(r => r.ok ? r.json() : null).then(d => {
+      if (d?.streak) setDayStreak(d.streak);
     }).catch((e) => { console.warn("Failed to save drill session to server:", e); });
   }
 
@@ -2394,12 +2419,33 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
     </div>
   );
 
+  // 3-2-1 Countdown
+  if (phase === "countdown") return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",
+      background:"linear-gradient(155deg,#0d1b2a 0%,#0f2d4a 55%,#133a5e 100%)",fontFamily:T.font}}>
+      <div style={{textAlign:"center"}}>
+        <div style={{fontSize:"0.85rem",fontWeight:700,letterSpacing:"0.15em",color:"rgba(255,255,255,0.5)",marginBottom:"1.5rem"}}>
+          GET READY
+        </div>
+        <div key={countdownNum} style={{
+          fontSize: countdownNum > 0 ? "8rem" : "3.5rem",
+          fontWeight:900, color:"#fff",
+          animation:"countPop 0.4s ease-out",
+          lineHeight:1,
+        }}>
+          {countdownNum > 0 ? countdownNum : "GO!"}
+        </div>
+        <style>{`@keyframes countPop { 0% { transform:scale(1.6);opacity:0.3 } 100% { transform:scale(1);opacity:1 } }`}</style>
+      </div>
+    </div>
+  );
+
   // Summary
   if (phase === "summary") {
     const totalP   = logRef.current.length;
     const correct  = logRef.current.filter(e=>e.correct).length;
     const accuracy = totalP ? Math.round(correct/totalP*100) : 0;
-    const ppm      = (totalP / 3).toFixed(1);
+    const ppm      = (totalP / drillMins).toFixed(1);
     const missed   = logRef.current.filter(e=>!e.correct);
     const chartData = sessionHistRef.current.map(s => ({ name: `#${s.n}`, Accuracy: s.accuracy }));
 
@@ -2447,6 +2493,24 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
                   <div style={{fontSize:"0.78rem",color:"#5a4500"}}>
                     {newBest.accuracy && newBest.ppm ? "New accuracy & speed record!" :
                      newBest.accuracy ? "New accuracy record!" : "New speed record!"}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Day streak banner ── */}
+            {dayStreak >= 2 && (
+              <div style={{
+                ...glassCard, padding:"0.65rem 1.25rem",
+                display:"flex",alignItems:"center",gap:"0.75rem",
+              }}>
+                <span style={{fontSize:"1.6rem"}}>🔥</span>
+                <div>
+                  <div style={{fontWeight:800,fontSize:"0.95rem",color:"#fbbf24"}}>{dayStreak}-Day Streak!</div>
+                  <div style={{fontSize:"0.72rem",color:"rgba(255,255,255,0.55)"}}>
+                    {dayStreak >= 7 ? "You're on fire! Keep it going!" :
+                     dayStreak >= 3 ? "Nice consistency! Don't break the chain!" :
+                     "Come back tomorrow to keep your streak alive!"}
                   </div>
                 </div>
               </div>
