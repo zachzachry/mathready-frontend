@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import EggScene from "./shared/EggScene";
+// Pet/avatar placeholder — EggScene removed, will be replaced later
 import { AreaChart, Area, LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import MathText from "./shared/MathText";
 import TopBar from "./shared/TopBar";
@@ -474,6 +474,8 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
   const [student,    setStudent]    = useState(null);
   const [cls,        setCls]        = useState(null);
   const [studentAssignments, setStudentAssignments] = useState([]);
+  const [studentHistory, setStudentHistory] = useState([]);
+  const [studentFluency, setStudentFluency] = useState(null);
   // skip google step if credential already provided from home screen sign-in
   const [step, setStep] = useState(
     impersonateStudent ? "choice"
@@ -509,20 +511,17 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
     }
   }, [step, googleReady]); // eslint-disable-line
 
-  // Fetch student assignments when reaching choice screen
+  // Fetch student assignments, history, and fluency when reaching choice screen
   useEffect(() => {
     if (step !== "choice") return;
     (async () => {
       try {
+        let sid = null;
         if (impersonateStudent) {
-          // Admin impersonation — use provided student data directly
           setStudent(impersonateStudent.student);
           setCls(impersonateStudent.cls);
-          const ar = await fetch(`${API}/assignments/student/${impersonateStudent.student.id}`);
-          const ad = await ar.json();
-          setStudentAssignments(ad.assignments || []);
+          sid = impersonateStudent.student.id;
         } else if (credential) {
-          // Normal Google auth flow
           const r = await fetch(`${API}/auth/google/drill`, {
             method:"POST", headers:{"Content-Type":"application/json"},
             body: JSON.stringify({ token: credential }),
@@ -531,10 +530,20 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
           if (r.ok && d.student) {
             setStudent(d.student);
             setCls(d.cls);
-            const ar = await fetch(`${API}/assignments/student/${d.student.id}`);
-            const ad = await ar.json();
-            setStudentAssignments(ad.assignments || []);
+            sid = d.student.id;
           }
+        }
+        if (sid) {
+          try {
+            const [ar, hr, fr] = await Promise.all([
+              fetch(`${API}/assignments/student/${encodeURIComponent(sid)}`).catch(()=>null),
+              fetch(`${API}/student/history/${encodeURIComponent(sid)}`).catch(()=>null),
+              fetch(`${API}/fluency/progress/${encodeURIComponent(sid)}`).catch(()=>null),
+            ]);
+            if (ar?.ok) { const ad = await ar.json(); setStudentAssignments(ad.assignments || []); }
+            if (hr?.ok) { setStudentHistory(await hr.json()); }
+            if (fr?.ok) { setStudentFluency(await fr.json()); }
+          } catch {}
         }
       } catch {}
     })();
@@ -603,77 +612,225 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
     </div>
   );
 
-  // ── Choice screen ──
-  if (step === "choice") return (
-    <div style={S.page}>
-      <div style={{background:T.midnight,width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
-        <button onClick={()=>{setStep("google");setErr("");}} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:T.white,borderRadius:T.xs,padding:"6px 14px",cursor:"pointer",fontSize:"0.8rem"}}>← Back</button>
-        <div style={{color:T.white,fontSize:"0.95rem",fontWeight:700}}>Georgia Milestones Readiness Trainer</div>
+  // ── Student Dashboard ──
+  if (step === "choice") {
+    const testHistory = studentHistory.filter(s => s.mode !== "drill" && s.mode !== "practice");
+    const recentTests = [...testHistory].sort((a,b) => (b.submitted||"").localeCompare(a.submitted||"")).slice(0, 5);
+    const fl = studentFluency;
+    const drillStreak = fl?.streakDays || 0;
+    const drillSessions = fl?.sessions || [];
+    const pb = fl?.personalBests || {};
+    const levels = fl ? { add: fl.add, sub: fl.sub, mul: fl.mul, div: fl.div } : null;
+
+    // Standard mastery from test history
+    const stdMap = {};
+    testHistory.forEach(s => {
+      const ans = s.answers || {};
+      // We don't have full question data here, so use questionTimes if available
+      (s.questionTimes || []).forEach(qt => {
+        if (!qt.standard) return;
+        if (!stdMap[qt.standard]) stdMap[qt.standard] = { correct: 0, total: 0 };
+        stdMap[qt.standard].total++;
+        if (qt.correct) stdMap[qt.standard].correct++;
+      });
+    });
+    const standards = Object.entries(stdMap).map(([std, d]) => ({
+      standard: std, pct: Math.round(d.correct / d.total * 100), correct: d.correct, total: d.total,
+    })).sort((a,b) => a.pct - b.pct);
+
+    const cardStyle = {background:T.white,border:`1px solid ${T.border}`,borderRadius:"8px",overflow:"hidden"};
+    const cardHead = {padding:"0.6rem 1rem",background:"#f1f5f9",borderBottom:`1px solid ${T.border}`,fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary};
+
+    return (
+    <div style={{...S.page,background:"linear-gradient(155deg,#0d1b2a 0%,#0f2d4a 55%,#133a5e 100%)"}}>
+      <div style={{background:"rgba(0,0,0,.25)",width:"100%",padding:"0.75rem 2rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
+        <button onClick={()=>{setStep("google");setErr("");}} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:T.white,borderRadius:T.xs,padding:"6px 14px",cursor:"pointer",fontSize:"0.8rem"}}>← Sign Out</button>
+        <div style={{flex:1,color:T.white,fontSize:"0.95rem",fontWeight:700}}>MathReady</div>
+        {student && <div style={{color:"rgba(255,255,255,.7)",fontSize:"0.82rem"}}>{student.name}</div>}
       </div>
-      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem 1rem",width:"100%"}}>
-        <div style={{display:"flex",flexDirection:"column",gap:"1rem",width:"100%",maxWidth:"360px"}}>
-          {student && <div style={{textAlign:"center",fontSize:"0.85rem",color:T.textSecondary}}>Hi, <strong>{student.name}</strong> — what would you like to do?</div>}
-          <button onClick={async () => {
-            setChecking(true); setErr("");
-            try {
-              const r = await fetch(`${API}/auth/google/drill`, {
-                method:"POST", headers:{"Content-Type":"application/json"},
-                body: JSON.stringify({ token: credential }),
-              });
-              const d = await r.json();
-              if (!r.ok) { setErr(d.detail || "Sign-in failed."); setChecking(false); return; }
-              onStartDrill(d.student, d.cls);
-            } catch { setErr("Could not connect. Try again."); }
-            setChecking(false);
-          }} disabled={checking}
-            style={{background:T.white,border:`2px solid ${T.warning}`,borderRadius:T.r,padding:"1.5rem 2rem",cursor:"pointer",display:"flex",alignItems:"center",gap:"1.25rem",boxShadow:"0 2px 8px rgba(0,0,0,.06)",textAlign:"left",opacity:checking?0.6:1}}>
-            <div style={{width:"52px",height:"52px",borderRadius:"50%",background:"#fff8f0",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.6rem",flexShrink:0}}>⚡</div>
+
+      <div style={{flex:1,overflow:"auto",padding:"1.25rem",width:"100%"}}>
+        <div style={{maxWidth:"800px",margin:"0 auto"}}>
+
+          {/* Welcome + streak */}
+          <div style={{marginBottom:"1.25rem",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"0.5rem"}}>
             <div>
-              <div style={{fontSize:"1.1rem",fontWeight:700,color:T.warning,marginBottom:"3px"}}>Fluency Drill</div>
-              <div style={{fontSize:"0.8rem",color:T.textSecondary}}>3-min adaptive fact practice</div>
+              <div style={{fontSize:"1.4rem",fontWeight:800,color:T.white}}>
+                Hi, {student?.name?.split(" ")[0] || "Student"}!
+              </div>
+              <div style={{fontSize:"0.82rem",color:"rgba(255,255,255,.6)",marginTop:"2px"}}>
+                {studentAssignments.length > 0
+                  ? `You have ${studentAssignments.length} assignment${studentAssignments.length!==1?"s":""} to complete`
+                  : "You're all caught up!"}
+              </div>
             </div>
-          </button>
-          {/* Assigned tests */}
-          {studentAssignments.map(a => (
-            <button key={a.assignmentId} onClick={async () => {
+            {drillStreak > 0 && (
+              <div style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.2)",borderRadius:"12px",padding:"0.5rem 1rem",display:"flex",alignItems:"center",gap:"0.5rem"}}>
+                <span style={{fontSize:"1.3rem"}}>🔥</span>
+                <div>
+                  <div style={{fontSize:"1.1rem",fontWeight:800,color:"#fbbf24"}}>{drillStreak}</div>
+                  <div style={{fontSize:"0.6rem",fontWeight:700,color:"rgba(255,255,255,.5)",letterSpacing:"0.1em"}}>DAY STREAK</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Quick actions row */}
+          <div style={{display:"flex",gap:"0.75rem",marginBottom:"1.25rem",flexWrap:"wrap"}}>
+            <button onClick={async () => {
+              if (student && cls) { onStartDrill(student, cls); return; }
               setChecking(true); setErr("");
               try {
-                setTestInfo({
-                  found: true, questions: a.questions, title: a.testTitle,
-                  adaptive: a.adaptive, untimed: a.untimed,
-                  timeLimitSecs: a.timeLimitSecs, warnSecs: a.warnSecs,
-                  oneAttempt: a.oneAttempt,
+                const r = await fetch(`${API}/auth/google/drill`, {
+                  method:"POST", headers:{"Content-Type":"application/json"},
+                  body: JSON.stringify({ token: credential }),
                 });
-                setCode(a.testCode);
-                setStep("confirm");
-              } catch { setErr("Failed to load test."); }
+                const d = await r.json();
+                if (!r.ok) { setErr(d.detail || "Sign-in failed."); setChecking(false); return; }
+                onStartDrill(d.student, d.cls);
+              } catch { setErr("Could not connect. Try again."); }
               setChecking(false);
             }} disabled={checking}
-              style={{background:T.white,border:`2px solid #2e7d32`,borderRadius:T.r,padding:"1.5rem 2rem",cursor:"pointer",display:"flex",alignItems:"center",gap:"1.25rem",boxShadow:"0 2px 8px rgba(0,0,0,.06)",textAlign:"left",opacity:checking?0.6:1}}>
-              <div style={{width:"52px",height:"52px",borderRadius:"50%",background:"#e8f5e9",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.6rem",flexShrink:0}}>📝</div>
-              <div>
-                <div style={{fontSize:"1.1rem",fontWeight:700,color:"#2e7d32",marginBottom:"3px"}}>{a.testTitle}</div>
-                <div style={{fontSize:"0.8rem",color:T.textSecondary}}>Assigned by your teacher</div>
+              style={{flex:1,minWidth:"140px",background:"linear-gradient(135deg,#f59e0b,#d97706)",border:"none",borderRadius:"10px",padding:"1rem 1.25rem",cursor:"pointer",display:"flex",alignItems:"center",gap:"0.75rem",boxShadow:"0 4px 12px rgba(245,158,11,.3)",opacity:checking?0.6:1}}>
+              <span style={{fontSize:"1.5rem"}}>⚡</span>
+              <div style={{textAlign:"left"}}>
+                <div style={{fontSize:"0.95rem",fontWeight:800,color:T.white}}>Fluency Drill</div>
+                <div style={{fontSize:"0.7rem",color:"rgba(255,255,255,.8)"}}>Adaptive fact practice</div>
               </div>
             </button>
-          ))}
-          {studentAssignments.length === 0 && (
-            <div style={{textAlign:"center",fontSize:"0.82rem",color:T.textSecondary,padding:"0.5rem",lineHeight:1.6}}>
-              No test assigned right now.
-            </div>
-          )}
-          {err && <div style={{...S.errBox}}>⚠ {err}</div>}
-          {/* Escape hatch — code entry */}
-          <div style={{textAlign:"center",marginTop:"0.25rem"}}>
             <button onClick={()=>{setErr("");setStep("code");}}
-              style={{background:"none",border:"none",color:T.textSecondary,fontSize:"0.75rem",cursor:"pointer",textDecoration:"underline",padding:"4px"}}>
-              Have a code from your teacher?
+              style={{flex:1,minWidth:"140px",background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.2)",borderRadius:"10px",padding:"1rem 1.25rem",cursor:"pointer",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+              <span style={{fontSize:"1.5rem"}}>🔑</span>
+              <div style={{textAlign:"left"}}>
+                <div style={{fontSize:"0.95rem",fontWeight:800,color:T.white}}>Enter Code</div>
+                <div style={{fontSize:"0.7rem",color:"rgba(255,255,255,.6)"}}>Join with a test code</div>
+              </div>
             </button>
           </div>
+
+          {err && <div style={{...S.errBox,marginBottom:"1rem"}}>⚠ {err}</div>}
+
+          {/* Assignments */}
+          {studentAssignments.length > 0 && (
+            <div style={{...cardStyle,marginBottom:"1rem"}}>
+              <div style={cardHead}>📝 ASSIGNMENTS DUE</div>
+              {studentAssignments.map(a => (
+                <div key={a.assignmentId} style={{padding:"0.75rem 1rem",borderBottom:`1px solid ${T.surfaceAlt}`,display:"flex",alignItems:"center",gap:"0.75rem",cursor:"pointer",transition:"background .15s"}}
+                  onClick={async () => {
+                    setChecking(true); setErr("");
+                    try {
+                      setTestInfo({ found:true, questions:a.questions, title:a.testTitle, adaptive:a.adaptive, untimed:a.untimed, timeLimitSecs:a.timeLimitSecs, warnSecs:a.warnSecs, oneAttempt:a.oneAttempt });
+                      setCode(a.testCode); setStep("confirm");
+                    } catch { setErr("Failed to load test."); }
+                    setChecking(false);
+                  }}
+                  onMouseEnter={e=>e.currentTarget.style.background=T.surfaceAlt}
+                  onMouseLeave={e=>e.currentTarget.style.background=""}>
+                  <div style={{width:"36px",height:"36px",borderRadius:"8px",background:"#e8f5e9",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.1rem",flexShrink:0}}>📝</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:"0.88rem",fontWeight:700,color:T.text}}>{a.testTitle}</div>
+                    <div style={{fontSize:"0.72rem",color:T.textSecondary}}>{a.className}</div>
+                  </div>
+                  <div style={{fontSize:"0.75rem",fontWeight:700,color:"#2e7d32",background:"#e8f5e9",padding:"4px 10px",borderRadius:"12px"}}>Start →</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{display:"flex",gap:"1rem",flexWrap:"wrap",marginBottom:"1rem"}}>
+
+            {/* Fluency stats */}
+            {fl && (
+              <div style={{...cardStyle,flex:1,minWidth:"220px"}}>
+                <div style={cardHead}>⚡ FLUENCY PROGRESS</div>
+                <div style={{padding:"0.75rem 1rem"}}>
+                  <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap",marginBottom:"0.75rem"}}>
+                    {["add","sub","mul","div"].map(op => {
+                      const lv = levels?.[op] || 1;
+                      const label = {add:"+",sub:"−",mul:"×",div:"÷"}[op];
+                      return (
+                        <div key={op} style={{flex:1,minWidth:"50px",textAlign:"center",background:"#f8fafc",border:`1px solid ${T.border}`,borderRadius:"6px",padding:"0.5rem 0.25rem"}}>
+                          <div style={{fontSize:"1rem",fontWeight:800,color:T.midnight}}>{label}</div>
+                          <div style={{fontSize:"1.3rem",fontWeight:800,color:lv>=7?T.success:lv>=4?"#d97706":T.dangerText}}>{lv}</div>
+                          <div style={{fontSize:"0.55rem",fontWeight:700,color:T.textSecondary,letterSpacing:"0.05em"}}>LEVEL</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {(pb.bestAccuracy > 0 || pb.bestPPM > 0) && (
+                    <div style={{display:"flex",gap:"0.75rem",flexWrap:"wrap"}}>
+                      <div style={{fontSize:"0.72rem",color:T.textSecondary}}>
+                        🎯 Best: <strong style={{color:T.text}}>{pb.bestAccuracy}%</strong>
+                      </div>
+                      <div style={{fontSize:"0.72rem",color:T.textSecondary}}>
+                        ⏱ Best PPM: <strong style={{color:T.text}}>{pb.bestPPM}</strong>
+                      </div>
+                    </div>
+                  )}
+                  {drillSessions.length > 1 && (
+                    <div style={{marginTop:"0.5rem"}}>
+                      <div style={{display:"flex",alignItems:"flex-end",gap:"2px",height:"40px"}}>
+                        {drillSessions.slice(-15).map((s,i) => (
+                          <div key={i} style={{flex:1,background:s.pct>=80?T.success:s.pct>=60?"#f59e0b":T.dangerText,borderRadius:"2px 2px 0 0",height:`${Math.max(4, s.pct * 0.4)}px`,opacity:0.8,transition:"height .3s"}}
+                            title={`${s.pct}%`}/>
+                        ))}
+                      </div>
+                      <div style={{fontSize:"0.55rem",color:T.textSecondary,textAlign:"center",marginTop:"2px"}}>Last {Math.min(15, drillSessions.length)} sessions</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Recent test scores */}
+            <div style={{...cardStyle,flex:1,minWidth:"220px"}}>
+              <div style={cardHead}>📊 RECENT SCORES</div>
+              {recentTests.length === 0 ? (
+                <div style={{padding:"1.5rem 1rem",textAlign:"center",fontSize:"0.82rem",color:T.textMuted}}>No tests taken yet</div>
+              ) : (
+                <div>
+                  {recentTests.map((s,i) => {
+                    const p = s.pct;
+                    return (
+                      <div key={i} style={{padding:"0.6rem 1rem",borderBottom:`1px solid ${T.surfaceAlt}`,display:"flex",alignItems:"center",gap:"0.5rem"}}>
+                        <div style={{width:"32px",height:"32px",borderRadius:"50%",background:p>=70?"#dcfce7":p>=50?"#fff8e1":"#fef2f2",border:`2px solid ${p>=70?T.success:p>=50?"#f59e0b":T.dangerText}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                          <span style={{fontSize:"0.7rem",fontWeight:800,color:p>=70?T.success:p>=50?"#d97706":T.dangerText}}>{p}%</span>
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:"0.8rem",fontWeight:600,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.testTitle || s.testCode || "Test"}</div>
+                          <div style={{fontSize:"0.65rem",color:T.textSecondary}}>{s.score}/{s.total} · {new Date(s.submitted).toLocaleDateString()}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Standard mastery */}
+          {standards.length > 0 && (
+            <div style={{...cardStyle,marginBottom:"1rem"}}>
+              <div style={cardHead}>📋 STANDARD MASTERY</div>
+              <div style={{padding:"0.75rem 1rem",display:"flex",flexDirection:"column",gap:"6px"}}>
+                {standards.map(s => (
+                  <div key={s.standard} style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
+                    <span style={{fontSize:"0.68rem",fontWeight:700,color:T.midnight,minWidth:"70px"}}>{s.standard}</span>
+                    <div style={{flex:1,height:"8px",background:"#e8edf2",borderRadius:"4px",overflow:"hidden"}}>
+                      <div style={{height:"100%",width:`${s.pct}%`,background:s.pct>=70?T.success:s.pct>=50?"#f59e0b":T.dangerText,borderRadius:"4px",transition:"width .3s"}}/>
+                    </div>
+                    <span style={{fontSize:"0.68rem",fontWeight:700,color:s.pct>=70?T.success:s.pct>=50?"#d97706":T.dangerText,minWidth:"35px",textAlign:"right"}}>{s.pct}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
     </div>
   );
+  }
 
   // ── Code entry screen ──
   if (step === "code") return (
@@ -2221,7 +2378,7 @@ function pickDrillOp(levels, streaks) {
 const STAR_LABELS = ["", "Keep going! 📚", "Nice work! 👍", "Good job! ✨", "Great work! 🌟", "PERFECT! 🏆"];
 
 // ── Drill session ───────────────────────────────────────────────────────────
-function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drillNumber = 1 }) {
+function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drillNumber = 1, parentBests, onBestsUpdate }) {
   const drillSecs = cls?.drillDuration || DRILL_SECS;
   const drillMins = drillSecs / 60;
   const [phase,    setPhase]    = useState("loading");
@@ -2242,7 +2399,7 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
   const inputRef          = useRef(null);
   const endedRef          = useRef(false);
   const drillEndTime      = useRef(null); // Date.now() + DRILL_SECS*1000
-  const personalBestsRef  = useRef({ bestAccuracy: 0, bestPPM: 0 });
+  const personalBestsRef  = useRef(parentBests || { bestAccuracy: 0, bestPPM: 0 });
   const sessionHistoryRef = useRef([]);
   const [dayStreak, setDayStreak] = useState(0);
 
@@ -2335,10 +2492,12 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
     const isBestPPM = hasHistory && ppm > (pb.bestPPM || 0);
     if (isBestAcc || isBestPPM) setNewBest({ accuracy: isBestAcc, ppm: isBestPPM });
     // Update ref so back-to-back drills compare against latest bests
-    personalBestsRef.current = {
+    const updatedBests = {
       bestAccuracy: Math.max(pb.bestAccuracy || 0, accuracy),
       bestPPM: Math.max(pb.bestPPM || 0, ppm),
     };
+    personalBestsRef.current = updatedBests;
+    if (onBestsUpdate) onBestsUpdate(updatedBests);
 
     setPhase("summary");
     const _acc   = totalP ? Math.round(correctP / totalP * 100) : 0;
@@ -2518,17 +2677,6 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
 
             {/* ── Hero row: character + stats ── */}
             <div style={{display:"flex",gap:"1rem",flexWrap:"wrap",alignItems:"stretch"}}>
-
-              {/* Character card */}
-              <div style={{...glassCard,flex:"0 0 200px",minWidth:"160px",
-                display:"flex",flexDirection:"column",alignItems:"center",
-                justifyContent:"center",padding:"1.25rem 1rem", height:240}}>
-                <EggScene
-                  accuracy={accuracy}
-                  element="earth"
-                  sessionStars={accuracy>=90?5:accuracy>=75?4:accuracy>=60?3:accuracy>=40?2:1}
-                />
-              </div>
 
               {/* Stats card */}
               <div style={{...glassCard,flex:1,minWidth:"220px",padding:"1.25rem 1.5rem",
@@ -3062,6 +3210,7 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
   const [practiceHistory, setPracticeHistory] = useState([]);
   const [drillKey,        setDrillKey]        = useState(0);   // increment to remount (Play Again)
   const [drillHistory,    setDrillHistory]    = useState([]);  // grows across Play Again sessions
+  const [drillBests,      setDrillBests]      = useState(null); // persists across Play Again remounts
   const [questions,       setQuestions]       = useState(FALLBACK_QUESTIONS);
   const [isAdaptive,      setIsAdaptive]      = useState(false);
   const [isDrill,         setIsDrill]         = useState(false);
@@ -3207,6 +3356,8 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
               student={student} cls={cls} testCode={testCode}
               priorHistory={drillHistory}
               drillNumber={drillKey + 1}
+              parentBests={drillBests}
+              onBestsUpdate={setDrillBests}
               onDone={(dest, history) => {
                 if (history) setDrillHistory(history);
                 if (dest === "again") { setDrillKey(k => k + 1); return; }

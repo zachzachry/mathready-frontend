@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { QUESTIONS, lvl, lvlC, lvlBg, lvlBd, loadSessions, clearSessions, API, T } from "./shared/constants";
+import MathText from "./shared/MathText";
 import { generateClassReport } from "./generateReport";
 import ParentReport from "./ParentReport";
 import TestParentReport from "./TestParentReport";
@@ -302,6 +303,21 @@ export default function Dashboard({ teacher, readOnly }) {
 
   const [bankQ, setBankQ] = useState(QUESTIONS);
   const [savedTests, setSavedTests] = useState([]); // for code→name lookup
+  const [reviewCode, setReviewCode] = useState(null); // test code to review
+  const [reviewData, setReviewData] = useState(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+
+  async function openReview(code) {
+    setReviewCode(code);
+    setReviewLoading(true);
+    setReviewData(null);
+    try {
+      const classFilter = teacher?.classIds?.length ? `&classId=${teacher.classIds[0]}` : "";
+      const r = await fetch(`${API}/test/review/${encodeURIComponent(code)}?_=${Date.now()}${classFilter}`);
+      if (r.ok) setReviewData(await r.json());
+    } catch (e) { console.warn("Review fetch failed:", e); }
+    setReviewLoading(false);
+  }
 
   const refresh = useCallback(async () => {
     try {
@@ -520,16 +536,20 @@ export default function Dashboard({ teacher, readOnly }) {
                   {testCodes.map(c=><option key={c} value={c}>{testCodeNames[c] !== c ? `${testCodeNames[c]} (${c})` : c}</option>)}
                 </select>
               </div>
-              {!readOnly && (
-                <div style={{display:"flex",flexWrap:"wrap",gap:"0.35rem"}}>
-                  {(overviewTest === "all" ? testCodes : [overviewTest]).map(c => (
-                    <button key={c} onClick={()=>setClearTestCode(c)}
-                      style={{fontSize:"0.65rem",fontWeight:600,color:"#8b1a1a",background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:T.xs,padding:"3px 9px",cursor:"pointer"}}>
-                      🗑 {testCodeNames[c]!==c ? testCodeNames[c] : c}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <div style={{display:"flex",flexWrap:"wrap",gap:"0.35rem"}}>
+                {(overviewTest === "all" ? testCodes : [overviewTest]).map(c => (
+                  <button key={`rev-${c}`} onClick={()=>openReview(c)}
+                    style={{fontSize:"0.65rem",fontWeight:600,color:T.midnight,background:"rgba(13,148,136,.1)",border:`1px solid ${T.midnight}44`,borderRadius:T.xs,padding:"3px 9px",cursor:"pointer"}}>
+                    📖 Review {testCodeNames[c]!==c ? testCodeNames[c] : c}
+                  </button>
+                ))}
+                {!readOnly && (overviewTest === "all" ? testCodes : [overviewTest]).map(c => (
+                  <button key={`del-${c}`} onClick={()=>setClearTestCode(c)}
+                    style={{fontSize:"0.65rem",fontWeight:600,color:"#8b1a1a",background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:T.xs,padding:"3px 9px",cursor:"pointer"}}>
+                    🗑 {testCodeNames[c]!==c ? testCodeNames[c] : c}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
           <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,overflow:"hidden"}}>
@@ -1489,6 +1509,151 @@ export default function Dashboard({ teacher, readOnly }) {
           studentName={diagStudentId.name}
           onClose={() => setDiagStudentId(null)}
         />
+      )}
+
+      {/* ── Test Review Modal ── */}
+      {reviewCode && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}
+          onClick={()=>{setReviewCode(null);setReviewData(null);}}>
+          <div style={{background:T.white,borderRadius:"8px",width:"100%",maxWidth:"900px",maxHeight:"90vh",overflow:"auto",boxShadow:"0 12px 40px rgba(0,0,0,.3)"}}
+            onClick={e=>e.stopPropagation()}>
+            {/* Header */}
+            <div style={{position:"sticky",top:0,background:T.midnight,color:T.white,padding:"1rem 1.5rem",display:"flex",alignItems:"center",justifyContent:"space-between",zIndex:1}}>
+              <div>
+                <div style={{fontSize:"1.1rem",fontWeight:800}}>📖 Test Review</div>
+                {reviewData && <div style={{fontSize:"0.75rem",opacity:0.8,marginTop:"2px"}}>{reviewData.testTitle} · {reviewData.testCode} · {reviewData.totalStudents} student{reviewData.totalStudents!==1?"s":""}</div>}
+              </div>
+              <button onClick={()=>{setReviewCode(null);setReviewData(null);}}
+                style={{background:"rgba(255,255,255,.15)",border:"none",color:T.white,fontSize:"1.2rem",width:"32px",height:"32px",borderRadius:"50%",cursor:"pointer",fontWeight:700}}>×</button>
+            </div>
+
+            {reviewLoading && (
+              <div style={{padding:"3rem",textAlign:"center",color:T.textMuted}}>Loading review data...</div>
+            )}
+
+            {reviewData && reviewData.items.length === 0 && (
+              <div style={{padding:"3rem",textAlign:"center",color:T.textMuted}}>No student submissions yet for this test.</div>
+            )}
+
+            {reviewData && reviewData.items.length > 0 && (
+              <div style={{padding:"1rem 1.5rem"}}>
+                {/* Summary bar */}
+                <div style={{display:"flex",gap:"0.75rem",flexWrap:"wrap",marginBottom:"1rem"}}>
+                  {(() => {
+                    const items = reviewData.items;
+                    const avgPct = Math.round(items.reduce((a,q)=>a+q.pct,0)/items.length);
+                    const hardest = items[0];
+                    const easiest = items[items.length-1];
+                    return <>
+                      <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"0.6rem 1rem",flex:1,minWidth:"120px"}}>
+                        <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary}}>CLASS AVG</div>
+                        <div style={{fontSize:"1.5rem",fontWeight:800,color:avgPct>=70?T.success:avgPct>=50?"#b8860b":T.dangerText}}>{avgPct}%</div>
+                      </div>
+                      <div style={{background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:T.xs,padding:"0.6rem 1rem",flex:1,minWidth:"120px"}}>
+                        <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:"#8b1a1a"}}>MOST MISSED</div>
+                        <div style={{fontSize:"0.82rem",fontWeight:700,color:"#8b1a1a"}}>{hardest.standard} — {hardest.pct}%</div>
+                        <div style={{fontSize:"0.68rem",color:"#8b1a1a",opacity:0.7}}>{hardest.short}</div>
+                      </div>
+                      <div style={{background:T.successBg,border:`1px solid ${T.successBd}`,borderRadius:T.xs,padding:"0.6rem 1rem",flex:1,minWidth:"120px"}}>
+                        <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:T.success}}>EASIEST</div>
+                        <div style={{fontSize:"0.82rem",fontWeight:700,color:T.success}}>{easiest.standard} — {easiest.pct}%</div>
+                        <div style={{fontSize:"0.68rem",color:T.success,opacity:0.7}}>{easiest.short}</div>
+                      </div>
+                    </>;
+                  })()}
+                </div>
+
+                {/* Questions — sorted most missed first */}
+                {reviewData.items.map((q, qi) => {
+                  const barColor = q.pct>=70?T.success:q.pct>=50?"#f59e0b":T.dangerText;
+                  const barBg = q.pct>=70?T.successBg:q.pct>=50?"#fff8e1":"#fdf2f2";
+                  return (
+                    <div key={q.id} style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,marginBottom:"0.75rem",overflow:"hidden"}}>
+                      {/* Question header */}
+                      <div style={{padding:"0.75rem 1rem",background:barBg,borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:"0.75rem"}}>
+                        <div style={{width:"44px",height:"44px",borderRadius:"50%",background:barColor,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                          <span style={{fontSize:"0.85rem",fontWeight:800,color:"#fff"}}>{q.pct}%</span>
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{display:"flex",gap:"0.35rem",marginBottom:"3px",flexWrap:"wrap"}}>
+                            <span style={{fontSize:"0.6rem",fontWeight:700,color:T.midnight,background:"rgba(13,148,136,.1)",padding:"1px 6px",borderRadius:"2px"}}>{q.standard}</span>
+                            {q.dok&&<span style={{fontSize:"0.6rem",fontWeight:700,color:T.warning,background:"#fff3cd",padding:"1px 6px",borderRadius:"2px"}}>DOK {q.dok}</span>}
+                            <span style={{fontSize:"0.6rem",color:T.textSecondary}}>{q.short}</span>
+                          </div>
+                          <div style={{fontSize:"0.82rem",color:T.text,fontWeight:600}}>{q.correctCount}/{q.attempted} correct</div>
+                        </div>
+                      </div>
+
+                      {/* Question text + image */}
+                      <div style={{padding:"0.75rem 1rem"}}>
+                        <div style={{fontSize:"0.88rem",color:T.text,lineHeight:1.5,marginBottom:q.questionImage?"0.5rem":"0"}}>
+                          <MathText text={q.question}/>
+                        </div>
+                        {q.questionImage && (
+                          <div style={{marginBottom:"0.5rem"}}>
+                            <img src={q.questionImage} alt="" style={{maxWidth:"100%",maxHeight:"200px",borderRadius:"4px",border:`1px solid ${T.border}`}}/>
+                          </div>
+                        )}
+
+                        {/* Answer choices with distribution bar */}
+                        {q.type === "mcq" && q.choices && q.choices.length > 0 && (
+                          <div style={{display:"flex",flexDirection:"column",gap:"4px",marginTop:"0.5rem"}}>
+                            {q.choices.map((ch, ci) => {
+                              const isCorrect = String(ch) === String(q.correct);
+                              const count = q.answerDistribution[ch] || 0;
+                              const pct = q.attempted ? Math.round(count / q.attempted * 100) : 0;
+                              return (
+                                <div key={ci} style={{display:"flex",alignItems:"center",gap:"0.5rem",padding:"6px 8px",
+                                  background:isCorrect?"rgba(16,185,129,.08)":"transparent",
+                                  border:isCorrect?`2px solid ${T.success}`:`1px solid ${T.border}`,
+                                  borderRadius:T.xs}}>
+                                  <div style={{width:"20px",fontWeight:700,fontSize:"0.72rem",color:isCorrect?T.success:T.textSecondary,flexShrink:0}}>
+                                    {String.fromCharCode(65+ci)}
+                                  </div>
+                                  <div style={{flex:1,minWidth:0}}>
+                                    <div style={{fontSize:"0.78rem",color:T.text,marginBottom:"2px"}}><MathText text={ch}/></div>
+                                    <div style={{height:"6px",background:"#e8edf2",borderRadius:"3px",overflow:"hidden"}}>
+                                      <div style={{height:"100%",width:`${pct}%`,background:isCorrect?T.success:pct>30?T.dangerText:"#94a3b8",borderRadius:"3px",transition:"width .3s"}}/>
+                                    </div>
+                                  </div>
+                                  <div style={{fontSize:"0.7rem",fontWeight:700,color:isCorrect?T.success:T.textSecondary,flexShrink:0,minWidth:"42px",textAlign:"right"}}>
+                                    {count} ({pct}%)
+                                  </div>
+                                  {isCorrect && <span style={{fontSize:"0.7rem",flexShrink:0}}>✓</span>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Non-MCQ: just show correct answer */}
+                        {q.type !== "mcq" && (
+                          <div style={{marginTop:"0.5rem",fontSize:"0.78rem",color:T.success,fontWeight:600}}>
+                            ✓ Correct: <MathText text={q.correct}/>
+                          </div>
+                        )}
+
+                        {/* Who missed it */}
+                        {q.pct < 100 && (
+                          <div style={{marginTop:"0.5rem",paddingTop:"0.5rem",borderTop:`1px solid ${T.surfaceAlt}`}}>
+                            <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"4px"}}>MISSED BY:</div>
+                            <div style={{display:"flex",flexWrap:"wrap",gap:"4px"}}>
+                              {q.studentAnswers.filter(s=>!s.correct).map((s,si)=>(
+                                <span key={si} style={{fontSize:"0.68rem",background:"#fdf2f2",border:"1px solid #f0b8b8",color:"#8b1a1a",padding:"2px 8px",borderRadius:"10px",fontWeight:600}}>
+                                  {s.studentName}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

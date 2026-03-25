@@ -861,7 +861,7 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
                 </div>
               </div>
               {!readOnly && (
-                <div style={{display:"flex",alignItems:"center",gap:"1.25rem"}}>
+                <div style={{display:"flex",alignItems:"center",gap:"1.25rem",flexWrap:"wrap"}}>
                   <label style={{display:"flex",alignItems:"center",gap:"0.5rem",fontSize:"0.78rem",color:T.textSecondary,cursor:"pointer",userSelect:"none"}}>
                     <span>Hide drill timer</span>
                     <div onClick={async () => {
