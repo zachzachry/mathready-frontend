@@ -133,7 +133,47 @@ const STANDARD_MAP = {
   "5.GSR.8.2": { short: "2D Figure Categories",     keywords: ["category","subcategory","attribute","belong","two-dimensional","rectangle","square","rhombus","trapezoid","parallel","perpendicular"] },
   "5.GSR.8.3": { short: "Volume with Unit Cubes",   keywords: ["volume","unit cube","pack","rectangular prism","fill","layer","gap","overlap"] },
   "5.GSR.8.4": { short: "Volume Formula",           keywords: ["volume","formula","base","height","area","length","width","multiply","rectangular prism","l×w×h"] },
+
+  // ── Earth & Space Science ──────────────────────────────
+  "S5E1.a": { short: "Surface Features",               keywords: ["surface","feature","constructive","destructive","delta","sand dune","mountain","volcano","deposition","weathering","erosion","organism"] },
+  "S5E1.b": { short: "Surface Change Models",          keywords: ["model","surface","change","constructive","destructive","illustrate","data","collect"] },
+  "S5E1.c": { short: "Technology & Earth Processes",   keywords: ["technology","seismological","flood","GIS","map","satellite","infrared","engineering","predict","limit"] },
+
+  // ── Physical Science: Matter ───────────────────────────
+  "S5P1.a": { short: "Physical Changes",               keywords: ["physical change","manipulate","separate","mix","dry","liquid","material"] },
+  "S5P1.b": { short: "States of Water",                keywords: ["state","water","temperature","solid","liquid","gas","particle","freeze","melt","evaporate","condense"] },
+  "S5P1.c": { short: "Chemical Changes",               keywords: ["chemical change","color","gas","temperature change","odor","new substance","evidence","observable"] },
+
+  // ── Physical Science: Electricity ─────────────────────
+  "S5P2.a": { short: "Static vs. Harnessed Electricity", keywords: ["static","electricity","naturally occurring","human-harnessed","lightning","charge"] },
+  "S5P2.b": { short: "Electric Circuits",               keywords: ["circuit","complete","component","battery","bulb","wire","switch","open","closed"] },
+  "S5P2.c": { short: "Conductors & Insulators",         keywords: ["conductor","insulator","material","electricity","flow","metal","rubber","plastic","wood","glass"] },
+
+  // ── Physical Science: Magnetism ───────────────────────
+  "S5P3.a": { short: "Electromagnets vs. Magnets",      keywords: ["electromagnet","magnet","permanent","temporary","function","purpose","electric current","coil"] },
+  "S5P3.b": { short: "Magnetic Fields",                 keywords: ["magnetic field","magnetic object","material","wood","paper","glass","metal","rock","thickness","attract"] },
+
+  // ── Life Science: Classification ──────────────────────
+  "S5L1.a": { short: "Animal Classification",           keywords: ["vertebrate","invertebrate","fish","amphibian","reptile","bird","mammal","classify","group","animal"] },
+  "S5L1.b": { short: "Plant Classification",            keywords: ["seed","non-seed","plant","classify","group","producer","fern","moss","flowering"] },
+
+  // ── Life Science: Heredity & Behavior ─────────────────
+  "S5L2.a": { short: "Instincts vs. Learned Behaviors", keywords: ["instinct","learned","behavior","compare","contrast","born","trained","animal"] },
+  "S5L2.b": { short: "Inherited vs. Acquired Traits",   keywords: ["inherited","acquired","trait","characteristic","physical","parent","offspring","environment","compare"] },
+
+  // ── Life Science: Cells ───────────────────────────────
+  "S5L3.a": { short: "Cells & Magnification",           keywords: ["cell","magnification","microscope","too small","plant","animal","comprised","observe"] },
+  "S5L3.b": { short: "Cell Parts",                      keywords: ["membrane","wall","cytoplasm","nucleus","chloroplast","organelle","label","plant cell","animal cell"] },
+  "S5L3.c": { short: "Plant vs. Animal Cells",          keywords: ["plant cell","animal cell","difference","structure","compare","contrast","chloroplast","cell wall"] },
+
+  // ── Life Science: Microorganisms ──────────────────────
+  "S5L4.a": { short: "Beneficial Microorganisms",       keywords: ["microorganism","beneficial","helpful","bacteria","probiotic","organism","benefit","lactobacillus"] },
+  "S5L4.b": { short: "Harmful Microorganisms",          keywords: ["microorganism","harmful","disease","bacteria","infection","organism","harm","salmonella","e-coli"] },
 };
+
+const MATH_STANDARD_KEYS    = Object.keys(STANDARD_MAP).filter(k => !k.startsWith("S5"));
+const SCIENCE_STANDARD_KEYS = Object.keys(STANDARD_MAP).filter(k =>  k.startsWith("S5"));
+const STANDARDS_BY_SUBJECT  = { math: MATH_STANDARD_KEYS, science: SCIENCE_STANDARD_KEYS };
 
 const DOK_OPTIONS = [
   { level: 1, label: "Recall",        desc: "Recall a fact, term, or simple procedure" },
@@ -228,7 +268,8 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
 
   function handleStandardChange(std) {
     const data = STANDARD_MAP[std];
-    onChange({ ...q, standard: std, short: data?.short || q.short });
+    const subject = std.startsWith("S5") ? "science" : "math";
+    onChange({ ...q, standard: std, short: data?.short || q.short, subject });
     setSuggestion(null);
   }
 
@@ -262,12 +303,28 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
       {open && (
         <div style={{ padding: "1.1rem 1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
 
+          {/* Subject selector */}
+          <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+            <span style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.1em", color: T.textSecondary, marginRight: "4px" }}>SUBJECT</span>
+            {["math", "science"].map(s => (
+              <button key={s} onClick={() => {
+                const firstStd = STANDARDS_BY_SUBJECT[s][0];
+                const data = STANDARD_MAP[firstStd];
+                onChange({ ...q, subject: s, standard: firstStd, short: data?.short || "" });
+                setSuggestion(null);
+              }}
+                style={{ padding: "5px 14px", borderRadius: T.xs, border: `2px solid ${(q.subject||"math")===s ? T.teal : T.border}`, background: (q.subject||"math")===s ? T.teal : T.surface, color: (q.subject||"math")===s ? T.white : T.textSecondary, fontSize: "0.78rem", fontWeight: 700, cursor: "pointer", textTransform: "capitalize" }}>
+                {s}
+              </button>
+            ))}
+          </div>
+
           {/* Standard + skill + DOK */}
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
             <div style={{ flex: 2, minWidth: "200px" }}>
               <label style={lbl}>GSE STANDARD <span style={{ fontWeight: 400, color: T.textMuted }}>— auto-suggests as you type</span></label>
               <select style={{ ...inp, fontFamily: "monospace", borderColor: suggestion ? T.warningBd : T.border }} value={q.standard} onChange={e => handleStandardChange(e.target.value)}>
-                {Object.keys(STANDARD_MAP).map(s => <option key={s} value={s}>{s} — {STANDARD_MAP[s].short}</option>)}
+                {(STANDARDS_BY_SUBJECT[q.subject || "math"]).map(s => <option key={s} value={s}>{s} — {STANDARD_MAP[s].short}</option>)}
               </select>
               {suggestion && (
                 <div style={{ marginTop: "5px", display: "flex", alignItems: "center", gap: "6px", fontSize: "0.73rem" }}>
@@ -752,7 +809,7 @@ function HotspotPreview({ q }) {
 
 // ── Main ───────────────────────────────────────────────────
 function EMPTY_Q() {
-  return { id: uid(), type: "mcq", standard: "5.NR.1.1", short: "Place Value Relationships", question: "", questionImage: null, choices: ["","","",""], choiceImages: [null,null,null,null], correct: "", answer: null, dok: null };
+  return { id: uid(), type: "mcq", standard: "5.NR.1.1", short: "Place Value Relationships", subject: "math", question: "", questionImage: null, choices: ["","","",""], choiceImages: [null,null,null,null], correct: "", answer: null, dok: null };
 }
 
 export default function QuestionBuilder() {

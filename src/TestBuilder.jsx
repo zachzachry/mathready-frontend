@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import MathText from "./shared/MathText";
 import { API, T } from "./shared/constants";
 
@@ -36,6 +36,59 @@ const S = {
 
 function genCode() {
   return Math.random().toString(36).substring(2,8).toUpperCase();
+}
+
+// ── Image paste zone ───────────────────────────────────────
+function ImagePasteZone({ image, onImage, onClear }) {
+  const ref = useRef();
+  const handlePaste = useCallback(e => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const blob = item.getAsFile();
+        const reader = new FileReader();
+        reader.onload = ev => onImage(ev.target.result);
+        reader.readAsDataURL(blob);
+        return;
+      }
+    }
+  }, [onImage]);
+
+  const handleFileChange = useCallback(e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => onImage(ev.target.result);
+    reader.readAsDataURL(file);
+  }, [onImage]);
+
+  if (image) return (
+    <div><label style={S.lbl}>QUESTION IMAGE</label>
+      <div style={{ position:"relative", display:"inline-block" }}>
+        <img src={image} alt="question diagram" style={{ maxWidth:"100%", maxHeight:"200px", borderRadius:T.xs, border:`1px solid ${T.border}`, display:"block" }} />
+        <button onClick={onClear} style={{ position:"absolute", top:"4px", right:"4px", background:"rgba(0,0,0,.6)", color:"#fff", border:"none", borderRadius:"50%", width:"22px", height:"22px", cursor:"pointer", fontSize:"0.7rem" }}>✕</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div><label style={S.lbl}>QUESTION IMAGE <span style={{fontWeight:400,color:T.textMuted}}>— optional</span></label>
+      <div style={{ display:"flex", gap:"0.5rem", alignItems:"stretch" }}>
+        <div ref={ref} tabIndex={0} onPaste={handlePaste} onClick={() => ref.current?.focus()}
+          style={{ flex:1, border:`2px dashed ${T.border}`, borderRadius:T.xs, padding:"0.5rem 0.85rem", fontSize:"0.74rem", color:T.textMuted, cursor:"pointer", background:T.surface, outline:"none" }}
+          onFocus={e => e.currentTarget.style.borderColor=T.teal}
+          onBlur={e  => e.currentTarget.style.borderColor=T.border}>
+          📋 Click here, then Ctrl+V / ⌘V to paste image
+        </div>
+        <label style={{ display:"flex", alignItems:"center", padding:"0 0.75rem", background:T.surfaceAlt, border:`1px solid ${T.border}`, borderRadius:T.xs, cursor:"pointer", fontSize:"0.74rem", color:T.textSecondary, whiteSpace:"nowrap" }}>
+          📁 Browse
+          <input type="file" accept="image/*" style={{ display:"none" }} onChange={handleFileChange} />
+        </label>
+      </div>
+    </div>
+  );
 }
 
 // ── Edit Question Modal ────────────────────────────────────
@@ -95,7 +148,7 @@ function EditModal({ question, onSave, onClose }) {
     } else if (q.type === "plotpoint") {
       if (!Array.isArray(q.answer) || q.answer.length !== 2) return;
     } else {
-      if ((q.choices||[]).filter(c=>c.trim()).length < 4 || !(typeof q.correct==="string"&&q.correct.trim())) return;
+      if ((q.choices||[]).filter(c=>c.trim()).length < 2 || !(typeof q.correct==="string"&&q.correct.trim())) return;
     }
     setSaving(true);
     try {
@@ -147,6 +200,8 @@ function EditModal({ question, onSave, onClose }) {
             <textarea style={S.ta} value={q.question} onChange={e=>setQ(p=>({...p,question:e.target.value}))} rows={3}/>
             {q.question&&<div style={{marginTop:"4px",padding:"0.5rem 0.75rem",background:T.surface,border:`1px solid ${T.border}`,borderRadius:T.xs,fontSize:"0.85rem",fontFamily:"Georgia,serif"}}><MathText text={q.question}/></div>}
           </div>
+
+          <ImagePasteZone image={q.questionImage} onImage={img=>setQ(p=>({...p,questionImage:img}))} onClear={()=>setQ(p=>({...p,questionImage:null}))} />
 
           {isDragDrop ? (
             <>
