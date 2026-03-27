@@ -55,7 +55,14 @@ export const lvl     = p  => p>=80?"Proficient":p>=60?"Developing":"Beginning";
 export const lvlC    = p  => p>=80?"#10b981":p>=60?"#f59e0b":"#ef4444";
 export const lvlBg   = p  => p>=80?"#d1fae5":p>=60?"#fef3c7":"#fee2e2";
 export const lvlBd   = p  => p>=80?"#6ee7b7":p>=60?"#fcd34d":"#fca5a5";
-export const now     = () => new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+export const now     = () => {
+  const d = new Date();
+  const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
+  const hh = d.getHours(), mm = String(d.getMinutes()).padStart(2,'0');
+  const ampm = hh >= 12 ? 'PM' : 'AM';
+  const h12  = String(hh % 12 || 12).padStart(2,'0');
+  return `${mo} ${d.getDate()}, ${d.getFullYear()} ${h12}:${mm} ${ampm}`;
+};
 
 // ── Bold Modern Design Tokens ────────────────────────────
 export const T = {
