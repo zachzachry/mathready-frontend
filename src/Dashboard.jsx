@@ -1029,6 +1029,7 @@ export default function Dashboard({ teacher, readOnly }) {
                   </div>
                   <div style={{flex:1,fontSize:"0.82rem",fontWeight:600,color:"#1a1a1a"}}>{s.studentName}</div>
                   <div style={{fontSize:"0.72rem",color:"#888"}}>{s.sessionCount} drill{s.sessionCount!==1?"s":""}</div>
+                  <div style={{fontSize:"0.72rem",color:"#555",background:"#f0f4f8",borderRadius:"3px",padding:"1px 5px",fontWeight:600}}>Lvl {s.avgLevel}</div>
                   <div style={{fontWeight:700,fontSize:"0.88rem",color:"#1a6e2e",minWidth:"44px",textAlign:"right"}}>{s.bestAccuracy}%</div>
                 </div>
               ))}
