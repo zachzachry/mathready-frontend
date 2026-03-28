@@ -332,10 +332,10 @@ export default function Dashboard({ teacher, readOnly }) {
         ? `?teacherId=${teacher.teacherId}&role=${teacher.teacherRole||"teacher"}`
         : "";
       const [s, r, q, st] = await Promise.all([
-        fetch(`${API}/sessions${sessionParam}`).then(r=>r.json()),
-        fetch(`${API}/roster${classFilter}`).then(r=>r.json()),
-        fetch(`${API}/questions`).then(r=>r.json()).catch(()=>[]),
-        fetch(`${API}/tests/saved${savedParam}`).then(r=>r.json()).catch(()=>[]),
+        fetch(`${API}/sessions${sessionParam}`).then(r=>r.ok?r.json():[]),
+        fetch(`${API}/roster${classFilter}`).then(r=>r.ok?r.json():[]),
+        fetch(`${API}/questions`).then(r=>r.ok?r.json():[]).catch(()=>[]),
+        fetch(`${API}/tests/saved${savedParam}`).then(r=>r.ok?r.json():[]).catch(()=>[]),
       ]);
       setSessions(Array.isArray(s) ? s : []);
       if (Array.isArray(st)) setSavedTests(st);
@@ -345,17 +345,17 @@ export default function Dashboard({ teacher, readOnly }) {
       // Fetch fluency reports and leaderboards per class
       try {
         const reports = await Promise.all(
-          rosterArr.map(c => fetch(`${API}/fluency/class/${c.id}/report`).then(r=>r.json()).catch(()=>[]))
+          rosterArr.map(c => fetch(`${API}/fluency/class/${c.id}/report`).then(r=>r.ok?r.json():[]).catch(()=>[]))
         );
-        setFluencyReport(rosterArr.map((c, i) => ({ classId: c.id, className: c.name, students: reports[i] || [] })));
+        setFluencyReport(rosterArr.map((c, i) => ({ classId: c.id, className: c.name, students: Array.isArray(reports[i]) ? reports[i] : [] })));
         const boards = await Promise.all(
-          rosterArr.map(c => fetch(`${API}/fluency/class/${c.id}/leaderboard`).then(r=>r.json()).catch(()=>[]))
+          rosterArr.map(c => fetch(`${API}/fluency/class/${c.id}/leaderboard`).then(r=>r.ok?r.json():[]).catch(()=>[]))
         );
-        setLeaderboard(rosterArr.map((c, i) => ({ classId: c.id, className: c.name, top5: boards[i] || [] })));
+        setLeaderboard(rosterArr.map((c, i) => ({ classId: c.id, className: c.name, top5: Array.isArray(boards[i]) ? boards[i] : [] })));
       } catch (e) { console.warn("Failed to load fluency reports:", e); }
       // Admin overview (only for admin roles)
       if (teacher && (teacher.teacherRole === "super_admin" || teacher.teacherRole === "school_admin")) {
-        try { setAdminData(await fetch(`${API}/admin/overview`).then(r=>r.json())); } catch {}
+        try { const r = await fetch(`${API}/admin/overview`); if (r.ok) setAdminData(await r.json()); } catch {}
       }
     } catch { setSessions([]); }
     setLoading(false);
