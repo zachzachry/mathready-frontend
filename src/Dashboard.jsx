@@ -306,15 +306,18 @@ export default function Dashboard({ teacher, readOnly }) {
   const [reviewCode, setReviewCode] = useState(null); // test code to review
   const [reviewData, setReviewData] = useState(null);
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewNotFound, setReviewNotFound] = useState(false);
 
   async function openReview(code) {
     setReviewCode(code);
     setReviewLoading(true);
     setReviewData(null);
+    setReviewNotFound(false);
     try {
       const classFilter = teacher?.classIds?.length ? `&classId=${teacher.classIds[0]}` : "";
       const r = await fetch(`${API}/test/review/${encodeURIComponent(code)}?_=${Date.now()}${classFilter}`);
       if (r.ok) setReviewData(await r.json());
+      else if (r.status === 404) setReviewNotFound(true);
     } catch (e) { console.warn("Review fetch failed:", e); }
     setReviewLoading(false);
   }
@@ -1620,7 +1623,7 @@ export default function Dashboard({ teacher, readOnly }) {
       {/* ── Test Review Modal ── */}
       {reviewCode && (
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}
-          onClick={()=>{setReviewCode(null);setReviewData(null);}}>
+          onClick={()=>{setReviewCode(null);setReviewData(null);setReviewNotFound(false);}}>
           <div style={{background:T.white,borderRadius:"8px",width:"100%",maxWidth:"900px",maxHeight:"90vh",overflow:"auto",boxShadow:"0 12px 40px rgba(0,0,0,.3)"}}
             onClick={e=>e.stopPropagation()}>
             {/* Header */}
@@ -1629,12 +1632,20 @@ export default function Dashboard({ teacher, readOnly }) {
                 <div style={{fontSize:"1.1rem",fontWeight:800}}>📖 Test Review</div>
                 {reviewData && <div style={{fontSize:"0.75rem",opacity:0.8,marginTop:"2px"}}>{reviewData.testTitle} · {reviewData.testCode} · {reviewData.totalStudents} student{reviewData.totalStudents!==1?"s":""}</div>}
               </div>
-              <button onClick={()=>{setReviewCode(null);setReviewData(null);}}
+              <button onClick={()=>{setReviewCode(null);setReviewData(null);setReviewNotFound(false);}}
                 style={{background:"rgba(255,255,255,.15)",border:"none",color:T.white,fontSize:"1.2rem",width:"32px",height:"32px",borderRadius:"50%",cursor:"pointer",fontWeight:700}}>×</button>
             </div>
 
             {reviewLoading && (
               <div style={{padding:"3rem",textAlign:"center",color:T.textMuted}}>Loading review data...</div>
+            )}
+
+            {!reviewLoading && reviewNotFound && (
+              <div style={{padding:"3rem",textAlign:"center"}}>
+                <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>🗂️</div>
+                <div style={{fontWeight:700,color:T.textSecondary,marginBottom:"4px"}}>Test not found</div>
+                <div style={{fontSize:"0.8rem",color:T.textMuted}}>The test with code <strong>{reviewCode}</strong> no longer exists. Student session data is still intact.</div>
+              </div>
             )}
 
             {reviewData && reviewData.items.length === 0 && (
