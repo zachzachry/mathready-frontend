@@ -909,7 +909,6 @@ export default function QuestionBuilder() {
   const [jsonImporting, setJsonImporting] = useState(false);
   const [jsonResult,    setJsonResult]    = useState(null);
   const [jsonChecked,   setJsonChecked]   = useState({});     // { idx: bool } for select/deselect
-  const [importMenu,    setImportMenu]    = useState(false);
   const [importSubject, setImportSubject] = useState("math");
 
   const VALID_TYPES = ["mcq","multiselect","keypad","plotpoint","dragdrop","hotspot"];
@@ -1168,28 +1167,14 @@ ${standards}`;
         </div>
         <div style={{ display: "flex", gap: "0.65rem", alignItems: "center" }}>
           <span style={{ fontSize: "0.75rem", opacity: .75 }}>{complete}/{questions.length} complete</span>
-          <div style={{position:"relative",display:"inline-block"}}>
-            <button onClick={()=>setImportMenu(p=>!p)}
-              style={{ background:"#4a7fa5", border:"none", borderRadius:T.xs, padding:"6px 14px", fontSize:"0.78rem", fontWeight:700, color:T.white, cursor:"pointer" }}>
-              📥 Import ▾
-            </button>
-            {importMenu && (
-              <div style={{position:"absolute",top:"100%",left:0,marginTop:"4px",background:"#fff",border:"1px solid #c8d3dd",borderRadius:"6px",boxShadow:"0 4px 12px rgba(0,0,0,.15)",zIndex:10,minWidth:"180px",overflow:"hidden"}}>
-                <div onClick={()=>{setJsonPanel(true);setJsonPreview(null);setJsonErr("");setJsonResult(null);setJsonChecked({});setCsvPanel(false);setImportMenu(false);}}
-                  style={{padding:"10px 16px",fontSize:"0.85rem",fontWeight:600,cursor:"pointer",borderBottom:"1px solid #eee",color:"#1e3a5f",display:"flex",alignItems:"center",gap:"8px"}}
-                  onMouseEnter={e=>e.currentTarget.style.background="#f0f4f8"}
-                  onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
-                  📄 <span>JSON File</span>
-                </div>
-                <div onClick={()=>{setCsvPanel(true);setCsvPreview(null);setCsvErr("");setCsvResult(null);setJsonPanel(false);setImportMenu(false);}}
-                  style={{padding:"10px 16px",fontSize:"0.85rem",fontWeight:600,cursor:"pointer",color:"#1e3a5f",display:"flex",alignItems:"center",gap:"8px"}}
-                  onMouseEnter={e=>e.currentTarget.style.background="#f0f4f8"}
-                  onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
-                  📊 <span>CSV Spreadsheet</span>
-                </div>
-              </div>
-            )}
-          </div>
+          <button onClick={()=>{setJsonPanel(true);setJsonPreview(null);setJsonErr("");setJsonResult(null);setJsonChecked({});setCsvPanel(false);}}
+            style={{ background:"#4a7fa5", border:"none", borderRadius:T.xs, padding:"6px 14px", fontSize:"0.78rem", fontWeight:700, color:T.white, cursor:"pointer" }}>
+            📄 Import JSON
+          </button>
+          <button onClick={()=>{setCsvPanel(true);setCsvPreview(null);setCsvErr("");setCsvResult(null);setJsonPanel(false);}}
+            style={{ background:"#4a7fa5", border:"none", borderRadius:T.xs, padding:"6px 14px", fontSize:"0.78rem", fontWeight:700, color:T.white, cursor:"pointer" }}>
+            📊 Import CSV
+          </button>
           <button onClick={seedBank} disabled={saving}
             style={{ background:T.warning, border:"none", borderRadius:T.xs, padding:"6px 14px", fontSize:"0.78rem", fontWeight:700, color:T.white, cursor:"pointer", opacity:saving?0.6:1 }}
             title="Re-load the 100 built-in questions into the bank">
