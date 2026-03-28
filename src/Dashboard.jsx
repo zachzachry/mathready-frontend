@@ -319,21 +319,31 @@ export default function Dashboard({ teacher, readOnly }) {
     setReviewLoading(false);
   }
 
+  // Build URL params once (stable across renders)
+  const classFilter  = teacher && teacher.classIds !== null && teacher.classIds.length > 0
+    ? "?classIds="+teacher.classIds.join(",") : teacher && teacher.classIds !== null ? "?classIds=" : "";
+  const roleParam    = teacher?.teacherRole ? `&role=${teacher.teacherRole}` : "";
+  const tidParam     = teacher?.teacherId   ? `&teacherId=${teacher.teacherId}` : "";
+  const sessionParam = classFilter
+    ? `${classFilter}${roleParam}${tidParam}`
+    : (roleParam||tidParam) ? `?${(roleParam+tidParam).slice(1)}` : "";
+  const savedParam   = teacher?.teacherId
+    ? `?teacherId=${teacher.teacherId}&role=${teacher.teacherRole||"teacher"}` : "";
+
+  // ── Fast poll: sessions only (every 3 s) ──────────────────
+  const refreshSessions = useCallback(async () => {
+    try {
+      const s = await fetch(`${API}/sessions${sessionParam}`).then(r=>r.ok?r.json():[]).catch(()=>[]);
+      setSessions(Array.isArray(s) ? s : []);
+    } catch {}
+  }, [sessionParam]);
+
+  // ── Slow refresh: everything else (on mount + every 30 s) ─
   const refresh = useCallback(async () => {
     try {
-      const classFilter = teacher && teacher.classIds !== null && teacher.classIds.length > 0
-        ? "?classIds="+teacher.classIds.join(",") : teacher && teacher.classIds !== null ? "?classIds=" : "";
-      const roleParam = teacher?.teacherRole ? `&role=${teacher.teacherRole}` : "";
-      const tidParam  = teacher?.teacherId   ? `&teacherId=${teacher.teacherId}` : "";
-      const sessionParam = classFilter
-        ? `${classFilter}${roleParam}${tidParam}`
-        : (roleParam||tidParam) ? `?${(roleParam+tidParam).slice(1)}` : "";
-      const savedParam = teacher?.teacherId
-        ? `?teacherId=${teacher.teacherId}&role=${teacher.teacherRole||"teacher"}`
-        : "";
       const [s, r, q, st] = await Promise.all([
-        fetch(`${API}/sessions${sessionParam}`).then(r=>r.ok?r.json():[]),
-        fetch(`${API}/roster${classFilter}`).then(r=>r.ok?r.json():[]),
+        fetch(`${API}/sessions${sessionParam}`).then(r=>r.ok?r.json():[]).catch(()=>[]),
+        fetch(`${API}/roster${classFilter}`).then(r=>r.ok?r.json():[]).catch(()=>[]),
         fetch(`${API}/questions`).then(r=>r.ok?r.json():[]).catch(()=>[]),
         fetch(`${API}/tests/saved${savedParam}`).then(r=>r.ok?r.json():[]).catch(()=>[]),
       ]);
@@ -342,7 +352,7 @@ export default function Dashboard({ teacher, readOnly }) {
       const rosterArr = Array.isArray(r) ? r : [];
       setRoster(rosterArr);
       if (Array.isArray(q) && q.length > 0) setBankQ(q);
-      // Fetch fluency reports and leaderboards per class
+      // Fluency reports + leaderboards
       try {
         const reports = await Promise.all(
           rosterArr.map(c => fetch(`${API}/fluency/class/${c.id}/report`).then(r=>r.ok?r.json():[]).catch(()=>[]))
@@ -353,15 +363,21 @@ export default function Dashboard({ teacher, readOnly }) {
         );
         setLeaderboard(rosterArr.map((c, i) => ({ classId: c.id, className: c.name, top5: Array.isArray(boards[i]) ? boards[i] : [] })));
       } catch (e) { console.warn("Failed to load fluency reports:", e); }
-      // Admin overview (only for admin roles)
+      // Admin overview
       if (teacher && (teacher.teacherRole === "super_admin" || teacher.teacherRole === "school_admin")) {
-        try { const r = await fetch(`${API}/admin/overview`); if (r.ok) setAdminData(await r.json()); } catch {}
+        try { const ov = await fetch(`${API}/admin/overview`); if (ov.ok) setAdminData(await ov.json()); } catch {}
       }
-    } catch { setSessions([]); }
+    } catch {}
     setLoading(false);
-  }, []);
+  }, [sessionParam, classFilter, savedParam]);
 
-  useEffect(() => { refresh(); const t=setInterval(refresh,3000); return()=>clearInterval(t); }, [refresh]);
+  // Mount: full load once, then fast-poll sessions + slow-poll everything else
+  useEffect(() => {
+    refresh();
+    const fast = setInterval(refreshSessions, 3000);
+    const slow = setInterval(refresh, 30000);
+    return () => { clearInterval(fast); clearInterval(slow); };
+  }, [refresh, refreshSessions]);
 
   async function handleClearByTest(code) {
     setClearing(true); setClearTestCode("");
