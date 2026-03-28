@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import MathTest from "./MathTest";
 import TeacherShell from "./TeacherShell";
+import PrivacyPolicy from "./PrivacyPolicy";
 import { API, T, setToken, clearToken } from "./shared/constants";
 
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
@@ -99,6 +100,9 @@ function UnifiedGoogleSignIn({ onTeacher, onStudent }) {
 }
 
 export default function App() {
+  // Serve privacy policy at /privacy without needing React Router
+  if (window.location.pathname === "/privacy") return <PrivacyPolicy />;
+
   function getUrlParams() {
     const p = new URLSearchParams(window.location.search);
     return { code: p.get("code"), practiceClass: p.get("practice") };
@@ -203,6 +207,12 @@ export default function App() {
           onTeacher={handleTeacherSuccess}
           onStudent={(credential) => { setStudentCredential(credential); setScreen("student"); }}
         />
+      </div>
+
+      <div style={{fontSize:"0.75rem",color:"#4a5568",textAlign:"center"}}>
+        By signing in, you agree to our{" "}
+        <a href="/privacy" style={{color:T.teal,textDecoration:"underline"}}>Privacy Policy</a>.
+        <br/>Student data is protected under COPPA and FERPA.
       </div>
     </div>
   );
