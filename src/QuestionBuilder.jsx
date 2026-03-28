@@ -83,16 +83,6 @@ const LETTERS = ["A","B","C","D"];
 const uid = () => `q${String(Math.floor(Math.random()*9000)+1000)}`;
 
 const STANDARD_MAP = {
-  // ── Mathematical Practices ─────────────────────────────
-  "5.MP.1": { short: "Make Sense & Persevere",      keywords: ["problem","solve","plan","approach","stuck","persevere","check"] },
-  "5.MP.2": { short: "Reason Abstractly",           keywords: ["abstract","quantitative","represent","symbol","reason"] },
-  "5.MP.3": { short: "Construct Arguments",         keywords: ["argument","explain","justify","critique","prove","convince"] },
-  "5.MP.4": { short: "Model with Math",             keywords: ["model","diagram","equation","real world","represent","draw"] },
-  "5.MP.5": { short: "Use Tools Strategically",     keywords: ["tool","ruler","calculator","manipulative","choose","strategy"] },
-  "5.MP.6": { short: "Attend to Precision",         keywords: ["precise","accurate","label","units","exact","careful"] },
-  "5.MP.7": { short: "Use Structure",               keywords: ["pattern","structure","property","rule","organize"] },
-  "5.MP.8": { short: "Repeated Reasoning",          keywords: ["repeat","shortcut","generalize","always","regularity"] },
-
   // ── NR.1: Place Value ──────────────────────────────────
   "5.NR.1.1": { short: "Place Value Relationships", keywords: ["place value","digit","10 times","one-tenth","left","right","represents"] },
   "5.NR.1.2": { short: "Powers of 10",              keywords: ["power of 10","exponent","pattern","multiply","divide","10²","10³"] },
