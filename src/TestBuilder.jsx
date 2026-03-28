@@ -241,15 +241,37 @@ function EditModal({ question, onSave, onClose }) {
               </div>
             </>
           ) : (
-          <div><label style={S.lbl}>ANSWER CHOICES — click letter to mark correct</label>
+          <div>
+            <label style={S.lbl}>
+              ANSWER CHOICES —{" "}
+              {q.type==="multiselect"
+                ? <span style={{fontWeight:400,color:T.textMuted}}>click checkboxes to mark all correct answers</span>
+                : <span style={{fontWeight:400,color:T.textMuted}}>click letter to mark correct</span>}
+            </label>
             <div style={{display:"flex",flexDirection:"column",gap:"0.4rem"}}>
               {["A","B","C","D"].map((letter,i)=>{
-                const isCorrect=q.correct===q.choices[i];
+                const isMultiSelect = q.type === "multiselect";
+                const isCorrect = isMultiSelect
+                  ? (Array.isArray(q.answer) && q.answer.includes(q.choices[i]) && !!q.choices[i])
+                  : (q.correct === q.choices[i]);
+                const toggle = () => {
+                  if (isMultiSelect) {
+                    const choice = q.choices[i];
+                    if (!choice) return;
+                    setQ(p => {
+                      const cur = Array.isArray(p.answer) ? p.answer : [];
+                      const next = cur.includes(choice) ? cur.filter(c=>c!==choice) : [...cur, choice];
+                      return { ...p, answer: next };
+                    });
+                  } else {
+                    setQ(p => ({ ...p, correct: p.choices[i] }));
+                  }
+                };
                 return (
                   <div key={i} style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
-                    <div onClick={()=>setQ(p=>({...p,correct:p.choices[i]}))}
-                      style={{width:"24px",height:"24px",borderRadius:"50%",background:isCorrect?T.success:"#e8edf2",border:`2px solid ${isCorrect?T.success:"#bcc8d4"}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,cursor:"pointer"}}>
-                      <span style={{fontSize:"0.65rem",fontWeight:700,color:isCorrect?T.white:"#667"}}>{letter}</span>
+                    <div onClick={toggle}
+                      style={{width:"24px",height:"24px",borderRadius:isMultiSelect?"4px":"50%",background:isCorrect?T.success:"#e8edf2",border:`2px solid ${isCorrect?T.success:"#bcc8d4"}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,cursor:"pointer"}}>
+                      <span style={{fontSize:"0.65rem",fontWeight:700,color:isCorrect?T.white:"#667"}}>{isMultiSelect&&isCorrect?"✓":letter}</span>
                     </div>
                     <input style={{...S.inp,flex:1,border:`1px solid ${isCorrect?T.success:T.border}`,background:isCorrect?T.successBg:T.surface}}
                       value={q.choices[i]} onChange={e=>updateChoice(i,e.target.value)} placeholder={`Choice ${letter}`}/>
@@ -257,6 +279,13 @@ function EditModal({ question, onSave, onClose }) {
                 );
               })}
             </div>
+            {q.type==="multiselect" && (
+              <div style={{fontSize:"0.72rem",color:T.textSecondary,marginTop:"0.4rem"}}>
+                {Array.isArray(q.answer) && q.answer.filter(Boolean).length > 0
+                  ? <span>✓ {q.answer.filter(Boolean).length} correct answer{q.answer.filter(Boolean).length!==1?"s":""} selected</span>
+                  : <span style={{color:T.dangerText}}>Select at least 2 correct answers</span>}
+              </div>
+            )}
           </div>
           )}
         </div>
