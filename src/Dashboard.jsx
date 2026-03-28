@@ -341,17 +341,15 @@ export default function Dashboard({ teacher, readOnly }) {
   // ── Slow refresh: everything else (on mount + every 30 s) ─
   const refresh = useCallback(async () => {
     try {
-      const [s, r, q, st] = await Promise.all([
+      const [s, r, st] = await Promise.all([
         fetch(`${API}/sessions${sessionParam}`).then(r=>r.ok?r.json():[]).catch(()=>[]),
         fetch(`${API}/roster${classFilter}`).then(r=>r.ok?r.json():[]).catch(()=>[]),
-        fetch(`${API}/questions`).then(r=>r.ok?r.json():[]).catch(()=>[]),
         fetch(`${API}/tests/saved${savedParam}`).then(r=>r.ok?r.json():[]).catch(()=>[]),
       ]);
       setSessions(Array.isArray(s) ? s : []);
       if (Array.isArray(st)) setSavedTests(st);
       const rosterArr = Array.isArray(r) ? r : [];
       setRoster(rosterArr);
-      if (Array.isArray(q) && q.length > 0) setBankQ(q);
       // Fluency reports + leaderboards
       try {
         const reports = await Promise.all(
@@ -370,6 +368,13 @@ export default function Dashboard({ teacher, readOnly }) {
     } catch {}
     setLoading(false);
   }, [sessionParam, classFilter, savedParam]);
+
+  // Load question bank once on mount — 2.4 MB, no need to re-fetch every 30 s
+  useEffect(() => {
+    fetch(`${API}/questions`).then(r=>r.ok?r.json():[]).then(q => {
+      if (Array.isArray(q) && q.length > 0) setBankQ(q);
+    }).catch(()=>{});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Mount: full load once, then fast-poll sessions + slow-poll everything else
   useEffect(() => {
