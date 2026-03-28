@@ -88,6 +88,7 @@ export default function StudentDiagnostic({ studentId, studentName, onClose }) {
               {[
                 ["Tests Taken",   data.sessionCount,                           T.midnight],
                 ["Avg Score",     data.avgTestScore != null ? `${data.avgTestScore}%` : "—",  pctColor(data.avgTestScore)],
+                ["Score Variance", data.scoreVariance != null ? `±${data.scoreVariance}%` : "—", data.scoreVariance > 20 ? "#c62828" : data.scoreVariance > 10 ? "#b45309" : T.textSecondary],
                 ["Avg Fluency",   data.engagementSignals?.avgFluencyScore != null ? `${data.engagementSignals.avgFluencyScore}%` : "—", T.warning],
                 ["Avg Time/Q",    data.engagementSignals?.avgTimePerQuestion != null ? `${data.engagementSignals.avgTimePerQuestion}s` : "—", T.teal],
                 ["Violations",    data.engagementSignals?.totalViolations ?? 0, data.engagementSignals?.totalViolations > 3 ? T.dangerText : T.textSecondary],

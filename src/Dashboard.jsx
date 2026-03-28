@@ -443,6 +443,13 @@ export default function Dashboard({ teacher, readOnly }) {
   const devC    = latestByStudent.filter(s=>s.pct>=60&&s.pct<80).length;
   const begC    = latestByStudent.filter(s=>s.pct<60).length;
 
+  // ── DOK breakdown from questionTimes across filtered sessions ──
+  const dokBuckets = {1:{c:0,t:0}, 2:{c:0,t:0}, 3:{c:0,t:0}};
+  filteredTestSessions.forEach(s => (s.questionTimes||[]).forEach(qt => {
+    const d = Number(qt.dok); if (d >= 1 && d <= 3) { dokBuckets[d].t++; if (qt.correct) dokBuckets[d].c++; }
+  }));
+  const dokAvg = k => dokBuckets[k].t ? Math.round(dokBuckets[k].c / dokBuckets[k].t * 100) : null;
+
   // ── Item analysis (use live question ids if available) ──
   function gradeSessionAnswer(q, ans) {
     if (!q || ans === undefined || ans === null) return false;
@@ -547,6 +554,28 @@ export default function Dashboard({ teacher, readOnly }) {
               </div>
             ))}
           </div>
+          {/* DOK breakdown row — only show when there's question-time data */}
+          {(dokAvg(1) !== null || dokAvg(2) !== null || dokAvg(3) !== null) && (
+            <div style={{display:"flex",gap:"0.75rem",flexWrap:"wrap"}}>
+              {[[1,"Recall / Procedural","#4338ca","#e0e7ff"],[2,"Skill / Concept","#0369a1","#e0f2fe"],[3,"Strategic Thinking","#7c3aed","#f3e8ff"]].map(([dok,desc,c,bg])=>{
+                const v = dokAvg(dok);
+                return (
+                  <div key={dok} style={{background:T.white,border:`1px solid ${T.border}`,borderLeft:`3px solid ${c}`,borderRadius:T.xs,padding:"0.7rem 1.25rem",minWidth:"140px",flex:1}}>
+                    <div style={{fontSize:"0.55rem",fontWeight:700,letterSpacing:"0.12em",color:c,marginBottom:"2px"}}>DOK {dok} — {desc.toUpperCase()}</div>
+                    <div style={{display:"flex",alignItems:"baseline",gap:"0.4rem"}}>
+                      <div style={{fontSize:"1.5rem",fontWeight:700,color:v==null?T.textMuted:v>=80?T.success:v>=60?T.warning:T.dangerText}}>{v != null ? `${v}%` : "—"}</div>
+                      {v != null && <div style={{fontSize:"0.6rem",color:T.textMuted}}>{dokBuckets[dok].t} qs</div>}
+                    </div>
+                    {v != null && (
+                      <div style={{height:"4px",background:bg,borderRadius:"2px",marginTop:"6px"}}>
+                        <div style={{width:`${v}%`,height:"100%",background:c,borderRadius:"2px"}}/>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {testCodes.length > 0 && (
             <div style={{display:"flex",alignItems:"flex-start",gap:"0.5rem",flexWrap:"wrap"}}>
               <div style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
@@ -602,6 +631,13 @@ export default function Dashboard({ teacher, readOnly }) {
                     <div style={{textAlign:"right"}}>
                       <div style={{fontSize:"1rem",fontWeight:700,color:lvlC(p)}}>{p}%</div>
                       <div style={{fontSize:"0.65rem",color:T.textSecondary}}>{s.score}/{s.total} · {s.timeUsed}</div>
+                      {(() => {
+                        const qt = s.questionTimes||[];
+                        if (!qt.length) return null;
+                        const avg = (qt.reduce((a,q)=>a+(q.timeSecs||0),0)/qt.length).toFixed(1);
+                        const isFast = Number(avg) < 10;
+                        return <div style={{fontSize:"0.6rem",fontWeight:700,color:isFast?"#c62828":"#888"}} title="Average seconds per question">{avg}s/q{isFast?" ⚡":""}</div>;
+                      })()}
                     </div>
                     <span style={{fontSize:"0.7rem",color:T.textMuted,flexShrink:0}}>{isOpen?"▲":"▼"}</span>
                   </div>
@@ -736,20 +772,50 @@ export default function Dashboard({ teacher, readOnly }) {
               ITEM ANALYSIS — {itemData.length} questions attempted
             </div>
             {itemData.sort((a,b)=>a.pct-b.pct).map(q=>(
-              <div key={q.id} style={{padding:"0.65rem 1rem",borderBottom:`1px solid ${T.surfaceAlt}`,display:"flex",alignItems:"center",gap:"0.75rem"}}>
-                <div style={{width:"36px",textAlign:"right",fontSize:"0.9rem",fontWeight:700,color:q.pct>=70?T.success:q.pct>=50?T.warning:T.dangerText,flexShrink:0}}>{q.pct}%</div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{display:"flex",gap:"0.35rem",marginBottom:"2px",flexWrap:"wrap"}}>
-                    <span style={{fontSize:"0.6rem",fontWeight:700,color:T.midnight,background:"rgba(13,148,136,.1)",padding:"1px 5px",borderRadius:"2px"}}>{q.standard}</span>
-                    {q.dok&&<span style={{fontSize:"0.6rem",fontWeight:700,color:T.warning,background:"#fff3cd",padding:"1px 5px",borderRadius:"2px"}}>DOK {q.dok}</span>}
-                    <span style={{fontSize:"0.6rem",color:T.textSecondary}}>{q.short}</span>
+              {(()=>{
+                // Compute answer distribution from session answers
+                const dist = {};
+                filteredTestSessions.forEach(s => {
+                  const a = s.answers?.[q.id];
+                  if (a != null && a !== "") dist[String(a)] = (dist[String(a)]||0) + 1;
+                });
+                const letters = ["A","B","C","D"];
+                const hasDistrib = q.type === "mcq" && q.choices?.length > 0 && Object.keys(dist).length > 0;
+                return (
+                <div key={q.id} style={{padding:"0.65rem 1rem",borderBottom:`1px solid ${T.surfaceAlt}`,display:"flex",alignItems:"flex-start",gap:"0.75rem"}}>
+                  <div style={{width:"36px",textAlign:"right",fontSize:"0.9rem",fontWeight:700,color:q.pct>=70?T.success:q.pct>=50?T.warning:T.dangerText,flexShrink:0,paddingTop:"2px"}}>{q.pct}%</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",gap:"0.35rem",marginBottom:"2px",flexWrap:"wrap"}}>
+                      <span style={{fontSize:"0.6rem",fontWeight:700,color:T.midnight,background:"rgba(13,148,136,.1)",padding:"1px 5px",borderRadius:"2px"}}>{q.standard}</span>
+                      {q.dok&&<span style={{fontSize:"0.6rem",fontWeight:700,color:T.warning,background:"#fff3cd",padding:"1px 5px",borderRadius:"2px"}}>DOK {q.dok}</span>}
+                      <span style={{fontSize:"0.6rem",color:T.textSecondary}}>{q.short}</span>
+                    </div>
+                    <div style={{height:"6px",background:"#e8edf2",borderRadius:T.xs,overflow:"hidden",marginBottom: hasDistrib?"6px":"0"}}>
+                      <div style={{height:"100%",width:`${q.pct}%`,background:q.pct>=70?T.success:q.pct>=50?"#f59e0b":T.dangerText,borderRadius:T.xs,transition:"width .3s"}}/>
+                    </div>
+                    {hasDistrib && (
+                      <div style={{display:"flex",gap:"4px"}}>
+                        {letters.map((ltr,li) => {
+                          const count = dist[ltr] || 0;
+                          const pct   = q.attempted ? Math.round(count/q.attempted*100) : 0;
+                          const isCor = ltr === q.correct;
+                          return (
+                            <div key={ltr} style={{flex:1,minWidth:0}}>
+                              <div style={{height:"20px",background:"#f0f4f8",borderRadius:"2px",overflow:"hidden",position:"relative"}}>
+                                <div style={{position:"absolute",bottom:0,left:0,right:0,height:`${pct}%`,background:isCor?T.success:"#e57373",opacity:0.85,transition:"height .3s"}}/>
+                                <div style={{position:"absolute",top:"50%",left:0,right:0,transform:"translateY(-50%)",textAlign:"center",fontSize:"0.52rem",fontWeight:700,color:isCor?T.success:"#b71c1c",zIndex:1}}>{pct>0?`${pct}%`:""}</div>
+                              </div>
+                              <div style={{textAlign:"center",fontSize:"0.52rem",fontWeight:700,color:isCor?T.success:T.textMuted,marginTop:"1px"}}>{ltr}{isCor?"✓":""}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                  <div style={{height:"6px",background:"#e8edf2",borderRadius:T.xs,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:`${q.pct}%`,background:q.pct>=70?T.success:q.pct>=50?"#f59e0b":T.dangerText,borderRadius:T.xs,transition:"width .3s"}}/>
-                  </div>
+                  <div style={{fontSize:"0.68rem",color:T.textSecondary,flexShrink:0,paddingTop:"2px"}}>{q.correctCount}/{q.attempted}</div>
                 </div>
-                <div style={{fontSize:"0.68rem",color:T.textSecondary,flexShrink:0}}>{q.correctCount}/{q.attempted}</div>
-              </div>
+                );
+              })()}
             ))}
           </div>
         </div>
@@ -947,6 +1013,16 @@ export default function Dashboard({ teacher, readOnly }) {
                   const avg = validScores.length ? Math.round(validScores.reduce((a,b)=>a+b,0)/validScores.length) : 0;
                   const mastery = standardMastery(st.sessions);
                   const weakStds = Object.entries(mastery).filter(([,v])=>v.total>=2&&v.correct/v.total<0.6).map(([std])=>std);
+                  // Standard mastery deltas: first session vs last session (only when 2+ sessions)
+                  const stdDeltas = {};
+                  if (st.sessions.length >= 2) {
+                    const first = standardMastery([st.sessions[0]]);
+                    const last  = standardMastery([st.sessions[st.sessions.length-1]]);
+                    Object.keys(mastery).forEach(std => {
+                      const f = first[std], l = last[std];
+                      if (f?.total && l?.total) stdDeltas[std] = Math.round(l.correct/l.total*100) - Math.round(f.correct/f.total*100);
+                    });
+                  }
                   return (
                     <div key={key} style={{borderBottom:`1px solid ${T.surfaceAlt}`}}>
                     <div onClick={()=>setGrowthStudent(key)}
@@ -985,9 +1061,15 @@ export default function Dashboard({ teacher, readOnly }) {
                     {weakStds.length>0&&(
                       <div style={{padding:"0.4rem 1.25rem 0.5rem",background:T.dangerBg,display:"flex",alignItems:"center",gap:"0.5rem",flexWrap:"wrap"}}>
                         <span style={{fontSize:"0.58rem",fontWeight:700,color:T.dangerText,letterSpacing:"0.1em"}}>NEEDS RETEACH:</span>
-                        {weakStds.map(std=>(
-                          <span key={std} style={{fontSize:"0.62rem",fontWeight:700,color:T.dangerText,background:T.white,padding:"1px 6px",borderRadius:"2px",border:`1px solid ${T.dangerBd}`}}>{std}</span>
-                        ))}
+                        {weakStds.map(std=>{
+                          const d = stdDeltas[std];
+                          return (
+                            <span key={std} style={{fontSize:"0.62rem",fontWeight:700,color:T.dangerText,background:T.white,padding:"1px 6px",borderRadius:"2px",border:`1px solid ${T.dangerBd}`,display:"inline-flex",alignItems:"center",gap:"2px"}}>
+                              {std}
+                              {d != null && <span style={{fontWeight:800,color:d>5?T.success:d<-5?T.dangerText:"#888"}} title={`${d>0?"+":""}${d}% since first test`}>{d>5?"▲":d<-5?"▼":"→"}</span>}
+                            </span>
+                          );
+                        })}
                       </div>
                     )}
                     </div>
@@ -1068,7 +1150,7 @@ export default function Dashboard({ teacher, readOnly }) {
                 </button>
               </div>
               <div style={{overflowX:"auto"}}>
-              <div style={{display:"grid",gridTemplateColumns:"1fr repeat(4,48px) 4px repeat(4,48px) 46px 42px 52px 42px 36px 36px",gap:0,fontSize:"0.68rem",minWidth:"700px"}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr repeat(4,48px) 4px repeat(4,48px) 46px 42px 52px 42px 36px 36px 36px",gap:0,fontSize:"0.68rem",minWidth:"740px"}}>
                 {/* ── header row ── */}
                 <div style={{padding:"0.5rem 0.75rem",fontWeight:700,color:T.textSecondary,borderBottom:`2px solid ${T.border}`}}>Student</div>
                 {["Add","Sub","Mul","Div"].map(op=>(
@@ -1079,9 +1161,10 @@ export default function Dashboard({ teacher, readOnly }) {
                   <div key={`acc-${op}`} style={{padding:"0.5rem 0.15rem",fontWeight:700,color:T.textSecondary,textAlign:"center",borderBottom:`2px solid ${T.border}`,fontSize:"0.6rem"}}>{op}<br/><span style={{fontWeight:400,fontSize:"0.5rem",color:T.textMuted}}>acc</span></div>
                 ))}
                 <div style={{padding:"0.5rem 0.15rem",fontWeight:700,color:T.textSecondary,textAlign:"center",borderBottom:`2px solid ${T.border}`,fontSize:"0.6rem"}}>Drills</div>
-                <div style={{padding:"0.5rem 0.15rem",fontWeight:700,color:T.textSecondary,textAlign:"center",borderBottom:`2px solid ${T.border}`,fontSize:"0.6rem"}}>PPM</div>
+                <div style={{padding:"0.5rem 0.15rem",fontWeight:700,color:T.textSecondary,textAlign:"center",borderBottom:`2px solid ${T.border}`,fontSize:"0.6rem"}}>Best<br/><span style={{fontWeight:400,fontSize:"0.5rem",color:T.textMuted}}>PPM</span></div>
                 <div style={{padding:"0.5rem 0.15rem",fontWeight:700,color:T.textSecondary,textAlign:"center",borderBottom:`2px solid ${T.border}`,fontSize:"0.6rem"}}>Avg %</div>
                 <div style={{padding:"0.5rem 0.15rem",fontWeight:700,color:T.textSecondary,textAlign:"center",borderBottom:`2px solid ${T.border}`,fontSize:"0.6rem"}}>Trend</div>
+                <div style={{padding:"0.5rem 0.15rem",fontWeight:700,color:T.textSecondary,textAlign:"center",borderBottom:`2px solid ${T.border}`,fontSize:"0.6rem"}}>⭐<br/><span style={{fontWeight:400,fontSize:"0.5rem",color:T.textMuted}}>best</span></div>
                 <div style={{padding:"0.5rem 0.15rem",fontWeight:700,color:T.textSecondary,textAlign:"center",borderBottom:`2px solid ${T.border}`,fontSize:"0.6rem"}}>Rpt</div>
                 <div style={{padding:"0.5rem 0.15rem",fontWeight:700,color:T.textSecondary,textAlign:"center",borderBottom:`2px solid ${T.border}`,fontSize:"0.6rem"}}>Rst</div>
 
@@ -1092,7 +1175,7 @@ export default function Dashboard({ teacher, readOnly }) {
                   <React.Fragment key={s.student.id}>
                     <div style={{padding:"0.45rem 0.75rem",borderBottom:`1px solid ${T.surfaceAlt}`,fontWeight:600,color:T.text,display:"flex",alignItems:"center",gap:"0.4rem"}}>
                       {s.student.name}
-                      {(s.streakDays||0) >= 2 && <span title={`${s.streakDays}-day streak`} style={{fontSize:"0.65rem"}}>🔥{s.streakDays}</span>}
+                      {(s.streakDays||0) >= 1 && <span title={`${s.streakDays}-day streak`} style={{fontSize:"0.65rem",background:"#fff3e0",border:"1px solid #ffcc80",borderRadius:"3px",padding:"0px 4px"}}>🔥{s.streakDays}d</span>}
                     </div>
                     {["add","sub","mul","div"].map(op=>(
                       <div key={`lvl-${op}`} style={{padding:"0.45rem 0.15rem",textAlign:"center",borderBottom:`1px solid ${T.surfaceAlt}`,fontWeight:700,
@@ -1107,11 +1190,14 @@ export default function Dashboard({ teacher, readOnly }) {
                       );
                     })}
                     <div style={{padding:"0.45rem 0.15rem",textAlign:"center",borderBottom:`1px solid ${T.surfaceAlt}`,color:T.textMuted}}>{s.sessionCount}</div>
-                    <div style={{padding:"0.45rem 0.15rem",textAlign:"center",borderBottom:`1px solid ${T.surfaceAlt}`,fontWeight:600,fontSize:"0.62rem",color:T.textSecondary}}>{s.lastSession?.ppm != null ? s.lastSession.ppm : "—"}</div>
+                    <div style={{padding:"0.45rem 0.15rem",textAlign:"center",borderBottom:`1px solid ${T.surfaceAlt}`,fontWeight:600,fontSize:"0.62rem",color:T.textSecondary}}>{s.personalBests?.bestPPM != null ? Math.round(s.personalBests.bestPPM) : "—"}</div>
                     <div style={{padding:"0.45rem 0.15rem",textAlign:"center",borderBottom:`1px solid ${T.surfaceAlt}`,fontWeight:700,
                       color:s.avgAccuracy>=80?T.success:s.avgAccuracy>=60?T.warning:T.dangerText}}>{s.avgAccuracy}%</div>
                     <div style={{padding:"0.45rem 0.15rem",textAlign:"center",borderBottom:`1px solid ${T.surfaceAlt}`,fontSize:"0.85rem"}}>
                       {s.trend === "improving" ? "📈" : s.trend === "declining" ? "📉" : "➡️"}
+                    </div>
+                    <div style={{padding:"0.45rem 0.15rem",textAlign:"center",borderBottom:`1px solid ${T.surfaceAlt}`,fontSize:"0.72rem",color:"#c67c00",fontWeight:700,letterSpacing:"-1px"}}>
+                      {s.personalBests?.bestStars != null ? "★".repeat(s.personalBests.bestStars) : "—"}
                     </div>
                     <div style={{padding:"0.3rem 0.15rem",textAlign:"center",borderBottom:`1px solid ${T.surfaceAlt}`,display:"flex",flexDirection:"column",gap:"2px",alignItems:"center"}}>
                       <button
