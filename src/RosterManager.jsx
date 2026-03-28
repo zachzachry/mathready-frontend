@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { API, T } from "./shared/constants";
+import { API, T, teacherHeaders } from "./shared/constants";
 
 const S = {
   inp:   { width:"100%", padding:"0.5rem 0.75rem", border:`1px solid ${T.border}`, borderRadius:T.xs, fontSize:"0.85rem", background:T.surface, boxSizing:"border-box" },
@@ -582,7 +582,7 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
   async function addClass() {
     if (!newClassName.trim()) return;
     try {
-      const r = await fetch(`${API}/roster/class`, { method:"POST", headers:{"Content-Type":"application/json"},
+      const r = await fetch(`${API}/roster/class`, { method:"POST", headers:teacherHeaders(),
         body: JSON.stringify({ name: newClassName.trim(), teacherId: teacher?.teacherId || null }) });
       const data = await r.json();
       // Sync new classId into App state + sessionStorage so it survives navigation/refresh
@@ -597,7 +597,7 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
     const cls = classes.find(c => c.id === cid);
     if (!window.confirm(`Delete "${cls?.name || "this class"}" and all its students? This cannot be undone.`)) return;
     try {
-      await fetch(`${API}/roster/class/${cid}`, { method:"DELETE" });
+      await fetch(`${API}/roster/class/${cid}`, { method:"DELETE", headers:teacherHeaders() });
       // Sync removed classId out of App state + sessionStorage
       if (onUpdateClassIds && teacher?.classIds !== null) {
         onUpdateClassIds((teacher.classIds || []).filter(id => id !== cid));
@@ -617,7 +617,7 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
     setAdding(true);
     try {
       const r    = await fetch(`${API}/roster/class/${activeClass}/students`, {
-        method:"POST", headers:{"Content-Type":"application/json"},
+        method:"POST", headers:teacherHeaders(),
         body: JSON.stringify({ students: names })
       });
       const data = await r.json();
@@ -670,7 +670,7 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
     const names = csvPreview.map(r => r.name);
     try {
       const r = await fetch(`${API}/roster/class/${activeClass}/students`, {
-        method:"POST", headers:{"Content-Type":"application/json"},
+        method:"POST", headers:teacherHeaders(),
         body: JSON.stringify({ students: names })
       });
       const data = await r.json();
@@ -690,7 +690,7 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
     );
     try {
       await fetch(`${API}/roster/class/${cid}`, {
-        method:"PUT", headers:{"Content-Type":"application/json"},
+        method:"PUT", headers:teacherHeaders(),
         body: JSON.stringify({ name: cls.name, students: updated }),
       });
       await load();
@@ -702,7 +702,7 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
     if (!cid || !sid) { console.error("removeStudent: missing cid or sid", {cid, sid}); return; }
     if (!window.confirm(`Remove ${name} from this class?`)) return;
     try {
-      const r = await fetch(`${API}/roster/class/${cid}/student/${sid}`, { method:"DELETE" });
+      const r = await fetch(`${API}/roster/class/${cid}/student/${sid}`, { method:"DELETE", headers:teacherHeaders() });
       const d = await r.json();
       if (!r.ok) { flash("Failed to remove student."); return; }
       await load();
@@ -715,7 +715,7 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
     let addedCount = 0;
     if (newStudents.length > 0) {
       await fetch(`${API}/roster/class/${cls.id}/students`, {
-        method:"POST", headers:{"Content-Type":"application/json"},
+        method:"POST", headers:teacherHeaders(),
         body: JSON.stringify({ students: newStudents.map(s => ({ name: s.name })) }),
       });
       addedCount = newStudents.length;
@@ -734,7 +734,7 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
     for (const g of groups) {
       if (!g.students.length) continue; // skip empty groups
       const r = await fetch(`${API}/roster/class`, {
-        method:"POST", headers:{"Content-Type":"application/json"},
+        method:"POST", headers:teacherHeaders(),
         body: JSON.stringify({ name: g.name, teacherId: teacher?.teacherId || null, gcCourseId: g.gcCourseId }),
       });
       const { id: newCid } = await r.json();
@@ -742,7 +742,7 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
       newCids.push(newCid);
       // Add students
       await fetch(`${API}/roster/class/${newCid}/students`, {
-        method:"POST", headers:{"Content-Type":"application/json"},
+        method:"POST", headers:teacherHeaders(),
         body: JSON.stringify({ students: g.students.map(s => ({ name: s.name })) }),
       });
       // Apply accommodations
@@ -756,7 +756,7 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
           reduceChoices: g.reduceChoices || false,
         }));
         await fetch(`${API}/roster/class/${newCid}`, {
-          method:"PUT", headers:{"Content-Type":"application/json"},
+          method:"PUT", headers:teacherHeaders(),
           body: JSON.stringify({ name: g.name, students: updated }),
         });
       }
@@ -868,7 +868,7 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
                       const newVal = !(activeClassData.hideTimer ?? true);
                       try {
                         await fetch(`${API}/roster/class/${activeClassData.id}`, {
-                          method:"PUT", headers:{"Content-Type":"application/json"},
+                          method:"PUT", headers:teacherHeaders(),
                           body: JSON.stringify({ hideTimer: newVal })
                         });
                         load();
@@ -891,7 +891,7 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
                       const dur = parseInt(e.target.value);
                       try {
                         await fetch(`${API}/roster/class/${activeClassData.id}`, {
-                          method:"PUT", headers:{"Content-Type":"application/json"},
+                          method:"PUT", headers:teacherHeaders(),
                           body: JSON.stringify({ drillDuration: dur })
                         });
                         load();
@@ -1033,12 +1033,12 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
         onImport={async (courseName, students, gcCourseId) => {
           // Create a new class with the course name
           const r = await fetch(`${API}/roster/class`, {
-            method:"POST", headers:{"Content-Type":"application/json"},
+            method:"POST", headers:teacherHeaders(),
             body: JSON.stringify({ name: courseName, teacherId: teacher?.teacherId || null, gcCourseId }),
           });
           const { id: newCid } = await r.json();
           await fetch(`${API}/roster/class/${newCid}/students`, {
-            method:"POST", headers:{"Content-Type":"application/json"},
+            method:"POST", headers:teacherHeaders(),
             body: JSON.stringify({ students: students.map(s => ({ name: s.name })) }),
           });
           // Sync new classId into App state + sessionStorage

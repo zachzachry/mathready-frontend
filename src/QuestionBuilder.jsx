@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import MathText from "./shared/MathText";
 import PlotGrid from "./shared/PlotGrid";
-import { API, QUESTIONS as BUILTIN_QUESTIONS, T } from "./shared/constants";
+import { API, QUESTIONS as BUILTIN_QUESTIONS, T, teacherHeaders } from "./shared/constants";
 import { HotspotAnswer } from "./MathTest";
 
 
@@ -875,7 +875,7 @@ export default function QuestionBuilder() {
         };
         const resp = await fetch(`${API}/questions`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: teacherHeaders(),
           body: JSON.stringify(toSave),
         });
         if (!resp.ok) { console.error("Save failed:", resp.status); }
@@ -893,7 +893,7 @@ export default function QuestionBuilder() {
     try {
       const r = await fetch(`${API}/questions/seed`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: teacherHeaders(),
         body: JSON.stringify(BUILTIN_QUESTIONS),
       });
       const data = await r.json();
@@ -1037,7 +1037,7 @@ ${standards}`;
       });
       const resp = await fetch(`${API}/questions/seed`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: teacherHeaders(),
         body: JSON.stringify(toUpload),
       });
       const d = await resp.json();
@@ -1141,7 +1141,7 @@ ${standards}`;
         : csvPreview.rows;
       const r = await fetch(`${API}/questions/seed`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: teacherHeaders(),
         body: JSON.stringify(toUpload),
       });
       const d = await r.json();

@@ -123,6 +123,19 @@ export const S = {
   btnDanger: {background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:T.xs,padding:"0.65rem 1rem",fontSize:"0.82rem",cursor:"pointer",fontWeight:600,color:T.dangerText,transition:"background .15s"},
 };
 
+// ── Teacher session token ──────────────────────────────────
+const _TOKEN_KEY = "mr_token";
+export function getToken()    { try { return sessionStorage.getItem(_TOKEN_KEY) || ""; } catch { return ""; } }
+export function setToken(t)   { try { sessionStorage.setItem(_TOKEN_KEY, t || ""); } catch {} }
+export function clearToken()  { try { sessionStorage.removeItem(_TOKEN_KEY); } catch {} }
+/** Returns headers with Authorization + Content-Type for teacher write calls */
+export function teacherHeaders() {
+  const t = getToken();
+  return t
+    ? { "Content-Type": "application/json", "Authorization": `Bearer ${t}` }
+    : { "Content-Type": "application/json" };
+}
+
 // ── API helpers ────────────────────────────────────────────
 export async function loadSessions() {
   try { const r = await fetch(`${API}/sessions`); return await r.json(); }

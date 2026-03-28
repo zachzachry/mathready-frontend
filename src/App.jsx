@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import MathTest from "./MathTest";
 import TeacherShell from "./TeacherShell";
-import { API, T } from "./shared/constants";
+import { API, T, setToken, clearToken } from "./shared/constants";
 
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
 const SESSION_KEY = "mathready_session";
@@ -128,10 +128,12 @@ export default function App() {
     }
     window.history.replaceState({}, "", window.location.pathname);
     clearSession();
+    clearToken();
     setScreen("home"); setTeacherIdentity(null); setStudentCredential(null); setImpersonateStudent(null);
   }
 
   function handleTeacherSuccess(data) {
+    if (data.sessionToken) setToken(data.sessionToken);
     const teacher = {
       teacherRole: data.teacherRole,
       teacherId:   data.teacherId,

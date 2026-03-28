@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import MathText from "./shared/MathText";
-import { API, T } from "./shared/constants";
+import { API, T, teacherHeaders } from "./shared/constants";
 
 const MATH_STANDARDS = [
   "5.NR.1.1","5.NR.1.2","5.NR.2.1","5.NR.2.2",
@@ -152,7 +152,7 @@ function EditModal({ question, onSave, onClose }) {
     }
     setSaving(true);
     try {
-      await fetch(`${API}/questions`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(q) });
+      await fetch(`${API}/questions`, { method:"POST", headers:teacherHeaders(), body:JSON.stringify(q) });
       onSave(q);
     } catch {}
     setSaving(false);
@@ -733,7 +733,7 @@ export default function TestBuilder({ teacher, readOnly }) {
   }
 
   async function deleteQuestion(id) {
-    try { await fetch(`${API}/questions/${id}`,{method:"DELETE"}); setBank(b=>b.filter(q=>q.id!==id)); setSelected(s=>s.filter(x=>x!==id)); }
+    try { await fetch(`${API}/questions/${id}`,{method:"DELETE",headers:teacherHeaders()}); setBank(b=>b.filter(q=>q.id!==id)); setSelected(s=>s.filter(x=>x!==id)); }
     catch {}
     setConfirmDelete(null);
   }
@@ -745,7 +745,7 @@ export default function TestBuilder({ teacher, readOnly }) {
     if (!t) return;
     try {
       await fetch(`${API}/tests/saved/${testId}`, {
-        method:"PUT", headers:{"Content-Type":"application/json"},
+        method:"PUT", headers:teacherHeaders(),
         body: JSON.stringify({...t, classIds})
       });
       await loadSavedTests();
@@ -765,7 +765,7 @@ export default function TestBuilder({ teacher, readOnly }) {
         ? `${API}/tests/saved/${editingTestId.id}${tParams}`
         : `${API}/tests/saved${tParams}`;
       const method = editingTestId ? "PUT" : "POST";
-      const r = await fetch(url,{method,headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+      const r = await fetch(url,{method,headers:teacherHeaders(),body:JSON.stringify(body)});
       if (!r.ok) { const err = await r.json().catch(()=>({})); return err.detail || `Server error (${r.status})`; }
       const data = await r.json();
       await loadSavedTests();
@@ -804,7 +804,7 @@ export default function TestBuilder({ teacher, readOnly }) {
   async function deleteSavedTest(id) {
     try {
       const p = teacher?.teacherId ? `?teacherId=${teacher.teacherId}&role=${teacher.teacherRole||"teacher"}` : "";
-      await fetch(`${API}/tests/saved/${id}${p}`,{method:"DELETE"});
+      await fetch(`${API}/tests/saved/${id}${p}`,{method:"DELETE",headers:teacherHeaders()});
       setSavedTests(s=>s.filter(t=>t.id!==id));
     } catch {}
   }
@@ -823,7 +823,7 @@ export default function TestBuilder({ teacher, readOnly }) {
         visibility: "private", sharedWith: [], adminScoresOnly: false, closeDate: null,
       };
       const cp = teacher?.teacherId ? `?teacherId=${teacher.teacherId}&role=${teacher.teacherRole||"teacher"}` : "";
-      await fetch(`${API}/tests/saved${cp}`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+      await fetch(`${API}/tests/saved${cp}`, { method:"POST", headers:teacherHeaders(), body: JSON.stringify(body) });
       await loadSavedTests();
     } catch {}
   }
