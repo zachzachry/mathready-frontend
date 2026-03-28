@@ -1,0 +1,5 @@
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Allow Google Sign-In popup to communicate back via postMessage
+    Cross-Origin-Opener-Policy = "same-origin-allow-popups"
