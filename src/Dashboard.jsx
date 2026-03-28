@@ -1142,8 +1142,8 @@ export default function Dashboard({ teacher, readOnly }) {
     }
 
     if (tab === "admin") {
-      if (!adminData) return <div style={{textAlign:"center",color:T.textMuted,paddingTop:"3rem"}}>Loading school overview…</div>;
-      const { classes, schoolGaps, totalStudents, testedStudents, totalSessions } = adminData;
+      if (!adminData || !adminData.classes) return <div style={{textAlign:"center",color:T.textMuted,paddingTop:"3rem"}}>Loading school overview…</div>;
+      const { classes, schoolGaps = [], totalStudents = 0, testedStudents = 0, totalSessions = 0 } = adminData;
       return (
         <div style={{maxWidth:"960px",display:"flex",flexDirection:"column",gap:"1rem"}}>
           {/* School-wide stat cards */}
