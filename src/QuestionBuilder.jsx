@@ -387,7 +387,7 @@ function QuestionEditor({ q, index, onChange, onRemove, onMoveUp, onMoveDown, is
                       <div style={{ width: "22px", height: "22px", borderRadius: "50%", border: `2px solid ${isCorrect ? T.success : "#bcc8d4"}`, background: isCorrect ? T.success : T.white, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                         <span style={{ fontSize: "0.65rem", fontWeight: 700, color: isCorrect ? T.white : "#667" }}>{LETTERS[i]}</span>
                       </div>
-                      <input style={{ ...inp, flex: 1, padding: "0.4rem 0.65rem", fontFamily: "monospace", fontSize: "0.85rem" }} value={choice} onChange={e => updateChoice(i, e.target.value)} placeholder={`Choice ${LETTERS[i]} — use $\frac{1}{2}$ for fractions`} />
+                      <input style={{ ...inp, flex: 1, padding: "0.4rem 0.65rem", fontFamily: "monospace", fontSize: "0.85rem" }} value={choice} onChange={e => updateChoice(i, e.target.value)} placeholder={`Choice ${LETTERS[i]} — use $\\frac{1}{2}$ for fractions`} />
                       {isMulti ? (
                         <button onClick={() => toggleCorrectMulti(choice)}
                           style={{ ...smBtn, background: isCorrect?T.success:T.surfaceAlt, color: isCorrect?T.white:T.textSecondary, borderColor: isCorrect?T.success:T.border, padding: "5px 10px", whiteSpace: "nowrap" }}>
