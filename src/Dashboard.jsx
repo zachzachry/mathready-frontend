@@ -997,7 +997,7 @@ export default function Dashboard({ teacher, readOnly }) {
     }
 
     if (tab === "drills") {
-      const hasFluency = fluencyReport.some(c => c.students.some(s => s.sessionCount > 0));
+      const hasFluency = fluencyReport.some(c => c.students.some(s => s.sessionCount > 0 || s.personalBests?.bestAccuracy > 0));
       if (drillSessions.length === 0 && !hasFluency) return (
         <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"3rem",textAlign:"center",color:"#aaa",maxWidth:"600px"}}>
           <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>🎯</div>
@@ -1053,7 +1053,7 @@ export default function Dashboard({ teacher, readOnly }) {
           ))}
 
           {/* Fluency Levels per class */}
-          {fluencyReport.filter(c => c.students.some(s => s.sessionCount > 0)).map(cls => (
+          {fluencyReport.filter(c => c.students.some(s => s.sessionCount > 0 || s.personalBests?.bestAccuracy > 0)).map(cls => (
             <div key={cls.classId} style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",overflow:"hidden"}}>
               <div style={{padding:"0.75rem 1rem",background:"#f0f4f8",borderBottom:"1px solid #dde3e9",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:"#555",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <span>FLUENCY LEVELS — {cls.className.toUpperCase()}</span>
