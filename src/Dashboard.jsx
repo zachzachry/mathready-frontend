@@ -771,8 +771,7 @@ export default function Dashboard({ teacher, readOnly }) {
             <div style={{padding:"0.75rem 1rem",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary}}>
               ITEM ANALYSIS — {itemData.length} questions attempted
             </div>
-            {itemData.sort((a,b)=>a.pct-b.pct).map(q=>(
-              {(()=>{
+            {itemData.sort((a,b)=>a.pct-b.pct).map(q=>(()=>{
                 // Compute answer distribution from session answers
                 const dist = {};
                 filteredTestSessions.forEach(s => {
@@ -815,8 +814,7 @@ export default function Dashboard({ teacher, readOnly }) {
                   <div style={{fontSize:"0.68rem",color:T.textSecondary,flexShrink:0,paddingTop:"2px"}}>{q.correctCount}/{q.attempted}</div>
                 </div>
                 );
-              })()}
-            ))}
+            })())}
           </div>
         </div>
       );
