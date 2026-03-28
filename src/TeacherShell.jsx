@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import TopBar from "./shared/TopBar";
 import Dashboard from "./Dashboard";
 import QuestionBuilder from "./QuestionBuilder";
-import PDFImporter from "./PDFImporter";
 import TestBuilder from "./TestBuilder";
 import RosterManager from "./RosterManager";
 import TeacherManager from "./TeacherManager";
@@ -123,9 +122,6 @@ const ALL_TOOLS = [
   { id:"builder",
     icon: _ic(<path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>),
     label:"Question Builder", sub:"Create & edit questions", roles:["super_admin","school_admin","teacher"] },
-  { id:"importer",
-    icon: _ic(<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="12" y1="15" x2="12" y2="11"/><polyline points="9,12 12,15 15,12"/></>),
-    label:"PDF Importer", sub:"Extract from PDFs", roles:["super_admin","school_admin","teacher"] },
   { id:"teachers",
     icon: _ic(<><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0 1 12 0v2"/></>),
     label:"Manage Teachers", sub:"Teacher accounts & access", roles:["super_admin"] },
@@ -299,7 +295,6 @@ export default function TeacherShell({ onBack, teacher, onUpdateClassIds, onView
               case "roster":      return <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column",height:"100%"}}><RosterManager teacher={effectiveTeacher} readOnly={readOnly} onUpdateClassIds={onUpdateClassIds}/></div>;
               case "testbuilder": return <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column",height:"100%"}}><TestBuilder   teacher={effectiveTeacher} readOnly={readOnly}/></div>;
               case "builder":     return <div style={{flex:1,overflowY:"auto",height:"100%"}}><QuestionBuilder readOnly={readOnly}/></div>;
-              case "importer":    return <div style={{flex:1,overflowY:"auto",height:"100%"}}><PDFImporter     readOnly={readOnly}/></div>;
               case "teachers":    return <div style={{flex:1,overflowY:"auto",height:"100%"}}><TeacherManager/></div>;
               case "classes":     return <div style={{flex:1,overflowY:"auto",height:"100%"}}><ClassAdmin/></div>;
               default:            return <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column",height:"100%"}}><Dashboard    teacher={effectiveTeacher} readOnly={readOnly}/></div>;
