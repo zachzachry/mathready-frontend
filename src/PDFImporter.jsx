@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { T } from "./shared/constants";
+import { T, API, teacherHeaders } from "./shared/constants";
 
 const GRADE_OPTIONS = ["Grade 3", "Grade 4", "Grade 5", "Grade 6", "Grade 7", "Grade 8"];
 
@@ -170,6 +170,7 @@ export default function PDFImporter() {
   const [questions, setQuestions] = useState([]);
   const [errMsg, setErrMsg]     = useState("");
   const [copied, setCopied]     = useState(false);
+  const [saveResult, setSaveResult] = useState(null); // null | {added, total, duplicates}
 
   async function handleExtract() {
     if (!file) return;
@@ -244,6 +245,26 @@ export default function PDFImporter() {
     navigator.clipboard.writeText(JSON.stringify(clean, null, 2));
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
+  }
+
+  async function handleSaveToBank() {
+    const clean = questions.map(q => ({
+      ...q,
+      correct: q.correct?.replace(" [REVIEW]", ""),
+    }));
+    setSaveResult("saving");
+    try {
+      const r = await fetch(`${API}/questions/seed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...teacherHeaders() },
+        body: JSON.stringify(clean),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.detail || "Save failed");
+      setSaveResult(data);
+    } catch (e) {
+      setSaveResult({ error: e.message });
+    }
   }
 
   const reviewCount = questions.filter(q => q.correct?.includes("[REVIEW]") || q.question?.includes("diagram")).length;
@@ -333,15 +354,28 @@ export default function PDFImporter() {
                   <div style={{ fontSize: "1.5rem", fontWeight: 700, color: T.teal }}>{questions.length - reviewCount}</div>
                 </div>
               </div>
-              <div style={{ display: "flex", gap: "0.65rem" }}>
-                <button onClick={handleCopyJSON} style={{ ...btn, background: copied ? T.successBg : T.teal, color: copied ? T.success : T.white, border: "none", padding: "0.6rem 1.25rem", fontWeight: 700, fontSize: "0.82rem" }}>
+              <div style={{ display: "flex", gap: "0.65rem", flexWrap: "wrap", alignItems: "center" }}>
+                <button
+                  onClick={handleSaveToBank}
+                  disabled={saveResult === "saving"}
+                  style={{ ...btn, background: saveResult && saveResult !== "saving" && !saveResult.error ? T.successBg : T.midnight, color: saveResult && saveResult !== "saving" && !saveResult.error ? T.success : T.white, border: "none", padding: "0.6rem 1.25rem", fontWeight: 700, fontSize: "0.82rem", opacity: saveResult === "saving" ? 0.7 : 1 }}>
+                  {saveResult === "saving" ? "⏳ Saving…" : saveResult && !saveResult.error ? `✓ Saved ${saveResult.added} questions` : "💾 Save to Bank"}
+                </button>
+                <button onClick={handleCopyJSON} style={{ ...btn, background: copied ? T.successBg : T.surfaceAlt, color: copied ? T.success : T.textSecondary, border: `1px solid ${T.border}`, padding: "0.6rem 1.25rem", fontWeight: 600, fontSize: "0.82rem" }}>
                   {copied ? "✓ Copied!" : "📋 Copy JSON"}
                 </button>
-                <button onClick={() => { setFile(null); setStatus("idle"); setQuestions([]); }}
+                <button onClick={() => { setFile(null); setStatus("idle"); setQuestions([]); setSaveResult(null); }}
                   style={{ ...btn, padding: "0.6rem 1.25rem", fontSize: "0.82rem" }}>
                   Start Over
                 </button>
               </div>
+              {saveResult && saveResult !== "saving" && (
+                <div style={{ marginTop: "0.5rem", fontSize: "0.75rem", color: saveResult.error ? T.dangerText : T.textSecondary }}>
+                  {saveResult.error
+                    ? `⚠ ${saveResult.error}`
+                    : `${saveResult.added} added · ${saveResult.duplicate_count || 0} duplicates skipped · ${saveResult.total} total in bank`}
+                </div>
+              )}
             </div>
 
             {reviewCount > 0 && (
