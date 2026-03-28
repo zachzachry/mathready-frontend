@@ -1174,18 +1174,18 @@ ${standards}`;
               📥 Import ▾
             </button>
             {importMenu && (
-              <div style={{position:"absolute",top:"100%",left:0,marginTop:"4px",background:"#fff",border:"1px solid #c8d3dd",borderRadius:"4px",boxShadow:"0 4px 12px rgba(0,0,0,.15)",zIndex:10,minWidth:"140px",overflow:"hidden"}}>
+              <div style={{position:"absolute",top:"100%",left:0,marginTop:"4px",background:"#fff",border:"1px solid #c8d3dd",borderRadius:"6px",boxShadow:"0 4px 12px rgba(0,0,0,.15)",zIndex:10,minWidth:"180px",overflow:"hidden"}}>
                 <div onClick={()=>{setJsonPanel(true);setJsonPreview(null);setJsonErr("");setJsonResult(null);setJsonChecked({});setCsvPanel(false);setImportMenu(false);}}
-                  style={{padding:"8px 14px",fontSize:"0.78rem",fontWeight:600,cursor:"pointer",borderBottom:"1px solid #eee"}}
+                  style={{padding:"10px 16px",fontSize:"0.85rem",fontWeight:600,cursor:"pointer",borderBottom:"1px solid #eee",color:"#1e3a5f",display:"flex",alignItems:"center",gap:"8px"}}
                   onMouseEnter={e=>e.currentTarget.style.background="#f0f4f8"}
                   onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
-                  📄 JSON
+                  📄 <span>JSON File</span>
                 </div>
                 <div onClick={()=>{setCsvPanel(true);setCsvPreview(null);setCsvErr("");setCsvResult(null);setJsonPanel(false);setImportMenu(false);}}
-                  style={{padding:"8px 14px",fontSize:"0.78rem",fontWeight:600,cursor:"pointer"}}
+                  style={{padding:"10px 16px",fontSize:"0.85rem",fontWeight:600,cursor:"pointer",color:"#1e3a5f",display:"flex",alignItems:"center",gap:"8px"}}
                   onMouseEnter={e=>e.currentTarget.style.background="#f0f4f8"}
                   onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
-                  📊 CSV
+                  📊 <span>CSV Spreadsheet</span>
                 </div>
               </div>
             )}
