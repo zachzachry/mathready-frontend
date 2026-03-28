@@ -374,7 +374,7 @@ export default function Dashboard({ teacher, readOnly }) {
     fetch(`${API}/questions`).then(r=>r.ok?r.json():[]).then(q => {
       if (Array.isArray(q) && q.length > 0) setBankQ(q);
     }).catch(()=>{});
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line
 
   // Mount: full load once, then fast-poll sessions + slow-poll everything else
   useEffect(() => {
