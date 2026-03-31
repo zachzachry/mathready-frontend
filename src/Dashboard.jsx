@@ -286,6 +286,7 @@ export default function Dashboard({ teacher, readOnly }) {
   const [overviewTest, setOverviewTest] = useState("all"); // filter overview by test code
   const [loading,  setLoading]  = useState(true);
   const [clearing, setClearing] = useState(false);
+  const [clearError, setClearError] = useState(""); // error message from failed delete
   const [clearModal, setClearModal] = useState(false);
   const [clearTestCode, setClearTestCode] = useState(""); // for per-test clear
   const [roster,   setRoster]   = useState([]);
@@ -388,12 +389,14 @@ export default function Dashboard({ teacher, readOnly }) {
   }, [refresh, refreshSessions]);
 
   async function handleClearByTest(code) {
-    setClearing(true); setClearTestCode("");
+    setClearing(true); setClearError("");
     try {
-      await fetch(`${API}/sessions/test/${code}`, { method: "DELETE" });
-      setSessions(prev => prev.filter(s => (s.testCode||"").toUpperCase() !== code.toUpperCase()));
+      const r = await fetch(`${API}/sessions/test/${encodeURIComponent(code)}`, { method: "DELETE" });
+      if (!r.ok) { setClearError(`Delete failed (${r.status}). Try again or refresh.`); setClearing(false); return; }
+      setClearTestCode("");
+      setSessions(prev => prev.filter(s => (s.testCode||s.code||"").toUpperCase() !== code.toUpperCase()));
       if (overviewTest === code) { setOverviewTest("all"); setSelected(null); }
-    } catch {}
+    } catch (e) { setClearError("Network error — check your connection and try again."); }
     setClearing(false);
   }
 
@@ -1516,8 +1519,13 @@ export default function Dashboard({ teacher, readOnly }) {
               <br/><br/>
               <strong>{testSessions.filter(s=>(s.testCode||s.code||"").toUpperCase()===clearTestCode.toUpperCase()).length} session{testSessions.filter(s=>(s.testCode||s.code||"").toUpperCase()===clearTestCode.toUpperCase()).length!==1?"s":""}</strong> will be permanently removed. This cannot be undone.
             </div>
+            {clearError && (
+              <div style={{padding:"0 1.5rem",fontSize:"0.8rem",color:"#8b1a1a",background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"4px",margin:"0 1.5rem",padding:"0.5rem 0.75rem"}}>
+                ⚠ {clearError}
+              </div>
+            )}
             <div style={{display:"flex",gap:"0.65rem",padding:"0.9rem 1.5rem",borderTop:"1px solid #eee"}}>
-              <button onClick={()=>setClearTestCode("")}
+              <button onClick={()=>{setClearTestCode(""); setClearError("");}}
                 style={{flex:1,background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.55rem",fontSize:"0.85rem",cursor:"pointer",color:"#555",fontWeight:600}}>Cancel</button>
               <button onClick={()=>handleClearByTest(clearTestCode)} disabled={clearing}
                 style={{flex:1,background:"#7c3aed",border:"none",borderRadius:"3px",padding:"0.55rem",fontSize:"0.85rem",cursor:"pointer",color:"#fff",fontWeight:700}}>

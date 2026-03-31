@@ -431,10 +431,12 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
 
 function ClassroomSyncModal({ cls, onClose, onSync }) {
   const CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
-  const [step,        setStep]       = useState("idle"); // idle|loading|review
-  const [newStudents, setNewStudents] = useState([]);
-  const [err,         setErr]        = useState("");
-  const [syncing,     setSyncing]    = useState(false);
+  const [step,            setStep]           = useState("idle"); // idle|loading|review
+  const [newStudents,     setNewStudents]     = useState([]);
+  const [removedStudents, setRemovedStudents] = useState([]); // in roster but not in GC
+  const [removeChecked,   setRemoveChecked]   = useState({}); // sid -> bool
+  const [err,             setErr]            = useState("");
+  const [syncing,         setSyncing]        = useState(false);
 
   function startSync() {
     if (!window.google) { setErr("Google API not loaded. Refresh and try again."); return; }
@@ -465,16 +467,24 @@ function ClassroomSyncModal({ cls, onClose, onSync }) {
       const gcStudents = all.map(s => ({
         name: `${s.profile.name.givenName} ${s.profile.name.familyName}`,
       }));
+      const gcNames = new Set(gcStudents.map(s => s.name.toLowerCase()));
       const existingNames = new Set(cls.students.map(s => s.name.toLowerCase()));
       const newOnes = gcStudents.filter(gs => !existingNames.has(gs.name.toLowerCase()));
+      const removedOnes = cls.students.filter(s => !gcNames.has(s.name.toLowerCase()));
       setNewStudents(newOnes);
+      setRemovedStudents(removedOnes);
+      // Default: all removed students are checked for removal
+      const checked = {};
+      removedOnes.forEach(s => { checked[s.id] = true; });
+      setRemoveChecked(checked);
       setStep("review");
     } catch { setErr("Could not reach Google Classroom API."); setStep("idle"); }
   }
 
   async function doSync() {
     setSyncing(true);
-    await onSync(cls, newStudents);
+    const studentsToRemove = removedStudents.filter(s => removeChecked[s.id]);
+    await onSync(cls, newStudents, studentsToRemove);
     setSyncing(false);
   }
 
@@ -498,7 +508,7 @@ function ClassroomSyncModal({ cls, onClose, onSync }) {
           {step === "idle" && (
             <>
               <div style={{fontSize:"0.85rem",color:T.textSecondary,lineHeight:1.6}}>
-                Check Google Classroom for new students. Existing students, their accommodations, and scores will not be affected.
+                Compare roster against Google Classroom. You'll be able to add new students and remove ones who've left the class.
               </div>
               <button onClick={startSync}
                 style={{background:T.teal,border:"none",borderRadius:"6px",padding:"0.75rem",
@@ -515,32 +525,61 @@ function ClassroomSyncModal({ cls, onClose, onSync }) {
 
           {step === "review" && (
             <>
-              {newStudents.length === 0 ? (
+              {newStudents.length === 0 && removedStudents.length === 0 ? (
                 <div style={{textAlign:"center",color:T.success,fontWeight:700,padding:"1.5rem",background:T.successBg,borderRadius:"6px",fontSize:"0.9rem"}}>
-                  ✓ Class is up to date — no new students found.
+                  ✓ Class is up to date — roster matches Google Classroom.
                 </div>
               ) : (
                 <>
-                  <div style={{fontSize:"0.82rem",color:T.textSecondary}}>
-                    Found <strong>{newStudents.length} new student{newStudents.length!==1?"s":""}</strong> in Google Classroom:
-                  </div>
-                  <div style={{border:`1px solid ${T.border}`,borderRadius:"4px",overflow:"hidden",maxHeight:"200px",overflowY:"auto"}}>
-                    {newStudents.map((s, i) => (
-                      <div key={i} style={{padding:"0.45rem 0.75rem",borderBottom:i<newStudents.length-1?`1px solid ${T.border}`:"none",background:i%2===0?T.white:T.surface}}>
-                        <div style={{fontSize:"0.85rem",fontWeight:600}}>{s.name}</div>
+                  {newStudents.length > 0 && (
+                    <>
+                      <div style={{fontSize:"0.82rem",color:T.textSecondary}}>
+                        <strong style={{color:T.success}}>+ {newStudents.length} new student{newStudents.length!==1?"s":""}</strong> to add:
                       </div>
-                    ))}
-                  </div>
-                  <button onClick={doSync} disabled={syncing}
-                    style={{background:T.success,border:"none",borderRadius:"6px",padding:"0.75rem",
-                      fontSize:"0.88rem",fontWeight:700,color:T.white,cursor:"pointer",opacity:syncing?0.7:1}}>
-                    {syncing ? "Adding…" : `✓ Add ${newStudents.length} Student${newStudents.length!==1?"s":""}`}
+                      <div style={{border:`1px solid ${T.successBd}`,borderRadius:"4px",overflow:"hidden",maxHeight:"140px",overflowY:"auto"}}>
+                        {newStudents.map((s, i) => (
+                          <div key={i} style={{padding:"0.4rem 0.75rem",borderBottom:i<newStudents.length-1?`1px solid ${T.border}`:"none",background:i%2===0?T.white:T.surface,fontSize:"0.85rem",fontWeight:600}}>
+                            {s.name}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {removedStudents.length > 0 && (
+                    <>
+                      <div style={{fontSize:"0.82rem",color:T.textSecondary}}>
+                        <strong style={{color:T.dangerText}}>{removedStudents.length} student{removedStudents.length!==1?"s":""} not in Google Classroom</strong> — check to remove:
+                      </div>
+                      <div style={{border:`1px solid ${T.dangerBd}`,borderRadius:"4px",overflow:"hidden",maxHeight:"140px",overflowY:"auto"}}>
+                        {removedStudents.map((s, i) => (
+                          <div key={i} style={{padding:"0.4rem 0.75rem",borderBottom:i<removedStudents.length-1?`1px solid ${T.border}`:"none",background:i%2===0?T.white:T.surface,display:"flex",alignItems:"center",gap:"0.5rem"}}>
+                            <input type="checkbox" checked={!!removeChecked[s.id]}
+                              onChange={e => setRemoveChecked(p => ({...p, [s.id]: e.target.checked}))}
+                              style={{accentColor:T.dangerText,cursor:"pointer"}}/>
+                            <span style={{fontSize:"0.85rem",fontWeight:600}}>{s.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  <button onClick={doSync} disabled={syncing || (newStudents.length === 0 && !removedStudents.some(s => removeChecked[s.id]))}
+                    style={{background:T.teal,border:"none",borderRadius:"6px",padding:"0.75rem",
+                      fontSize:"0.88rem",fontWeight:700,color:T.white,cursor:"pointer",
+                      opacity:(syncing || (newStudents.length === 0 && !removedStudents.some(s => removeChecked[s.id])))?0.5:1}}>
+                    {syncing ? "Syncing…" : (() => {
+                      const addCount = newStudents.length;
+                      const removeCount = removedStudents.filter(s => removeChecked[s.id]).length;
+                      const parts = [];
+                      if (addCount) parts.push(`Add ${addCount}`);
+                      if (removeCount) parts.push(`Remove ${removeCount}`);
+                      return `✓ ${parts.join(" · ")}`;
+                    })()}
                   </button>
                 </>
               )}
               <button onClick={onClose}
                 style={{border:`1px solid ${T.borderDark}`,borderRadius:"4px",padding:"0.5rem",background:T.white,cursor:"pointer",fontSize:"0.82rem",color:T.textSecondary}}>
-                {newStudents.length === 0 ? "Done" : "Cancel"}
+                {newStudents.length === 0 && removedStudents.length === 0 ? "Done" : "Cancel"}
               </button>
             </>
           )}
@@ -710,9 +749,9 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
     } catch { flash("Failed to remove student."); }
   }
 
-  // ── Google Classroom: sync new students ──
-  async function handleGcSync(cls, newStudents) {
-    let addedCount = 0;
+  // ── Google Classroom: sync new students and optionally remove dropped ones ──
+  async function handleGcSync(cls, newStudents, removedStudents = []) {
+    let addedCount = 0, removedCount = 0;
     if (newStudents.length > 0) {
       await fetch(`${API}/roster/class/${cls.id}/students`, {
         method:"POST", headers:teacherHeaders(),
@@ -720,9 +759,18 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
       });
       addedCount = newStudents.length;
     }
+    for (const s of removedStudents) {
+      try {
+        const r = await fetch(`${API}/roster/class/${cls.id}/student/${s.id}`, { method:"DELETE", headers:teacherHeaders() });
+        if (r.ok) removedCount++;
+      } catch {}
+    }
     await load();
     setSyncModal(null);
-    flash(`Synced! ${addedCount ? `${addedCount} new student${addedCount!==1?"s":""} added` : "No changes"}.`);
+    const parts = [];
+    if (addedCount) parts.push(`${addedCount} added`);
+    if (removedCount) parts.push(`${removedCount} removed`);
+    flash(`Synced! ${parts.length ? parts.join(", ") : "No changes"}.`);
   }
 
   // ── Google Classroom: import multiple groups ───────────────
