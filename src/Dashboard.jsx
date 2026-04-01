@@ -296,6 +296,7 @@ export default function Dashboard({ teacher, readOnly }) {
   const [testReportData,   setTestReportData]   = useState(null); // {session, fullStudent, stds, className} for test report
   const [diagStudentId,    setDiagStudentId]    = useState(null); // {id, name}
   const [adminData, setAdminData] = useState(null);
+  const [openItem, setOpenItem] = useState(null); // q.id of expanded missed-by panel
 
   // Growth filters
   const [growthClass,      setGrowthClass]      = useState("all");
@@ -469,7 +470,14 @@ export default function Dashboard({ teacher, readOnly }) {
   const itemData = bankQ.map(q => {
     const correct = filteredTestSessions.filter(s=>gradeSessionAnswer(q, s.answers?.[q.id])).length;
     const attempted = filteredTestSessions.filter(s=>q.id in (s.answers||{})).length;
-    return { ...q, correctCount:correct, attempted, pct: attempted ? Math.round((correct/attempted)*100) : 0 };
+    const missedBy = filteredTestSessions
+      .filter(s => q.id in (s.answers||{}) && !gradeSessionAnswer(q, s.answers[q.id]))
+      .map(s => {
+        const rawAns = s.answers[q.id];
+        const choiceIdx = (q.choices||[]).indexOf(rawAns);
+        return { name: s.studentName||s.name||"Unknown", answerLabel: choiceIdx>=0 ? ["A","B","C","D"][choiceIdx] : null };
+      });
+    return { ...q, correctCount:correct, attempted, pct: attempted ? Math.round((correct/attempted)*100) : 0, missedBy };
   }).filter(q => q.attempted > 0);
 
   // ── Growth: build per-student history ──
@@ -786,8 +794,10 @@ export default function Dashboard({ teacher, readOnly }) {
                 });
                 const letters = ["A","B","C","D"];
                 const hasDistrib = q.type === "mcq" && q.choices?.length > 0 && Object.keys(dist).length > 0;
+                const isItemOpen = openItem === q.id;
                 return (
-                <div key={q.id} style={{padding:"0.65rem 1rem",borderBottom:`1px solid ${T.surfaceAlt}`,display:"flex",alignItems:"flex-start",gap:"0.75rem"}}>
+                <React.Fragment key={q.id}>
+                <div onClick={()=>q.missedBy.length>0&&setOpenItem(isItemOpen?null:q.id)} style={{padding:"0.65rem 1rem",borderBottom:`1px solid ${T.surfaceAlt}`,display:"flex",alignItems:"flex-start",gap:"0.75rem",cursor:q.missedBy.length>0?"pointer":"default",background:isItemOpen?T.surfaceAlt:T.white,transition:"background .15s"}}>
                   <div style={{width:"36px",textAlign:"right",fontSize:"0.9rem",fontWeight:700,color:q.pct>=70?T.success:q.pct>=50?T.warning:T.dangerText,flexShrink:0,paddingTop:"2px"}}>{q.pct}%</div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:"flex",gap:"0.35rem",marginBottom:"2px",flexWrap:"wrap"}}>
@@ -817,8 +827,27 @@ export default function Dashboard({ teacher, readOnly }) {
                       </div>
                     )}
                   </div>
-                  <div style={{fontSize:"0.68rem",color:T.textSecondary,flexShrink:0,paddingTop:"2px"}}>{q.correctCount}/{q.attempted}</div>
+                  <div style={{fontSize:"0.68rem",color:T.textSecondary,flexShrink:0,paddingTop:"2px",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:"2px"}}>
+                    <span>{q.correctCount}/{q.attempted}</span>
+                    {q.missedBy.length>0&&<span style={{fontSize:"0.6rem",color:T.textMuted}}>{isItemOpen?"▲":"▼"}</span>}
+                  </div>
                 </div>
+                {isItemOpen && q.missedBy.length>0 && (
+                  <div style={{padding:"0.65rem 1rem 0.75rem 3.5rem",background:T.surface,borderBottom:`1px solid ${T.surfaceAlt}`}}>
+                    <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"0.45rem"}}>
+                      MISSED BY — {q.missedBy.length} student{q.missedBy.length!==1?"s":""}
+                    </div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:"0.35rem"}}>
+                      {q.missedBy.map((m,mi)=>(
+                        <div key={mi} style={{display:"flex",alignItems:"center",gap:"4px",background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:T.xs,padding:"3px 8px",fontSize:"0.7rem"}}>
+                          <span style={{fontWeight:600,color:T.midnight}}>{m.name}</span>
+                          {m.answerLabel&&<span style={{fontWeight:700,color:T.dangerText,background:T.white,border:`1px solid ${T.dangerBd}`,borderRadius:"2px",padding:"0 4px",fontSize:"0.62rem"}}>{m.answerLabel}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                </React.Fragment>
                 );
             })())}
           </div>
