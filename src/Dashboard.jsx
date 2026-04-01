@@ -834,6 +834,14 @@ export default function Dashboard({ teacher, readOnly }) {
                 </div>
                 {isItemOpen && q.missedBy.length>0 && (
                   <div style={{padding:"0.65rem 1rem 0.75rem 3.5rem",background:T.surface,borderBottom:`1px solid ${T.surfaceAlt}`}}>
+                    {q.question && (
+                      <div style={{fontSize:"0.8rem",color:T.text,marginBottom:"0.5rem",lineHeight:1.4}}>
+                        <MathText text={q.question}/>
+                      </div>
+                    )}
+                    {q.questionImage && (
+                      <img src={q.questionImage} alt="" style={{maxHeight:"160px",maxWidth:"100%",borderRadius:"4px",border:`1px solid ${T.border}`,marginBottom:"0.5rem",display:"block"}}/>
+                    )}
                     <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"0.45rem"}}>
                       MISSED BY — {q.missedBy.length} student{q.missedBy.length!==1?"s":""}
                     </div>
