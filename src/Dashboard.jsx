@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { QUESTIONS, lvl, lvlC, lvlBg, lvlBd, loadSessions, clearSessions, API, T } from "./shared/constants";
+import { QUESTIONS, lvl, lvlC, lvlBg, lvlBd, loadSessions, clearSessions, API, T, teacherHeaders } from "./shared/constants";
 import MathText from "./shared/MathText";
 import { generateClassReport } from "./generateReport";
 import ParentReport from "./ParentReport";
@@ -297,6 +297,10 @@ export default function Dashboard({ teacher, readOnly }) {
   const [diagStudentId,    setDiagStudentId]    = useState(null); // {id, name}
   const [adminData, setAdminData] = useState(null);
   const [openItem, setOpenItem] = useState(null); // q.id of expanded missed-by panel
+  const [editingKeyId,   setEditingKeyId]   = useState(null);
+  const [pendingCorrect, setPendingCorrect] = useState(null);
+  const [regradeLoading, setRegradeLoading] = useState(false);
+  const [regradeResult,  setRegradeResult]  = useState(null);
 
   // Growth filters
   const [growthClass,      setGrowthClass]      = useState("all");
@@ -388,6 +392,34 @@ export default function Dashboard({ teacher, readOnly }) {
     const slow = setInterval(refresh, 30000);
     return () => { clearInterval(fast); clearInterval(slow); };
   }, [refresh, refreshSessions]);
+
+  async function handleSaveRegrade(q) {
+    if (!pendingCorrect || pendingCorrect === q.correct) return;
+    setRegradeLoading(true);
+    setRegradeResult(null);
+    try {
+      const r = await fetch(`${API}/questions/${encodeURIComponent(q.id)}/regrade`, {
+        method: "POST",
+        headers: teacherHeaders(),
+        body: JSON.stringify({ correct: pendingCorrect }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        alert(`Re-grade failed: ${err.detail || r.status}`);
+        setRegradeLoading(false);
+        return;
+      }
+      const data = await r.json();
+      setBankQ(prev => prev.map(bq => bq.id === q.id ? { ...bq, correct: pendingCorrect } : bq));
+      setRegradeResult({ questionId: q.id, updatedSessions: data.updated_sessions });
+      setTimeout(() => setRegradeResult(null), 4000);
+      setEditingKeyId(null);
+      await refreshSessions();
+    } catch {
+      alert("Network error during re-grade. Please try again.");
+    }
+    setRegradeLoading(false);
+  }
 
   async function handleClearByTest(code) {
     setClearing(true); setClearError("");
@@ -853,6 +885,69 @@ export default function Dashboard({ teacher, readOnly }) {
                         </div>
                       ))}
                     </div>
+                    {q.type==="mcq" && q.choices?.length>0 && (
+                      <div style={{marginTop:"0.75rem",paddingTop:"0.65rem",borderTop:`1px solid ${T.surfaceAlt}`}}>
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"0.45rem"}}>
+                          <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary}}>ANSWER CHOICES</div>
+                          {editingKeyId!==q.id && (
+                            <button onClick={e=>{e.stopPropagation();setEditingKeyId(q.id);setPendingCorrect(q.correct);setRegradeResult(null);}}
+                              style={{fontSize:"0.65rem",fontWeight:700,background:T.surface,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"2px 8px",cursor:"pointer",color:T.midnight}}>
+                              Edit Key
+                            </button>
+                          )}
+                        </div>
+                        <div style={{display:"flex",flexDirection:"column",gap:"4px"}}>
+                          {q.choices.map((ch,ci)=>{
+                            const ltr=["A","B","C","D"][ci]||String(ci+1);
+                            const isEditing=editingKeyId===q.id;
+                            const isSelected=isEditing?String(ch)===String(pendingCorrect):String(ch)===String(q.correct);
+                            const count=dist[String(ch)]||0;
+                            const pct=q.attempted?Math.round(count/q.attempted*100):0;
+                            return (
+                              <div key={ci}
+                                onClick={isEditing?e=>{e.stopPropagation();setPendingCorrect(ch);}:undefined}
+                                style={{display:"flex",alignItems:"center",gap:"0.5rem",padding:"6px 8px",
+                                  background:isSelected?"rgba(16,185,129,.10)":"transparent",
+                                  border:isSelected?`2px solid ${T.success}`:`1px solid ${T.border}`,
+                                  borderRadius:T.xs,cursor:isEditing?"pointer":"default",transition:"background .1s"}}>
+                                <div style={{width:"20px",fontWeight:700,fontSize:"0.72rem",color:isSelected?T.success:T.textSecondary,flexShrink:0}}>{ltr}</div>
+                                <div style={{flex:1,minWidth:0}}>
+                                  <div style={{fontSize:"0.78rem",color:T.text,marginBottom:"2px"}}><MathText text={ch}/></div>
+                                  <div style={{height:"6px",background:"#e8edf2",borderRadius:"3px",overflow:"hidden"}}>
+                                    <div style={{height:"100%",width:`${pct}%`,background:isSelected?T.success:pct>30?T.dangerText:"#94a3b8",borderRadius:"3px",transition:"width .3s"}}/>
+                                  </div>
+                                </div>
+                                <div style={{fontSize:"0.7rem",fontWeight:700,color:isSelected?T.success:T.textSecondary,flexShrink:0,minWidth:"42px",textAlign:"right"}}>{count} ({pct}%)</div>
+                                {isSelected&&<span style={{fontSize:"0.7rem",flexShrink:0}}>✓</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {editingKeyId===q.id && (
+                          <div style={{marginTop:"0.65rem",display:"flex",alignItems:"center",gap:"0.5rem",flexWrap:"wrap"}}>
+                            <button disabled={regradeLoading||pendingCorrect===q.correct}
+                              onClick={e=>{e.stopPropagation();handleSaveRegrade(q);}}
+                              style={{background:T.success,color:T.white,border:"none",borderRadius:T.xs,padding:"0.5rem 1rem",
+                                fontSize:"0.78rem",fontWeight:700,cursor:"pointer",opacity:(regradeLoading||pendingCorrect===q.correct)?0.5:1}}>
+                              {regradeLoading?"Saving…":"Save & Re-grade"}
+                            </button>
+                            <button disabled={regradeLoading}
+                              onClick={e=>{e.stopPropagation();setEditingKeyId(null);setPendingCorrect(null);}}
+                              style={{background:"transparent",color:T.textSecondary,border:`1px solid ${T.border}`,
+                                borderRadius:T.xs,padding:"0.5rem 0.85rem",fontSize:"0.78rem",fontWeight:600,cursor:"pointer"}}>
+                              Cancel
+                            </button>
+                            {pendingCorrect===q.correct&&<span style={{fontSize:"0.7rem",color:T.textMuted}}>Select a different choice to enable save.</span>}
+                          </div>
+                        )}
+                        {regradeResult?.questionId===q.id && (
+                          <div style={{marginTop:"0.5rem",fontSize:"0.72rem",fontWeight:700,color:T.success,
+                            background:T.successBg,border:`1px solid ${T.successBd}`,borderRadius:T.xs,padding:"4px 8px"}}>
+                            Saved — {regradeResult.updatedSessions} session{regradeResult.updatedSessions!==1?"s":""} re-graded.
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
                 </React.Fragment>
