@@ -3218,13 +3218,15 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
   const [timeLimitSecs,   setTimeLimitSecs]   = useState(1800);
   const [warnSecs,        setWarnSecs]        = useState(300);
 
-  // Keep sessionStorage in sync with login state
+  // Keep sessionStorage in sync with login state (not for drill — nothing to resume)
   useEffect(() => {
-    if (student) {
+    if (student && !directDrillMode) {
       sessionStorage.setItem(SESSION_KEY, JSON.stringify({ student, cls }));
+    } else if (directDrillMode) {
+      sessionStorage.removeItem(SESSION_KEY); // clear any leftover session so drill students don't bleed into practice
     }
-    // don't clear here — reset() handles logout
-  }, [student, cls]);
+    // don't clear here otherwise — reset() handles logout
+  }, [student, cls, directDrillMode]);
 
   function reset() {
     sessionStorage.removeItem(SESSION_KEY);   // ← logout clears session
