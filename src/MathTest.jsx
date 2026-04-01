@@ -3193,17 +3193,15 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
   // directPracticeClassId = class ID from ?practice= URL param (direct practice via Google)
   // directDrillMode       = true when launched from "Practice Drill" home button (no code)
 
-  // Restore session from sessionStorage if available
-  const _saved     = _loadSaved();
-  const _hasSession = !!((_saved?.student) && !prefillCode && !directPracticeClassId && !directDrillMode);
-  const initScreen = _hasSession ? "practice"
-                   : directDrillMode ? "drill-google"
+  // Students always go through Google sign-in at the App level first;
+  // never restore a saved session directly into practice mode.
+  const initScreen = directDrillMode ? "drill-google"
                    : directPracticeClassId ? "google-practice"
                    : "login";
 
   const [screen,          setScreen]          = useState(initScreen);
-  const [student,         setStudent]         = useState(_hasSession ? _saved.student : null);
-  const [cls,             setCls]             = useState(_hasSession ? _saved.cls    : null);
+  const [student,         setStudent]         = useState(null);
+  const [cls,             setCls]             = useState(null);
   const [testCode,        setTestCode]        = useState("");
   const [testTitle,       setTestTitle]       = useState("");
   const [finalSession,    setFinalSession]    = useState(null);
@@ -3218,15 +3216,13 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
   const [timeLimitSecs,   setTimeLimitSecs]   = useState(1800);
   const [warnSecs,        setWarnSecs]        = useState(300);
 
-  // Keep sessionStorage in sync with login state (not for drill — nothing to resume)
+  // Keep sessionStorage in sync with login state
   useEffect(() => {
-    if (student && !directDrillMode) {
+    if (student) {
       sessionStorage.setItem(SESSION_KEY, JSON.stringify({ student, cls }));
-    } else if (directDrillMode) {
-      sessionStorage.removeItem(SESSION_KEY); // clear any leftover session so drill students don't bleed into practice
     }
-    // don't clear here otherwise — reset() handles logout
-  }, [student, cls, directDrillMode]);
+    // don't clear here — reset() handles logout
+  }, [student, cls]);
 
   function reset() {
     sessionStorage.removeItem(SESSION_KEY);   // ← logout clears session
