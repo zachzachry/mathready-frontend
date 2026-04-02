@@ -395,7 +395,7 @@ export default function Dashboard({ teacher, readOnly }) {
   }, [refresh, refreshSessions]);
 
   async function handleSaveRegrade(q) {
-    const isMulti = q.type === "multiselect";
+    const isMulti = q.type === "multiselect" || Array.isArray(q.answer);
     const hasChanged = isMulti
       ? JSON.stringify([...(Array.isArray(pendingCorrect)?pendingCorrect:[])].sort()) !== JSON.stringify([...(Array.isArray(q.answer)?q.answer:[])].sort())
       : pendingCorrect && pendingCorrect !== q.correct;
@@ -899,11 +899,11 @@ export default function Dashboard({ teacher, readOnly }) {
                         </div>
                       ))}
                     </div>
-                    {(q.type==="mcq"||q.type==="multiselect") && q.choices?.length>0 && (
+                    {q.choices?.length>0 && (
                       <div style={{marginTop:"0.75rem",paddingTop:"0.65rem",borderTop:`1px solid ${T.surfaceAlt}`}}>
                         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"0.45rem"}}>
                           <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary}}>ANSWER CHOICES</div>
-                          <button onClick={e=>{e.stopPropagation();setPendingCorrect(q.type==="multiselect"?(Array.isArray(q.answer)?[...q.answer]:[]):q.correct);setRegradeModalError("");setRegradeModalQ(q);}}
+                          <button onClick={e=>{e.stopPropagation();setPendingCorrect((q.type==="multiselect"||Array.isArray(q.answer))?(Array.isArray(q.answer)?[...q.answer]:[]):q.correct);setRegradeModalError("");setRegradeModalQ(q);}}
                             style={{fontSize:"0.68rem",fontWeight:700,background:T.midnight,color:T.white,border:"none",borderRadius:T.xs,padding:"4px 12px",cursor:"pointer"}}>
                             Correct the Answer
                           </button>
@@ -911,7 +911,7 @@ export default function Dashboard({ teacher, readOnly }) {
                         <div style={{display:"flex",flexDirection:"column",gap:"4px"}}>
                           {q.choices.map((ch,ci)=>{
                             const ltr=["A","B","C","D"][ci]||String(ci+1);
-                            const isCorrect=String(ch)===String(q.correct);
+                            const isCorrect=(q.type==="multiselect"||Array.isArray(q.answer))?(Array.isArray(q.answer)?q.answer.includes(ch):false):String(ch)===String(q.correct);
                             const count=dist[String(ch)]||0;
                             const pct=q.attempted?Math.round(count/q.attempted*100):0;
                             return (
@@ -1711,7 +1711,7 @@ export default function Dashboard({ teacher, readOnly }) {
               )}
             </div>
             {(() => {
-              const isMulti = regradeModalQ.type === "multiselect";
+              const isMulti = regradeModalQ.type === "multiselect" || Array.isArray(regradeModalQ.answer);
               const pendingArr = isMulti ? (Array.isArray(pendingCorrect) ? pendingCorrect : []) : null;
               const originalArr = isMulti ? (Array.isArray(regradeModalQ.answer) ? regradeModalQ.answer : []) : null;
               const hasChanged = isMulti
