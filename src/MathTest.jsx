@@ -3224,6 +3224,27 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
     // don't clear here — reset() handles logout
   }, [student, cls]);
 
+  function hashSeed(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) h = Math.imul(31, h) + str.charCodeAt(i) | 0;
+    return h;
+  }
+  function seededShuffle(arr, seed) {
+    let s = seed | 0;
+    function rand() {
+      s = s + 0x6D2B79F5 | 0;
+      let t = Math.imul(s ^ s >>> 15, 1 | s);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    }
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
   function reset() {
     sessionStorage.removeItem(SESSION_KEY);   // ← logout clears session
     setStudent(null); setCls(null);
@@ -3257,6 +3278,17 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
         const removeIdx = wrongIdxs[Math.floor(Math.random() * wrongIdxs.length)];
         return { ...q, choices: q.choices.filter((_,i) => i !== removeIdx) };
       });
+      const seed = hashSeed((studentObj?.id || "") + (code || ""));
+      if (testInfo?.shuffleQuestions) {
+        qs = seededShuffle(qs, seed);
+      }
+      if (testInfo?.shuffleChoices) {
+        qs = qs.map((q, qi) => {
+          if (!q.choices || q.choices.length <= 1) return q;
+          if (q.type === "dragdrop" || q.type === "keypad" || q.type === "plotpoint" || q.type === "hotspot") return q;
+          return { ...q, choices: seededShuffle(q.choices, hashSeed(seed + (q.id || qi))) };
+        });
+      }
       setQuestions(qs);
     }
     setUntimed(!!testInfo?.untimed);

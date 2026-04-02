@@ -311,7 +311,9 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose, 
   const [untimed,        setUntimed]        = useState(editing?.untimed || false);
   const [timeMins,       setTimeMins]       = useState(editing?.timeLimitSecs ? Math.round(editing.timeLimitSecs/60) : 30);
   const [warnMins,       setWarnMins]       = useState(editing?.warnSecs ? Math.round(editing.warnSecs/60) : 5);
-  const [oneAttempt,     setOneAttempt]     = useState(editing?.oneAttempt || false);
+  const [oneAttempt,       setOneAttempt]       = useState(editing?.oneAttempt       || false);
+  const [shuffleQuestions, setShuffleQuestions] = useState(editing?.shuffleQuestions || false);
+  const [shuffleChoices,   setShuffleChoices]   = useState(editing?.shuffleChoices   || false);
   const [classes,        setClasses]        = useState([]);
   const [assignedClassIds, setAssignedClassIds] = useState([]);
   // Visibility / GMAS fields
@@ -348,6 +350,8 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose, 
       timeLimitSecs: untimed ? 0 : Math.max(1, timeMins) * 60,
       warnSecs:      untimed ? 0 : Math.max(1, warnMins) * 60,
       oneAttempt,
+      shuffleQuestions,
+      shuffleChoices,
       classIds: assignedClassIds,
       visibility,
       sharedWith: visibility === "grade" ? sharedWith : [],
@@ -428,6 +432,33 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose, 
               <div style={{fontSize:"0.7rem",color:T.textSecondary,marginTop:"1px"}}>
                 Students can only submit this test once. They cannot retake it.
               </div>
+            </div>
+          </label>
+        </div>
+        {/* Shuffle toggles */}
+        <div style={{borderTop:"1px solid #eef1f4",paddingTop:"0.85rem",display:"flex",flexDirection:"column",gap:"0.5rem"}}>
+          <label style={{display:"flex",alignItems:"center",gap:"0.75rem",cursor:"pointer",padding:"0.65rem 0.85rem",
+            background:shuffleQuestions?"#e8f5e9":T.surface,
+            border:`1px solid ${shuffleQuestions?T.successBd:T.border}`,borderRadius:T.xs}}
+            onClick={()=>setShuffleQuestions(v=>!v)}>
+            <div style={{width:"36px",height:"20px",borderRadius:"10px",background:shuffleQuestions?T.success:T.border,position:"relative",flexShrink:0,transition:"background .2s"}}>
+              <div style={{position:"absolute",top:"2px",left:shuffleQuestions?"18px":"2px",width:"16px",height:"16px",borderRadius:"50%",background:T.white,transition:"left .2s"}}/>
+            </div>
+            <div>
+              <div style={{fontSize:"0.82rem",fontWeight:700,color:shuffleQuestions?T.success:T.text}}>Shuffle Question Order {shuffleQuestions?"ON":"OFF"}</div>
+              <div style={{fontSize:"0.7rem",color:T.textSecondary,marginTop:"1px"}}>Each student sees questions in a different random order</div>
+            </div>
+          </label>
+          <label style={{display:"flex",alignItems:"center",gap:"0.75rem",cursor:"pointer",padding:"0.65rem 0.85rem",
+            background:shuffleChoices?"#e8f5e9":T.surface,
+            border:`1px solid ${shuffleChoices?T.successBd:T.border}`,borderRadius:T.xs}}
+            onClick={()=>setShuffleChoices(v=>!v)}>
+            <div style={{width:"36px",height:"20px",borderRadius:"10px",background:shuffleChoices?T.success:T.border,position:"relative",flexShrink:0,transition:"background .2s"}}>
+              <div style={{position:"absolute",top:"2px",left:shuffleChoices?"18px":"2px",width:"16px",height:"16px",borderRadius:"50%",background:T.white,transition:"left .2s"}}/>
+            </div>
+            <div>
+              <div style={{fontSize:"0.82rem",fontWeight:700,color:shuffleChoices?T.success:T.text}}>Shuffle Answer Choices {shuffleChoices?"ON":"OFF"}</div>
+              <div style={{fontSize:"0.7rem",color:T.textSecondary,marginTop:"1px"}}>A/B/C/D order is randomized per student</div>
             </div>
           </label>
         </div>
