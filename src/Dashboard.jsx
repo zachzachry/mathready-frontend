@@ -297,10 +297,11 @@ export default function Dashboard({ teacher, readOnly }) {
   const [diagStudentId,    setDiagStudentId]    = useState(null); // {id, name}
   const [adminData, setAdminData] = useState(null);
   const [openItem, setOpenItem] = useState(null); // q.id of expanded missed-by panel
-  const [editingKeyId,   setEditingKeyId]   = useState(null);
   const [pendingCorrect, setPendingCorrect] = useState(null);
   const [regradeLoading, setRegradeLoading] = useState(false);
   const [regradeResult,  setRegradeResult]  = useState(null);
+  const [regradeModalQ,     setRegradeModalQ]     = useState(null);
+  const [regradeModalError, setRegradeModalError] = useState("");
 
   // Growth filters
   const [growthClass,      setGrowthClass]      = useState("all");
@@ -396,6 +397,7 @@ export default function Dashboard({ teacher, readOnly }) {
   async function handleSaveRegrade(q) {
     if (!pendingCorrect || pendingCorrect === q.correct) return;
     setRegradeLoading(true);
+    setRegradeModalError("");
     setRegradeResult(null);
     try {
       const r = await fetch(`${API}/questions/${encodeURIComponent(q.id)}/regrade`, {
@@ -405,18 +407,18 @@ export default function Dashboard({ teacher, readOnly }) {
       });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
-        alert(`Re-grade failed: ${err.detail || r.status}`);
+        setRegradeModalError(err.detail || `Could not save. Please try again. (${r.status})`);
         setRegradeLoading(false);
         return;
       }
       const data = await r.json();
       setBankQ(prev => prev.map(bq => bq.id === q.id ? { ...bq, correct: pendingCorrect } : bq));
       setRegradeResult({ questionId: q.id, updatedSessions: data.updated_sessions });
-      setTimeout(() => setRegradeResult(null), 4000);
-      setEditingKeyId(null);
+      setTimeout(() => setRegradeResult(null), 5000);
+      setRegradeModalQ(null);
       await refreshSessions();
     } catch {
-      alert("Network error during re-grade. Please try again.");
+      setRegradeModalError("Network error — please check your connection and try again.");
     }
     setRegradeLoading(false);
   }
@@ -866,6 +868,11 @@ export default function Dashboard({ teacher, readOnly }) {
                 </div>
                 {isItemOpen && q.missedBy.length>0 && (
                   <div style={{padding:"0.65rem 1rem 0.75rem 3.5rem",background:T.surface,borderBottom:`1px solid ${T.surfaceAlt}`}}>
+                    {regradeResult?.questionId===q.id && (
+                      <div style={{marginBottom:"0.6rem",padding:"8px 12px",background:T.successBg,border:`1px solid ${T.successBd}`,borderRadius:T.xs,fontSize:"0.82rem",fontWeight:700,color:T.success}}>
+                        ✓ Correction saved — grades updated for {regradeResult.updatedSessions} student{regradeResult.updatedSessions!==1?"s":""}.
+                      </div>
+                    )}
                     {q.question && (
                       <div style={{fontSize:"0.8rem",color:T.text,marginBottom:"0.5rem",lineHeight:1.4}}>
                         <MathText text={q.question}/>
@@ -889,63 +896,35 @@ export default function Dashboard({ teacher, readOnly }) {
                       <div style={{marginTop:"0.75rem",paddingTop:"0.65rem",borderTop:`1px solid ${T.surfaceAlt}`}}>
                         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"0.45rem"}}>
                           <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary}}>ANSWER CHOICES</div>
-                          {editingKeyId!==q.id && (
-                            <button onClick={e=>{e.stopPropagation();setEditingKeyId(q.id);setPendingCorrect(q.correct);setRegradeResult(null);}}
-                              style={{fontSize:"0.65rem",fontWeight:700,background:T.surface,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"2px 8px",cursor:"pointer",color:T.midnight}}>
-                              Edit Key
-                            </button>
-                          )}
+                          <button onClick={e=>{e.stopPropagation();setPendingCorrect(q.correct);setRegradeModalError("");setRegradeModalQ(q);}}
+                            style={{fontSize:"0.68rem",fontWeight:700,background:T.midnight,color:T.white,border:"none",borderRadius:T.xs,padding:"4px 12px",cursor:"pointer"}}>
+                            Correct the Answer
+                          </button>
                         </div>
                         <div style={{display:"flex",flexDirection:"column",gap:"4px"}}>
                           {q.choices.map((ch,ci)=>{
                             const ltr=["A","B","C","D"][ci]||String(ci+1);
-                            const isEditing=editingKeyId===q.id;
-                            const isSelected=isEditing?String(ch)===String(pendingCorrect):String(ch)===String(q.correct);
+                            const isCorrect=String(ch)===String(q.correct);
                             const count=dist[String(ch)]||0;
                             const pct=q.attempted?Math.round(count/q.attempted*100):0;
                             return (
-                              <div key={ci}
-                                onClick={isEditing?e=>{e.stopPropagation();setPendingCorrect(ch);}:undefined}
-                                style={{display:"flex",alignItems:"center",gap:"0.5rem",padding:"6px 8px",
-                                  background:isSelected?"rgba(16,185,129,.10)":"transparent",
-                                  border:isSelected?`2px solid ${T.success}`:`1px solid ${T.border}`,
-                                  borderRadius:T.xs,cursor:isEditing?"pointer":"default",transition:"background .1s"}}>
-                                <div style={{width:"20px",fontWeight:700,fontSize:"0.72rem",color:isSelected?T.success:T.textSecondary,flexShrink:0}}>{ltr}</div>
+                              <div key={ci} style={{display:"flex",alignItems:"center",gap:"0.5rem",padding:"6px 8px",
+                                background:isCorrect?"rgba(16,185,129,.10)":"transparent",
+                                border:isCorrect?`2px solid ${T.success}`:`1px solid ${T.border}`,
+                                borderRadius:T.xs}}>
+                                <div style={{width:"20px",fontWeight:700,fontSize:"0.72rem",color:isCorrect?T.success:T.textSecondary,flexShrink:0}}>{ltr}</div>
                                 <div style={{flex:1,minWidth:0}}>
                                   <div style={{fontSize:"0.78rem",color:T.text,marginBottom:"2px"}}><MathText text={ch}/></div>
                                   <div style={{height:"6px",background:"#e8edf2",borderRadius:"3px",overflow:"hidden"}}>
-                                    <div style={{height:"100%",width:`${pct}%`,background:isSelected?T.success:pct>30?T.dangerText:"#94a3b8",borderRadius:"3px",transition:"width .3s"}}/>
+                                    <div style={{height:"100%",width:`${pct}%`,background:isCorrect?T.success:pct>30?T.dangerText:"#94a3b8",borderRadius:"3px",transition:"width .3s"}}/>
                                   </div>
                                 </div>
-                                <div style={{fontSize:"0.7rem",fontWeight:700,color:isSelected?T.success:T.textSecondary,flexShrink:0,minWidth:"42px",textAlign:"right"}}>{count} ({pct}%)</div>
-                                {isSelected&&<span style={{fontSize:"0.7rem",flexShrink:0}}>✓</span>}
+                                <div style={{fontSize:"0.7rem",fontWeight:700,color:isCorrect?T.success:T.textSecondary,flexShrink:0,minWidth:"42px",textAlign:"right"}}>{count} ({pct}%)</div>
+                                {isCorrect&&<span style={{fontSize:"0.7rem",flexShrink:0}}>✓</span>}
                               </div>
                             );
                           })}
                         </div>
-                        {editingKeyId===q.id && (
-                          <div style={{marginTop:"0.65rem",display:"flex",alignItems:"center",gap:"0.5rem",flexWrap:"wrap"}}>
-                            <button disabled={regradeLoading||pendingCorrect===q.correct}
-                              onClick={e=>{e.stopPropagation();handleSaveRegrade(q);}}
-                              style={{background:T.success,color:T.white,border:"none",borderRadius:T.xs,padding:"0.5rem 1rem",
-                                fontSize:"0.78rem",fontWeight:700,cursor:"pointer",opacity:(regradeLoading||pendingCorrect===q.correct)?0.5:1}}>
-                              {regradeLoading?"Saving…":"Save & Re-grade"}
-                            </button>
-                            <button disabled={regradeLoading}
-                              onClick={e=>{e.stopPropagation();setEditingKeyId(null);setPendingCorrect(null);}}
-                              style={{background:"transparent",color:T.textSecondary,border:`1px solid ${T.border}`,
-                                borderRadius:T.xs,padding:"0.5rem 0.85rem",fontSize:"0.78rem",fontWeight:600,cursor:"pointer"}}>
-                              Cancel
-                            </button>
-                            {pendingCorrect===q.correct&&<span style={{fontSize:"0.7rem",color:T.textMuted}}>Select a different choice to enable save.</span>}
-                          </div>
-                        )}
-                        {regradeResult?.questionId===q.id && (
-                          <div style={{marginTop:"0.5rem",fontSize:"0.72rem",fontWeight:700,color:T.success,
-                            background:T.successBg,border:`1px solid ${T.successBd}`,borderRadius:T.xs,padding:"4px 8px"}}>
-                            Saved — {regradeResult.updatedSessions} session{regradeResult.updatedSessions!==1?"s":""} re-graded.
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>
@@ -1699,6 +1678,82 @@ export default function Dashboard({ teacher, readOnly }) {
                 style={{background:"#f0f4f8",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"0.5rem 1.25rem",fontSize:"0.82rem",cursor:"pointer",color:"#555",fontWeight:600}}>
                 Cancel
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Correct the Answer modal */}
+      {regradeModalQ && (
+        <div onClick={()=>{if(!regradeLoading){setRegradeModalQ(null);setPendingCorrect(null);setRegradeModalError("");}}}
+          style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:T.white,borderRadius:T.rl,width:"100%",maxWidth:"500px",overflow:"hidden",boxShadow:T.lg}}>
+            <div style={{background:T.midnight,color:T.white,padding:"1.25rem 1.5rem",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div style={{fontSize:"1.15rem",fontWeight:800}}>Correct the Answer</div>
+              <button disabled={regradeLoading} onClick={()=>{setRegradeModalQ(null);setPendingCorrect(null);setRegradeModalError("");}}
+                style={{background:"rgba(255,255,255,.18)",border:"none",color:T.white,fontSize:"0.9rem",padding:"0.4rem 0.9rem",borderRadius:T.xs,cursor:"pointer",fontWeight:700}}>
+                Cancel
+              </button>
+            </div>
+            <div style={{padding:"1.25rem 1.5rem",borderBottom:`1px solid ${T.border}`,background:T.surface}}>
+              <div style={{fontSize:"0.7rem",fontWeight:700,color:T.textSecondary,marginBottom:"0.5rem",letterSpacing:"0.08em"}}>THE QUESTION</div>
+              <div style={{fontSize:"1rem",color:T.text,lineHeight:1.6,fontWeight:500}}><MathText text={regradeModalQ.question}/></div>
+              {regradeModalQ.questionImage && (
+                <img src={regradeModalQ.questionImage} alt=""
+                  style={{maxWidth:"100%",maxHeight:"180px",marginTop:"0.75rem",borderRadius:T.xs,border:`1px solid ${T.border}`,display:"block"}}/>
+              )}
+            </div>
+            <div style={{padding:"1.1rem 1.5rem",display:"flex",flexDirection:"column",gap:"0.6rem"}}>
+              <div style={{fontSize:"0.7rem",fontWeight:700,color:T.textSecondary,letterSpacing:"0.08em",marginBottom:"0.1rem"}}>TAP THE CORRECT ANSWER</div>
+              {(regradeModalQ.choices||[]).map((ch,ci)=>{
+                const ltr=["A","B","C","D"][ci]||String(ci+1);
+                const isSelected=String(ch)===String(pendingCorrect);
+                return (
+                  <button key={ci} onClick={()=>!regradeLoading&&setPendingCorrect(ch)}
+                    style={{display:"flex",alignItems:"center",gap:"1rem",padding:"0.9rem 1.1rem",width:"100%",textAlign:"left",
+                      background:isSelected?T.success:"#f8fafc",
+                      border:isSelected?`2px solid ${T.success}`:`2px solid ${T.border}`,
+                      borderRadius:T.r,cursor:regradeLoading?"default":"pointer",
+                      transition:"all .12s",boxShadow:isSelected?"0 2px 8px rgba(16,185,129,.25)":"none"}}>
+                    <div style={{width:"32px",height:"32px",borderRadius:T.xs,flexShrink:0,
+                      background:isSelected?"rgba(255,255,255,.25)":"#e2e8f0",
+                      display:"flex",alignItems:"center",justifyContent:"center",
+                      fontSize:"0.9rem",fontWeight:900,color:isSelected?T.white:T.textSecondary}}>
+                      {ltr}
+                    </div>
+                    <div style={{flex:1,fontSize:"0.95rem",color:isSelected?T.white:T.text,fontWeight:isSelected?700:500,lineHeight:1.4}}>
+                      <MathText text={ch}/>
+                    </div>
+                    {isSelected&&<span style={{fontSize:"1.1rem",flexShrink:0}}>✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+            {pendingCorrect && pendingCorrect!==regradeModalQ.correct && (
+              <div style={{margin:"0 1.5rem",padding:"0.85rem 1rem",background:"#fffbeb",border:"1px solid #fcd34d",borderRadius:T.xs,fontSize:"0.88rem",color:"#92400e",lineHeight:1.5}}>
+                ⚠️ This will update the grades of <strong>{regradeModalQ.attempted} student{regradeModalQ.attempted!==1?"s":""}</strong> who took this question.
+              </div>
+            )}
+            {regradeModalError && (
+              <div style={{margin:"0.75rem 1.5rem 0",padding:"0.75rem 1rem",background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:T.xs,fontSize:"0.88rem",fontWeight:600,color:T.dangerText}}>
+                ⚠ {regradeModalError}
+              </div>
+            )}
+            <div style={{padding:"1.1rem 1.5rem",marginTop:"0.5rem",borderTop:`1px solid ${T.border}`}}>
+              <button disabled={regradeLoading||!pendingCorrect||pendingCorrect===regradeModalQ.correct}
+                onClick={()=>handleSaveRegrade(regradeModalQ)}
+                style={{width:"100%",background:T.success,border:"none",borderRadius:T.r,
+                  padding:"1rem",fontSize:"1rem",fontWeight:800,
+                  cursor:(regradeLoading||!pendingCorrect||pendingCorrect===regradeModalQ.correct)?"default":"pointer",
+                  color:T.white,opacity:(regradeLoading||!pendingCorrect||pendingCorrect===regradeModalQ.correct)?0.4:1,
+                  transition:"opacity .15s"}}>
+                {regradeLoading ? "Saving…" : "✓  Save Correction & Update Student Grades"}
+              </button>
+              {(!pendingCorrect||pendingCorrect===regradeModalQ.correct) && (
+                <div style={{textAlign:"center",fontSize:"0.78rem",color:T.textMuted,marginTop:"0.6rem"}}>
+                  Tap an answer above to continue.
+                </div>
+              )}
             </div>
           </div>
         </div>
