@@ -695,6 +695,170 @@ function AssignTestModal({ test, onDone, onClose, teacher, existingAssignments }
 }
 
 // ── Main TestBuilder ───────────────────────────────────────
+// ── Teacher Preview Modal ─────────────────────────────────
+function TestPreviewModal({ test, bank, onClose }) {
+  const questions = (test.questionIds || [])
+    .map(id => bank.find(q => q.id === id))
+    .filter(Boolean);
+
+  const [cur,      setCur]      = useState(0);
+  const [answers,  setAnswers]  = useState({}); // qId → chosen value
+  const [revealed, setRevealed] = useState({}); // qId → bool
+  const [done,     setDone]     = useState(false);
+
+  const q        = questions[cur];
+  const chosen   = q ? answers[q.id] : null;
+  const isReveal = q ? !!revealed[q.id] : false;
+  const correct  = q ? (q.correct || q.answer) : null;
+
+  function choose(val) {
+    if (isReveal) return;
+    setAnswers(a => ({ ...a, [q.id]: val }));
+    setRevealed(r => ({ ...r, [q.id]: true }));
+  }
+
+  function next() {
+    if (cur < questions.length - 1) setCur(c => c + 1);
+    else setDone(true);
+  }
+
+  function prev() { setCur(c => Math.max(0, c - 1)); }
+  function restart() { setCur(0); setAnswers({}); setRevealed({}); setDone(false); }
+
+  const score = questions.filter(q => {
+    const a = answers[q.id];
+    const c = q.correct || q.answer;
+    return a != null && String(a).trim().toLowerCase() === String(c).trim().toLowerCase();
+  }).length;
+
+  const letters = ["a","b","c","d"];
+
+  return (
+    <div onClick={e => e.target === e.currentTarget && onClose()}
+      style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}>
+      <div style={{background:"#f8fafc",borderRadius:"8px",width:"100%",maxWidth:"680px",maxHeight:"92vh",display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 16px 60px rgba(0,0,0,.35)"}}>
+
+        {/* Header */}
+        <div style={{background:"#7c3aed",color:"#fff",padding:"0.85rem 1.25rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
+          <div style={{flex:1}}>
+            <div style={{fontSize:"0.55rem",opacity:.7,letterSpacing:"0.14em"}}>TEACHER PREVIEW — NOT RECORDED</div>
+            <div style={{fontSize:"1rem",fontWeight:700}}>{test.name || "Untitled"}</div>
+          </div>
+          {!done && <div style={{fontSize:"0.72rem",opacity:.8}}>{cur+1} / {questions.length}</div>}
+          <button onClick={onClose} style={{background:"rgba(255,255,255,.18)",border:"none",color:"#fff",borderRadius:"4px",padding:"5px 11px",cursor:"pointer",fontSize:"0.8rem"}}>✕ Close</button>
+        </div>
+
+        {questions.length === 0 ? (
+          <div style={{padding:"3rem",textAlign:"center",color:"#888"}}>
+            <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>📭</div>
+            <div style={{fontWeight:600}}>No questions found in bank for this test.</div>
+            <div style={{fontSize:"0.8rem",marginTop:"4px"}}>Questions may have been deleted from the bank.</div>
+          </div>
+        ) : done ? (
+          /* ── Results ── */
+          <div style={{flex:1,minHeight:0,overflowY:"auto",padding:"2rem",display:"flex",flexDirection:"column",alignItems:"center",gap:"1rem"}}>
+            <div style={{fontSize:"3rem"}}>{score === questions.length ? "🎉" : score >= questions.length * 0.8 ? "✅" : "📋"}</div>
+            <div style={{fontSize:"1.6rem",fontWeight:800,color:"#0f172a"}}>{Math.round(score/questions.length*100)}%</div>
+            <div style={{fontSize:"0.85rem",color:"#666"}}>{score} / {questions.length} correct</div>
+            <div style={{width:"100%",maxWidth:"420px",background:"#fff",border:"1px solid #e2e8f0",borderRadius:"8px",overflow:"hidden",marginTop:"0.5rem"}}>
+              {questions.map((q, i) => {
+                const a = answers[q.id];
+                const c = q.correct || q.answer;
+                const ok = a != null && String(a).trim().toLowerCase() === String(c).trim().toLowerCase();
+                return (
+                  <div key={q.id} style={{display:"flex",alignItems:"center",gap:"0.75rem",padding:"0.55rem 1rem",borderBottom:"1px solid #f1f5f9",fontSize:"0.78rem"}}>
+                    <span style={{width:"20px",height:"20px",borderRadius:"50%",background:a==null?"#e2e8f0":ok?"#dcfce7":"#fee2e2",border:`1.5px solid ${a==null?"#cbd5e1":ok?"#16a34a":"#dc2626"}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:"0.65rem",fontWeight:700,color:a==null?"#94a3b8":ok?"#16a34a":"#dc2626"}}>
+                      {a==null?"—":ok?"✓":"✗"}
+                    </span>
+                    <span style={{flex:1,color:"#334155",overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>Q{i+1}: <MathText text={q.question}/></span>
+                    {!ok && <span style={{fontSize:"0.68rem",color:"#16a34a",fontWeight:600}}>Key: <MathText text={String(c)}/></span>}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{display:"flex",gap:"0.75rem",marginTop:"0.5rem"}}>
+              <button onClick={restart} style={{background:"#7c3aed",color:"#fff",border:"none",borderRadius:"6px",padding:"0.65rem 1.5rem",fontWeight:700,cursor:"pointer",fontSize:"0.9rem"}}>↺ Retake</button>
+              <button onClick={onClose} style={{background:"#f1f5f9",color:"#334155",border:"1px solid #e2e8f0",borderRadius:"6px",padding:"0.65rem 1.5rem",fontWeight:600,cursor:"pointer",fontSize:"0.9rem"}}>Done</button>
+            </div>
+          </div>
+        ) : (
+          /* ── Question ── */
+          <div style={{flex:1,minHeight:0,overflowY:"auto",padding:"1.5rem 1.25rem 1rem"}}>
+            {/* Progress bar */}
+            <div style={{height:"4px",background:"#e2e8f0",borderRadius:"2px",marginBottom:"1.25rem"}}>
+              <div style={{width:`${(cur/questions.length)*100}%`,height:"100%",background:"#7c3aed",borderRadius:"2px",transition:"width .2s"}}/>
+            </div>
+
+            {/* Standard / DOK badge */}
+            <div style={{display:"flex",gap:"0.4rem",marginBottom:"0.75rem",flexWrap:"wrap"}}>
+              {q.standard && <span style={{fontSize:"0.6rem",fontWeight:700,background:"#ede9fe",color:"#5b21b6",borderRadius:"3px",padding:"2px 7px"}}>{q.standard}</span>}
+              {q.dok && <span style={{fontSize:"0.6rem",fontWeight:700,background:"#fef9c3",color:"#713f12",borderRadius:"3px",padding:"2px 7px"}}>DOK {q.dok}</span>}
+            </div>
+
+            {/* Question card */}
+            <div style={{background:"#fff",border:"1px solid #e2e8f0",borderTop:"4px solid #7c3aed",borderRadius:"6px",padding:"1.25rem 1.5rem",marginBottom:"1rem",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
+              <p style={{fontSize:"1.05rem",fontFamily:"Georgia,serif",color:"#0f0f0f",lineHeight:1.75,margin:0}}>
+                <MathText text={q.question}/>
+              </p>
+            </div>
+
+            {/* Choices */}
+            {(q.choices || []).length > 0 && (
+              <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:"6px",overflow:"hidden",marginBottom:"1rem"}}>
+                {(q.choices || []).map((choice, i) => {
+                  const isChosen  = chosen === choice;
+                  const isCorrect = String(choice) === String(correct);
+                  let rowBg = "transparent", textColor = "#334155";
+                  let circleBg = "#fff", circleBd = "#94a3b8", circleColor = "#445";
+                  let circleLabel = letters[i] || String(i+1);
+                  if (isReveal) {
+                    if (isCorrect)     { rowBg="#f0fdf4"; textColor="#166534"; circleBg="#16a34a"; circleBd="#16a34a"; circleColor="#fff"; circleLabel="✓"; }
+                    else if (isChosen) { rowBg="#fef2f2"; textColor="#991b1b"; circleBg="#dc2626"; circleBd="#dc2626"; circleColor="#fff"; circleLabel="✗"; }
+                    else               { textColor="#94a3b8"; circleBd="#e2e8f0"; circleColor="#94a3b8"; }
+                  } else if (isChosen) { rowBg="#eef4fb"; circleBg="#0f172a"; circleBd="#0f172a"; circleColor="#fff"; }
+                  return (
+                    <button key={i} onClick={() => choose(choice)}
+                      style={{background:rowBg,border:"none",borderBottom:"1px solid #f1f5f9",padding:"0.75rem 1.25rem",textAlign:"left",cursor:isReveal?"default":"pointer",display:"flex",alignItems:"center",gap:"1rem",width:"100%",transition:"background .1s"}}>
+                      <div style={{width:"26px",height:"26px",borderRadius:"50%",border:`1.5px solid ${circleBd}`,background:circleBg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <span style={{fontSize:"0.72rem",fontWeight:700,color:circleColor}}>{circleLabel}</span>
+                      </div>
+                      <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color:textColor,flex:1}}><MathText text={choice}/></span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Key answer for non-MCQ */}
+            {isReveal && (q.choices || []).length === 0 && (
+              <div style={{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:"6px",padding:"0.75rem 1rem",marginBottom:"1rem",fontSize:"0.88rem",color:"#166534",fontWeight:600}}>
+                ✓ Answer key: <MathText text={String(correct)}/>
+              </div>
+            )}
+
+            {/* Feedback / nav */}
+            <div style={{display:"flex",alignItems:"center",gap:"0.5rem",marginTop:"0.5rem"}}>
+              <button onClick={prev} disabled={cur===0}
+                style={{background:"#f1f5f9",border:"1px solid #e2e8f0",borderRadius:"6px",padding:"0.6rem 1rem",fontSize:"0.85rem",fontWeight:600,cursor:cur===0?"not-allowed":"pointer",color:cur===0?"#cbd5e1":"#334155"}}>← Back</button>
+              <div style={{flex:1}}/>
+              {!isReveal && (q.choices||[]).length === 0 && (
+                <button onClick={() => setRevealed(r => ({...r, [q.id]: true}))}
+                  style={{background:"#f1f5f9",border:"1px solid #e2e8f0",borderRadius:"6px",padding:"0.6rem 1.1rem",fontSize:"0.85rem",fontWeight:600,cursor:"pointer",color:"#334155"}}>Show Answer</button>
+              )}
+              {isReveal && (
+                <button onClick={next}
+                  style={{background:"#7c3aed",color:"#fff",border:"none",borderRadius:"6px",padding:"0.6rem 1.25rem",fontSize:"0.9rem",fontWeight:700,cursor:"pointer"}}>
+                  {cur < questions.length - 1 ? "Next →" : "See Results"}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function TestBuilder({ teacher, readOnly }) {
   const isAdmin = teacher && (teacher.teacherRole === "super_admin" || teacher.teacherRole === "school_admin");
   const [bank, setBank]               = useState([]);
@@ -712,6 +876,7 @@ export default function TestBuilder({ teacher, readOnly }) {
   const [savedMsg, setSavedMsg]       = useState("");
   const [libSearch, setLibSearch]     = useState("");
   const [libSort,   setLibSort]       = useState("newest");
+  const [previewTest, setPreviewTest] = useState(null); // test object to preview
   const [rightTab, setRightTab]       = useState("current");
   const [testAssignments, setTestAssignments] = useState([]);
   const [editingTestId, setEditingTestId]   = useState(null); // non-null = editing existing test
@@ -1132,6 +1297,8 @@ export default function TestBuilder({ teacher, readOnly }) {
                           {(testAssignments||[]).some(a=>a.testId===t.id)?"📋 Assigned":"📋 Assign"}</button>
                         {canEdit&&<button onClick={()=>loadSavedTest(t.id,true)} title="Edit test"
                           style={{...S.smBtn,background:T.teal,color:"#fff",borderColor:T.teal,padding:"5px 12px"}}>✏️ Edit</button>}
+                        <button onClick={()=>setPreviewTest(t)} title="Preview test as teacher"
+                          style={{...S.smBtn,background:"#7c3aed",color:"#fff",borderColor:"#7c3aed",padding:"5px 12px"}}>🔍 Preview</button>
                         {canDupe&&<button onClick={()=>duplicateSavedTest(t.id)} title="Duplicate test"
                           style={{...S.smBtn,padding:"5px 8px",background:T.surfaceAlt,borderColor:T.border,color:T.text}}>📄</button>}
                         {canEdit&&<button onClick={()=>setConfirmDeleteTest(t)} title="Delete test"
@@ -1190,6 +1357,7 @@ export default function TestBuilder({ teacher, readOnly }) {
       {showSaveModal&&<SaveTestModal count={selected.length} currentTitle={testTitle} savedTests={savedTests} onSave={saveTest} onClose={()=>setShowSaveModal(false)} editing={editingTestId} teacher={teacher}/>}
       {assigningTest&&<AssignTestModal test={assigningTest} teacher={teacher} existingAssignments={testAssignments}
         onDone={()=>{setAssigningTest(null);loadAssignments();}} onClose={()=>setAssigningTest(null)}/>}
+      {previewTest&&<TestPreviewModal test={previewTest} bank={bank} onClose={()=>setPreviewTest(null)}/>}
 
       {confirmDeleteTest&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
