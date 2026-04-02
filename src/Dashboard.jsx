@@ -5,6 +5,7 @@ import { generateClassReport } from "./generateReport";
 import ParentReport from "./ParentReport";
 import TestParentReport from "./TestParentReport";
 import StudentDiagnostic from "./StudentDiagnostic";
+import StudentQuestionReport from "./StudentQuestionReport";
 
 const ALL_TABS = [
   ["overview",  "📊 Overview",       false, false],
@@ -295,6 +296,7 @@ export default function Dashboard({ teacher, readOnly }) {
   const [parentReportId,   setParentReportId]   = useState(null); // student ID for fluency parent report
   const [testReportData,   setTestReportData]   = useState(null); // {session, fullStudent, stds, className} for test report
   const [diagStudentId,    setDiagStudentId]    = useState(null); // {id, name}
+  const [questionReportSession, setQuestionReportSession] = useState(null); // session for per-question report
   const [adminData, setAdminData] = useState(null);
   const [openItem, setOpenItem] = useState(null); // q.id of expanded missed-by panel
   const [pendingCorrect, setPendingCorrect] = useState(null);
@@ -743,6 +745,10 @@ export default function Dashboard({ teacher, readOnly }) {
                         <button onClick={(e)=>{e.stopPropagation(); setTestReportData({session:s, fullStudent, stds, className:s.className||""});}}
                           style={{background:T.teal,color:T.white,border:"none",borderRadius:T.xs,padding:"5px 12px",fontSize:"0.72rem",fontWeight:600,cursor:"pointer"}}>
                           📋 Parent Report
+                        </button>
+                        <button onClick={(e)=>{e.stopPropagation(); setQuestionReportSession(s);}}
+                          style={{background:"#7c3aed",color:T.white,border:"none",borderRadius:T.xs,padding:"5px 12px",fontSize:"0.72rem",fontWeight:600,cursor:"pointer"}}>
+                          📄 Question Report
                         </button>
                       </div>
                     </div>
@@ -1846,6 +1852,14 @@ export default function Dashboard({ teacher, readOnly }) {
           studentId={diagStudentId.id}
           studentName={diagStudentId.name}
           onClose={() => setDiagStudentId(null)}
+        />
+      )}
+      {questionReportSession && (
+        <StudentQuestionReport
+          session={questionReportSession}
+          bankQ={bankQ}
+          teacherName={teacher?.name || ""}
+          onClose={() => setQuestionReportSession(null)}
         />
       )}
 

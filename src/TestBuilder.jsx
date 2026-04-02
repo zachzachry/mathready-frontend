@@ -92,7 +92,7 @@ function ImagePasteZone({ image, onImage, onClear }) {
 }
 
 // ── Edit Question Modal ────────────────────────────────────
-function EditModal({ question, onSave, onClose }) {
+function EditModal({ question, onSave, onClose, teacher }) {
   const [q, setQ] = useState({
     ...question,
     subject: question.subject||"math",
@@ -152,8 +152,14 @@ function EditModal({ question, onSave, onClose }) {
     }
     setSaving(true);
     try {
-      await fetch(`${API}/questions`, { method:"POST", headers:teacherHeaders(), body:JSON.stringify(q) });
-      onSave(q);
+      // Stamp author on new questions (don't overwrite if already set)
+      const toSave = {
+        ...q,
+        createdBy:     q.createdBy     || teacher?.teacherId   || "",
+        createdByName: q.createdByName || teacher?.teacherName || "",
+      };
+      await fetch(`${API}/questions`, { method:"POST", headers:teacherHeaders(), body:JSON.stringify(toSave) });
+      onSave(toSave);
     } catch {}
     setSaving(false);
   }
@@ -881,10 +887,11 @@ export default function TestBuilder({ teacher, readOnly }) {
   const [testAssignments, setTestAssignments] = useState([]);
   const [editingTestId, setEditingTestId]   = useState(null); // non-null = editing existing test
 
-  const [subject,    setSubject]    = useState("math");
-  const [filterStd,  setFilterStd]  = useState("");
-  const [filterDok,  setFilterDok]  = useState("");
-  const [filterText, setFilterText] = useState("");
+  const [subject,      setSubject]    = useState("math");
+  const [filterStd,    setFilterStd]  = useState("");
+  const [filterDok,    setFilterDok]  = useState("");
+  const [filterText,   setFilterText] = useState("");
+  const [filterAuthor, setFilterAuthor] = useState("");
   const [autoCount,  setAutoCount]  = useState(10);
   const activeStandards = STANDARDS_BY_SUBJECT[subject] || MATH_STANDARDS;
 
@@ -938,6 +945,10 @@ export default function TestBuilder({ teacher, readOnly }) {
       const matchesQ  = q.question?.toLowerCase().includes(t);
       const matchesS  = q.short?.toLowerCase().includes(t);
       if (!matchesId && !matchesQ && !matchesS) return false;
+    }
+    if (filterAuthor) {
+      const a = filterAuthor.toLowerCase();
+      if (!(q.createdByName||"").toLowerCase().includes(a)) return false;
     }
     return true;
   });
@@ -1084,6 +1095,7 @@ export default function TestBuilder({ teacher, readOnly }) {
               {[1,2,3,4].map(d=><option key={d} value={d}>DOK {d}</option>)}
             </select>
             <input style={{...S.inp,flex:2,minWidth:"120px"}} value={filterText} onChange={e=>setFilterText(e.target.value)} placeholder="Search by ID, keyword…"/>
+            <input style={{...S.inp,flex:2,minWidth:"120px"}} value={filterAuthor} onChange={e=>setFilterAuthor(e.target.value)} placeholder="Filter by author…"/>
           </div>
           <div style={{display:"flex",gap:"0.5rem",alignItems:"center",flexWrap:"wrap"}}>
             <span style={{fontSize:"0.72rem",color:T.textSecondary}}>
@@ -1118,6 +1130,7 @@ export default function TestBuilder({ teacher, readOnly }) {
                       <span style={{fontSize:"0.6rem",fontWeight:700,color:T.midnight,background:T.tealLight,padding:"1px 6px",borderRadius:"2px",border:`1px solid ${T.border}`}}>{q.standard}</span>
                       {q.dok&&<span style={{fontSize:"0.6rem",fontWeight:700,color:T.warning,background:"#fff3cd",padding:"1px 6px",borderRadius:"2px",border:`1px solid ${T.warningBd}`}}>DOK {q.dok}</span>}
                       {q.type&&q.type!=="mcq"&&<span style={{fontSize:"0.58rem",fontWeight:700,color:"#6d28d9",background:"#ede9fe",padding:"1px 6px",borderRadius:"2px",border:"1px solid #c4b5fd"}}>{q.type==="dragdrop"?"D&D":q.type==="multiselect"?"Multi":q.type==="keypad"?"Keypad":q.type}</span>}
+                      {q.createdByName&&<span style={{fontSize:"0.58rem",fontWeight:600,color:T.textSecondary,background:T.surfaceAlt,padding:"1px 6px",borderRadius:"2px",border:`1px solid ${T.border}`}}>👤 {q.createdByName}</span>}
                       <span style={{fontSize:"0.6rem",color:T.textSecondary}}>{q.short}</span>
                     </div>
                     <div style={{fontSize:"0.85rem",color:T.text,fontFamily:"Georgia,serif",lineHeight:1.5,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>
@@ -1353,7 +1366,7 @@ export default function TestBuilder({ teacher, readOnly }) {
       </div>
 
       {/* Modals */}
-      {editingQ&&<EditModal question={editingQ} onSave={handleSaveEdit} onClose={()=>setEditingQ(null)}/>}
+      {editingQ&&<EditModal question={editingQ} onSave={handleSaveEdit} onClose={()=>setEditingQ(null)} teacher={teacher}/>}
       {showSaveModal&&<SaveTestModal count={selected.length} currentTitle={testTitle} savedTests={savedTests} onSave={saveTest} onClose={()=>setShowSaveModal(false)} editing={editingTestId} teacher={teacher}/>}
       {assigningTest&&<AssignTestModal test={assigningTest} teacher={teacher} existingAssignments={testAssignments}
         onDone={()=>{setAssigningTest(null);loadAssignments();}} onClose={()=>setAssigningTest(null)}/>}
