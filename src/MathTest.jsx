@@ -1103,7 +1103,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
         <div style={{width:"100%",maxWidth:"680px",display:"flex",flexDirection:"column",gap:"1rem"}}>
 
           {/* Question card */}
-          <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:"6px",padding:"1.5rem 1.75rem",boxShadow:"0 2px 8px rgba(0,0,0,.05)"}}>
+          <div style={{background:T.white,border:`1px solid ${T.border}`,borderTop:`4px solid ${T.midnight}`,borderRadius:"6px",padding:"1.5rem 1.75rem",boxShadow:"0 2px 8px rgba(0,0,0,.05)"}}>
             <p style={{fontSize:"1.08rem",fontFamily:"Georgia,serif",color:"#0f0f0f",lineHeight:1.75,margin:0}}>
               <MathText text={q.question}/>
             </p>
@@ -1128,7 +1128,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
                 onChange={e => !revealed && handleChoose(e.target.value)}
                 disabled={revealed}
                 placeholder="Type your answer…"
-                style={{width:"100%",maxWidth:"260px",padding:"0.8rem 1rem",fontSize:"1.3rem",fontFamily:"monospace",fontWeight:700,border:`2px solid ${revealed?(String(selected??"").trim().toLowerCase()===correct?T.success:T.dangerText):T.midnight}`,borderRadius:"4px",outline:"none",background:T.surface,color:"#0f0f0f"}}
+                style={{width:"100%",maxWidth:"260px",padding:"0.65rem 0",fontSize:"1.5rem",fontFamily:"monospace",fontWeight:700,border:"none",borderBottom:`2px solid ${revealed?(String(selected??"").trim().toLowerCase()===correct?T.success:T.dangerText):T.midnight}`,borderRadius:0,outline:"none",background:"transparent",color:"#0f0f0f"}}
               />
               {!revealed && selected && (
                 <button onClick={() => handleChoose(selected)}
@@ -1177,19 +1177,21 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
               )}
             </div>
           ) : q.type === "multiselect" ? (
-            <div style={{display:"flex",flexDirection:"column",gap:"0.6rem"}}>
-              <div style={{fontSize:"0.7rem",color:T.textSecondary,marginBottom:"4px"}}>Select all that apply.</div>
+            <div style={{display:"flex",flexDirection:"column"}}>
+              <div style={{fontSize:"0.7rem",color:T.textSecondary,padding:"0.5rem 1.25rem",borderBottom:`1px solid ${T.border}`}}>Select all that apply.</div>
+              <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:"6px",overflow:"hidden"}}>
               {q.choices.map((choice, i) => {
                 const selArr = (() => { try { return selected ? JSON.parse(selected) : []; } catch { return []; } })();
                 const isChosen = selArr.includes(choice);
                 const correctArr = Array.isArray(q.answer) ? q.answer : [];
                 const isInCorrect = correctArr.includes(choice);
-                let bg = T.white, border = `2px solid ${T.border}`;
+                let rowBg = "transparent", textColor = T.text;
+                let boxBg = T.white, boxBd = "#b0bec5";
                 if (revealed) {
-                  if (isInCorrect)    { bg=T.successBg; border=`2px solid ${T.success}`; }
-                  else if (isChosen)  { bg=T.dangerBg; border=`2px solid ${T.dangerText}`; }
-                  else                { bg=T.surface; border="2px solid #e0e0e0"; }
-                } else if (isChosen) { bg="#ddeaf7"; border=`2px solid ${T.midnight}`; }
+                  if (isInCorrect)   { rowBg=T.successBg; textColor=T.success; boxBg=T.success; boxBd=T.success; }
+                  else if (isChosen) { rowBg=T.dangerBg; textColor=T.dangerText; boxBg=T.dangerText; boxBd=T.dangerText; }
+                  else               { textColor=T.textSecondary; boxBd="#ddd"; }
+                } else if (isChosen) { rowBg="#eef4fb"; boxBg=T.midnight; boxBd=T.midnight; }
                 return (
                   <button key={i}
                     onClick={() => {
@@ -1198,14 +1200,15 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
                       setSelected(next.length ? JSON.stringify(next) : null);
                     }}
                     disabled={revealed}
-                    style={{background:bg,border,borderRadius:"6px",padding:"0.9rem 1.25rem",textAlign:"left",cursor:revealed?"default":"pointer",display:"flex",alignItems:"center",gap:"1rem",transition:"all .15s"}}>
-                    <div style={{width:"22px",height:"22px",borderRadius:T.xs,border:`2px solid ${revealed?(isInCorrect?T.success:isChosen?T.dangerText:"#ddd"):"#9aabba"}`,background:revealed?(isInCorrect?T.success:isChosen?T.dangerText:"#f0f0f0"):(isChosen?T.midnight:T.white),display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    style={{background:rowBg,border:"none",borderBottom:`1px solid ${T.border}`,padding:"0.75rem 1.25rem",textAlign:"left",cursor:revealed?"default":"pointer",display:"flex",alignItems:"center",gap:"1rem",transition:"background .12s",width:"100%"}}>
+                    <div style={{width:"22px",height:"22px",borderRadius:"4px",border:`1.5px solid ${boxBd}`,background:boxBg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                       {(isChosen || (revealed && isInCorrect)) && <span style={{color:T.white,fontSize:"0.8rem",fontWeight:900}}>✓</span>}
                     </div>
-                    <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",flex:1}}><MathText text={choice}/></span>
+                    <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color:textColor,flex:1}}><MathText text={choice}/></span>
                   </button>
                 );
               })}
+              </div>
               {!revealed && (
                 <button onClick={() => handleChoose(selected || "[]")}
                   style={{background:T.midnight,color:T.white,border:"none",borderRadius:"4px",padding:"0.65rem 1.25rem",fontSize:"0.9rem",fontWeight:700,cursor:"pointer",marginTop:"0.25rem"}}>
@@ -1214,26 +1217,27 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
               )}
             </div>
           ) : (
-          <div style={{display:"flex",flexDirection:"column",gap:"0.6rem"}}>
+          <div style={{display:"flex",flexDirection:"column",background:T.white,border:`1px solid ${T.border}`,borderRadius:"6px",overflow:"hidden"}}>
             {q.choices.map((choice, i) => {
               const isChosen  = selected === choice;
               const isCorrect = choice === correct;
-              let bg = T.white, border = `2px solid ${T.border}`, color = T.text;
+              const letters   = ["a","b","c","d"];
+              let rowBg = "transparent", textColor = T.text;
+              let circleBg = T.white, circleBd = "#b0bec5", circleColor = "#445";
+              let circleLabel = letters[i];
               if (revealed) {
-                if (isCorrect)       { bg=T.successBg; border=`2px solid ${T.success}`; color=T.success; }
-                else if (isChosen)   { bg=T.dangerBg; border=`2px solid ${T.dangerText}`; color=T.dangerText; }
-                else                 { bg=T.surface; border="2px solid #e0e0e0"; color=T.textSecondary; }
-              } else if (isChosen)   { bg="#ddeaf7"; border=`2px solid ${T.midnight}`; }
+                if (isCorrect)     { rowBg=T.successBg; textColor=T.success; circleBg=T.success; circleBd=T.success; circleColor=T.white; circleLabel="✓"; }
+                else if (isChosen) { rowBg=T.dangerBg;  textColor=T.dangerText; circleBg=T.dangerText; circleBd=T.dangerText; circleColor=T.white; circleLabel="✗"; }
+                else               { textColor=T.textSecondary; circleBd="#ddd"; circleColor=T.textSecondary; }
+              } else if (isChosen) { rowBg="#eef4fb"; circleBg=T.midnight; circleBd=T.midnight; circleColor=T.white; }
 
               return (
                 <button key={i} onClick={() => handleChoose(choice)} disabled={revealed}
-                  style={{background:bg,border,borderRadius:"6px",padding:"0.9rem 1.25rem",textAlign:"left",cursor:revealed?"default":"pointer",display:"flex",alignItems:"center",gap:"1rem",transition:"all .15s"}}>
-                  <div style={{width:"30px",height:"30px",borderRadius:"50%",border:`2px solid ${revealed?(isCorrect?T.success:isChosen?T.dangerText:"#ddd"):"#9aabba"}`,background:revealed?(isCorrect?T.success:isChosen?T.dangerText:"#f0f0f0"):(isChosen?T.midnight:T.white),display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    <span style={{fontSize:"0.75rem",fontWeight:700,color:revealed?(isCorrect||isChosen?T.white:T.textSecondary):(isChosen?T.white:"#667")}}>
-                      {revealed && isCorrect ? "✓" : revealed && isChosen ? "✗" : LETTERS[i]}
-                    </span>
+                  style={{background:rowBg,border:"none",borderBottom:`1px solid ${T.border}`,padding:"0.75rem 1.25rem",textAlign:"left",cursor:revealed?"default":"pointer",display:"flex",alignItems:"center",gap:"1rem",transition:"background .12s",width:"100%"}}>
+                  <div style={{width:"26px",height:"26px",borderRadius:"50%",border:`1.5px solid ${circleBd}`,background:circleBg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <span style={{fontSize:"0.72rem",fontWeight:700,color:circleColor}}>{circleLabel}</span>
                   </div>
-                  <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color,flex:1}}>
+                  <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color:textColor,flex:1}}>
                     <MathText text={choice}/>
                   </span>
                 </button>
@@ -1662,15 +1666,26 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
     };
   }, []);
 
-  // Detect tab/window blur
+  // Detect tab/window blur — record leave time; patch last entry with return time on focus
   useEffect(() => {
     function onBlur()       { addViolation("Looks like you clicked away from the test. Click below to get back."); }
     function onVisibility() { if (document.hidden) addViolation("Looks like you switched away from the test. Click below to get back."); }
+    function onReturn() {
+      setViolationLog(log => {
+        if (!log.length) return log;
+        const last = log[log.length - 1];
+        if (last.returned) return log;
+        return [...log.slice(0, -1), { ...last, returned: new Date().toISOString() }];
+      });
+    }
     window.addEventListener("blur", onBlur);
     document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onReturn);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) onReturn(); });
     return () => {
       window.removeEventListener("blur", onBlur);
       document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onReturn);
     };
   }, []);
 

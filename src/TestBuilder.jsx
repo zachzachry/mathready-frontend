@@ -976,7 +976,7 @@ export default function TestBuilder({ teacher, readOnly }) {
           {[["current","📋 Current Test"],["library","📚 Test Library"]].map(([key,lbl])=>(
             <button key={key} onClick={()=>setRightTab(key)}
               style={{background:rightTab===key?"#fff":"transparent",color:rightTab===key?T.midnight:"rgba(13,148,136,.4)",border:"none",padding:"0.55rem 0.9rem",fontSize:"0.75rem",fontWeight:700,cursor:"pointer",borderRadius:"4px 4px 0 0"}}>
-              {lbl}{key==="library"&&savedTests.length>0&&<span style={{marginLeft:"5px",background:rightTab===key?T.midnight:"rgba(255,255,255,.25)",color:"#fff",borderRadius:"10px",padding:"0px 6px",fontSize:"0.65rem"}}>{savedTests.length}</span>}
+              {lbl}{key==="library"&&savedTests.length>0&&<span style={{marginLeft:"5px",background:rightTab===key?T.midnight:"rgba(255,255,255,.25)",color:"#fff",borderRadius:"10px",padding:"0px 6px",fontSize:"0.65rem"}}>{savedTests.filter(t=>(t.subject||"math")===subject).length}</span>}
             </button>
           ))}
         </div>
@@ -999,7 +999,7 @@ export default function TestBuilder({ teacher, readOnly }) {
               </div>
             </div>
 
-            <div style={{flex:1,overflowY:"auto",padding:"0.75rem"}}>
+            <div style={{flex:1,minHeight:0,overflowY:"auto",padding:"0.75rem"}}>
               {selected.length===0?(
                 <div style={{padding:"3rem 1rem",textAlign:"center",color:"#aaa"}}>
                   <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>👈</div>
@@ -1072,7 +1072,7 @@ export default function TestBuilder({ teacher, readOnly }) {
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"0.5rem"}}>
                 <div>
                   <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.midnight}}>TEST LIBRARY</div>
-                  <div style={{fontSize:"0.68rem",color:T.textSecondary,marginTop:"1px"}}>{savedTests.length} test{savedTests.length!==1?"s":""}{q?` · ${filtered.length} match${filtered.length!==1?"es":""}`:""}</div>
+                  <div style={{fontSize:"0.68rem",color:T.textSecondary,marginTop:"1px"}}>{filtered.length} test{filtered.length!==1?"s":""}{q?` · ${filtered.length} match${filtered.length!==1?"es":""}`:""}</div>
                 </div>
               </div>
               <div style={{display:"flex",gap:"0.4rem",alignItems:"center"}}>
@@ -1088,7 +1088,7 @@ export default function TestBuilder({ teacher, readOnly }) {
                 </select>
               </div>
             </div>
-            <div style={{flex:1,overflowY:"auto",padding:"0.75rem"}}>
+            <div style={{flex:1,minHeight:0,overflowY:"auto",padding:"0.75rem"}}>
               {sorted.length===0?(
                 <div style={{padding:"3rem 1rem",textAlign:"center",color:"#aaa"}}>
                   <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>{q?"🔍":"📚"}</div>

@@ -27,9 +27,47 @@ function pctBg(p) {
   return "#ffebee";
 }
 
+function violationType(reason) {
+  if (!reason) return "Other";
+  const r = reason.toLowerCase();
+  if (r.includes("switched away")) return "Tab switch";
+  if (r.includes("clicked away"))  return "Window blur";
+  if (r.includes("fullscreen"))    return "Fullscreen exit";
+  return "Other";
+}
+
+function fmtDuration(left, returned) {
+  if (!returned) return null;
+  const secs = Math.round((new Date(returned) - new Date(left)) / 1000);
+  if (secs < 60) return `${secs}s away`;
+  return `${Math.floor(secs/60)}m ${secs%60}s away`;
+}
+
+function fmtLocalTime(iso) {
+  try {
+    return new Date(iso).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit", second:"2-digit" });
+  } catch { return iso; }
+}
+
 export default function StudentDiagnostic({ studentId, studentName, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [expandedSessions, setExpandedSessions] = useState(new Set());
+  const bodyRef = React.useRef(null);
+
+  function printDiagnostic() {
+    const el = bodyRef.current;
+    if (!el) return;
+    const clone = el.cloneNode(true);
+    clone.style.cssText = "overflow:visible;max-height:none;padding:1.25rem;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;";
+    const win = window.open("", "_blank");
+    if (!win) { alert("Please allow popups to print."); return; }
+    win.document.write(`<!DOCTYPE html><html><head><title>MathReady — ${studentName}</title>
+<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;color:#111;padding:1rem;}@media print{body{padding:0;}}</style>
+</head><body><h2 style="margin-bottom:1rem;font-size:1rem;">Student Diagnostic — ${studentName}</h2>${clone.outerHTML}</body></html>`);
+    win.document.close();
+    setTimeout(() => { win.focus(); win.print(); }, 400);
+  }
 
   useEffect(() => {
     if (!studentId) return;
@@ -57,11 +95,14 @@ export default function StudentDiagnostic({ studentId, studentName, onClose }) {
               {cfg.icon} {cfg.label}
             </div>
           )}
+          {data && data.diagnosis !== "no_data" && (
+            <button onClick={printDiagnostic} style={{ background:"rgba(255,255,255,.15)", border:"none", color:"#fff", borderRadius:"4px", padding:"6px 12px", cursor:"pointer", fontSize:"0.8rem" }}>🖨 Print</button>
+          )}
           <button onClick={onClose} style={{ background:"rgba(255,255,255,.15)", border:"none", color:"#fff", borderRadius:"4px", padding:"6px 12px", cursor:"pointer", fontSize:"0.8rem" }}>✕ Close</button>
         </div>
 
         {/* Body */}
-        <div style={{ flex:1, overflowY:"auto", padding:"1.25rem", display:"flex", flexDirection:"column", gap:"1rem" }}>
+        <div ref={bodyRef} style={{ flex:1, minHeight:0, overflowY:"auto", padding:"1.25rem", display:"flex", flexDirection:"column", gap:"1rem" }}>
           {loading && <div style={{ textAlign:"center", color:T.textSecondary, padding:"3rem" }}>Loading diagnostic…</div>}
 
           {!loading && (!data || data.diagnosis === "no_data") && (
@@ -180,15 +221,46 @@ export default function StudentDiagnostic({ studentId, studentName, onClose }) {
                 <div style={{ padding:"0.6rem 1rem", background:"#f0f4f8", borderBottom:`1px solid ${T.border}`, fontSize:"0.6rem", fontWeight:700, letterSpacing:"0.12em", color:T.textSecondary }}>
                   TEST HISTORY
                 </div>
-                {[...data.sessions].reverse().map((s, i) => (
-                  <div key={i} style={{ display:"flex", alignItems:"center", gap:"0.75rem", padding:"0.5rem 1rem", borderBottom:`1px solid ${T.surfaceAlt}`, fontSize:"0.78rem" }}>
-                    <div style={{ flex:1, fontWeight:600 }}>{s.testTitle || s.testCode || "Test"}</div>
-                    <div style={{ color:T.textSecondary, fontSize:"0.68rem" }}>{s.submitted}</div>
-                    <div style={{ color:T.textSecondary, fontSize:"0.68rem" }}>{s.timeUsed}</div>
-                    {s.violations > 0 && <div style={{ color:T.dangerText, fontSize:"0.65rem", fontWeight:700 }}>⚠ {s.violations} switches</div>}
-                    <div style={{ fontWeight:700, minWidth:"40px", textAlign:"right", color:pctColor(s.pct) }}>{s.pct}%</div>
-                  </div>
-                ))}
+                {[...data.sessions].reverse().map((s, i) => {
+                  const isExpanded = expandedSessions.has(i);
+                  const log = s.violationLog || [];
+                  return (
+                    <div key={i} style={{ borderBottom:`1px solid ${T.surfaceAlt}` }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:"0.75rem", padding:"0.5rem 1rem", fontSize:"0.78rem" }}>
+                        <div style={{ flex:1, fontWeight:600 }}>{s.testTitle || s.testCode || "Test"}</div>
+                        <div style={{ color:T.textSecondary, fontSize:"0.68rem" }}>{s.submitted}</div>
+                        <div style={{ color:T.textSecondary, fontSize:"0.68rem" }}>{s.timeUsed}</div>
+                        {s.violations > 0 && (
+                          <button onClick={() => setExpandedSessions(prev => {
+                            const next = new Set(prev);
+                            next.has(i) ? next.delete(i) : next.add(i);
+                            return next;
+                          })} style={{ background:"none", border:"none", cursor:"pointer", color:T.dangerText, fontSize:"0.65rem", fontWeight:700, padding:0 }}>
+                            ⚠ {s.violations} switches {isExpanded ? "▲" : "▼"}
+                          </button>
+                        )}
+                        <div style={{ fontWeight:700, minWidth:"40px", textAlign:"right", color:pctColor(s.pct) }}>{s.pct}%</div>
+                      </div>
+                      {isExpanded && log.length > 0 && (
+                        <div style={{ background:"#fff8f0", borderTop:`1px solid #ffe0b2`, padding:"0.4rem 1rem 0.6rem 2rem" }}>
+                          {log.map((entry, j) => (
+                            <div key={j} style={{ display:"flex", gap:"0.75rem", alignItems:"baseline", padding:"3px 0", fontSize:"0.68rem", borderBottom:"1px solid rgba(0,0,0,.04)" }}>
+                              <span style={{ color:T.textSecondary, minWidth:"70px" }}>{fmtLocalTime(entry.time)}</span>
+                              <span style={{ fontWeight:600, color:"#7b2d00", minWidth:"90px" }}>{violationType(entry.reason)}</span>
+                              <span style={{ color:T.textSecondary }}>Q{entry.questionNum}</span>
+                              {entry.returned && <span style={{ color:"#555", marginLeft:"auto" }}>{fmtDuration(entry.time, entry.returned)}</span>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {isExpanded && log.length === 0 && (
+                        <div style={{ background:"#fff8f0", borderTop:`1px solid #ffe0b2`, padding:"0.4rem 1rem", fontSize:"0.68rem", color:T.textSecondary }}>
+                          No detailed log available for this session.
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
