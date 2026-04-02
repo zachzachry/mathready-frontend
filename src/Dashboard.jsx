@@ -321,7 +321,7 @@ export default function Dashboard({ teacher, readOnly }) {
     setReviewData(null);
     setReviewNotFound(false);
     try {
-      const classFilter = teacher?.classIds?.length ? `&classId=${teacher.classIds[0]}` : "";
+      const classFilter = teacher?.classIds?.length ? `&classIds=${teacher.classIds.join(",")}` : "";
       const r = await fetch(`${API}/test/review/${encodeURIComponent(code)}?_=${Date.now()}${classFilter}`);
       if (r.ok) setReviewData(await r.json());
       else if (r.status === 404) setReviewNotFound(true);
