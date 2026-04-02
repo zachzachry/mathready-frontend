@@ -395,7 +395,11 @@ export default function Dashboard({ teacher, readOnly }) {
   }, [refresh, refreshSessions]);
 
   async function handleSaveRegrade(q) {
-    if (!pendingCorrect || pendingCorrect === q.correct) return;
+    const isMulti = q.type === "multiselect";
+    const hasChanged = isMulti
+      ? JSON.stringify([...(Array.isArray(pendingCorrect)?pendingCorrect:[])].sort()) !== JSON.stringify([...(Array.isArray(q.answer)?q.answer:[])].sort())
+      : pendingCorrect && pendingCorrect !== q.correct;
+    if (!hasChanged) return;
     setRegradeLoading(true);
     setRegradeModalError("");
     setRegradeResult(null);
@@ -412,7 +416,10 @@ export default function Dashboard({ teacher, readOnly }) {
         return;
       }
       const data = await r.json();
-      setBankQ(prev => prev.map(bq => bq.id === q.id ? { ...bq, correct: pendingCorrect } : bq));
+      setBankQ(prev => prev.map(bq => bq.id === q.id
+        ? { ...bq, correct: pendingCorrect, ...(isMulti ? { answer: pendingCorrect } : {}) }
+        : bq
+      ));
       setRegradeResult({ questionId: q.id, updatedSessions: data.updated_sessions });
       setTimeout(() => setRegradeResult(null), 5000);
       setRegradeModalQ(null);
@@ -892,11 +899,11 @@ export default function Dashboard({ teacher, readOnly }) {
                         </div>
                       ))}
                     </div>
-                    {q.type==="mcq" && q.choices?.length>0 && (
+                    {(q.type==="mcq"||q.type==="multiselect") && q.choices?.length>0 && (
                       <div style={{marginTop:"0.75rem",paddingTop:"0.65rem",borderTop:`1px solid ${T.surfaceAlt}`}}>
                         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"0.45rem"}}>
                           <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary}}>ANSWER CHOICES</div>
-                          <button onClick={e=>{e.stopPropagation();setPendingCorrect(q.correct);setRegradeModalError("");setRegradeModalQ(q);}}
+                          <button onClick={e=>{e.stopPropagation();setPendingCorrect(q.type==="multiselect"?(Array.isArray(q.answer)?[...q.answer]:[]):q.correct);setRegradeModalError("");setRegradeModalQ(q);}}
                             style={{fontSize:"0.68rem",fontWeight:700,background:T.midnight,color:T.white,border:"none",borderRadius:T.xs,padding:"4px 12px",cursor:"pointer"}}>
                             Correct the Answer
                           </button>
@@ -1703,58 +1710,85 @@ export default function Dashboard({ teacher, readOnly }) {
                   style={{maxWidth:"100%",maxHeight:"180px",marginTop:"0.75rem",borderRadius:T.xs,border:`1px solid ${T.border}`,display:"block"}}/>
               )}
             </div>
-            <div style={{padding:"1.1rem 1.5rem",display:"flex",flexDirection:"column",gap:"0.6rem"}}>
-              <div style={{fontSize:"0.7rem",fontWeight:700,color:T.textSecondary,letterSpacing:"0.08em",marginBottom:"0.1rem"}}>TAP THE CORRECT ANSWER</div>
-              {(regradeModalQ.choices||[]).map((ch,ci)=>{
-                const ltr=["A","B","C","D"][ci]||String(ci+1);
-                const isSelected=String(ch)===String(pendingCorrect);
-                return (
-                  <button key={ci} onClick={()=>!regradeLoading&&setPendingCorrect(ch)}
-                    style={{display:"flex",alignItems:"center",gap:"1rem",padding:"0.9rem 1.1rem",width:"100%",textAlign:"left",
-                      background:isSelected?T.success:"#f8fafc",
-                      border:isSelected?`2px solid ${T.success}`:`2px solid ${T.border}`,
-                      borderRadius:T.r,cursor:regradeLoading?"default":"pointer",
-                      transition:"all .12s",boxShadow:isSelected?"0 2px 8px rgba(16,185,129,.25)":"none"}}>
-                    <div style={{width:"32px",height:"32px",borderRadius:T.xs,flexShrink:0,
-                      background:isSelected?"rgba(255,255,255,.25)":"#e2e8f0",
-                      display:"flex",alignItems:"center",justifyContent:"center",
-                      fontSize:"0.9rem",fontWeight:900,color:isSelected?T.white:T.textSecondary}}>
-                      {ltr}
+            {(() => {
+              const isMulti = regradeModalQ.type === "multiselect";
+              const pendingArr = isMulti ? (Array.isArray(pendingCorrect) ? pendingCorrect : []) : null;
+              const originalArr = isMulti ? (Array.isArray(regradeModalQ.answer) ? regradeModalQ.answer : []) : null;
+              const hasChanged = isMulti
+                ? JSON.stringify([...(pendingArr||[])].sort()) !== JSON.stringify([...(originalArr||[])].sort())
+                : pendingCorrect && pendingCorrect !== regradeModalQ.correct;
+              const isReady = isMulti ? (pendingArr?.length > 0 && hasChanged) : (pendingCorrect && hasChanged);
+              return (
+                <>
+                  <div style={{padding:"1.1rem 1.5rem",display:"flex",flexDirection:"column",gap:"0.6rem"}}>
+                    <div style={{fontSize:"0.7rem",fontWeight:700,color:T.textSecondary,letterSpacing:"0.08em",marginBottom:"0.1rem"}}>
+                      {isMulti ? "TAP ALL CORRECT ANSWERS" : "TAP THE CORRECT ANSWER"}
                     </div>
-                    <div style={{flex:1,fontSize:"0.95rem",color:isSelected?T.white:T.text,fontWeight:isSelected?700:500,lineHeight:1.4}}>
-                      <MathText text={ch}/>
+                    {isMulti && <div style={{fontSize:"0.75rem",color:T.textMuted,marginBottom:"0.2rem"}}>Select every answer that is correct.</div>}
+                    {(regradeModalQ.choices||[]).map((ch,ci)=>{
+                      const ltr=["A","B","C","D"][ci]||String(ci+1);
+                      const isSelected = isMulti
+                        ? (pendingArr||[]).includes(ch)
+                        : String(ch)===String(pendingCorrect);
+                      return (
+                        <button key={ci} onClick={()=>{
+                          if (regradeLoading) return;
+                          if (isMulti) {
+                            const cur = Array.isArray(pendingCorrect) ? [...pendingCorrect] : [];
+                            setPendingCorrect(cur.includes(ch) ? cur.filter(x=>x!==ch) : [...cur, ch]);
+                          } else {
+                            setPendingCorrect(ch);
+                          }
+                        }}
+                          style={{display:"flex",alignItems:"center",gap:"1rem",padding:"0.9rem 1.1rem",width:"100%",textAlign:"left",
+                            background:isSelected?T.success:"#f8fafc",
+                            border:isSelected?`2px solid ${T.success}`:`2px solid ${T.border}`,
+                            borderRadius:T.r,cursor:regradeLoading?"default":"pointer",
+                            transition:"all .12s",boxShadow:isSelected?"0 2px 8px rgba(16,185,129,.25)":"none"}}>
+                          <div style={{width:"32px",height:"32px",borderRadius:isMulti?"4px":T.xs,flexShrink:0,
+                            background:isSelected?"rgba(255,255,255,.25)":"#e2e8f0",
+                            border:isMulti?(isSelected?`2px solid rgba(255,255,255,.6)`:`2px solid ${T.borderDark}`):"none",
+                            display:"flex",alignItems:"center",justifyContent:"center",
+                            fontSize:"0.9rem",fontWeight:900,color:isSelected?T.white:T.textSecondary}}>
+                            {ltr}
+                          </div>
+                          <div style={{flex:1,fontSize:"0.95rem",color:isSelected?T.white:T.text,fontWeight:isSelected?700:500,lineHeight:1.4}}>
+                            <MathText text={ch}/>
+                          </div>
+                          {isSelected&&<span style={{fontSize:"1.1rem",flexShrink:0}}>✓</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {hasChanged && (
+                    <div style={{margin:"0 1.5rem",padding:"0.85rem 1rem",background:"#fffbeb",border:"1px solid #fcd34d",borderRadius:T.xs,fontSize:"0.88rem",color:"#92400e",lineHeight:1.5}}>
+                      ⚠️ This will update the grades of <strong>{regradeModalQ.attempted} student{regradeModalQ.attempted!==1?"s":""}</strong> who took this question.
                     </div>
-                    {isSelected&&<span style={{fontSize:"1.1rem",flexShrink:0}}>✓</span>}
-                  </button>
-                );
-              })}
-            </div>
-            {pendingCorrect && pendingCorrect!==regradeModalQ.correct && (
-              <div style={{margin:"0 1.5rem",padding:"0.85rem 1rem",background:"#fffbeb",border:"1px solid #fcd34d",borderRadius:T.xs,fontSize:"0.88rem",color:"#92400e",lineHeight:1.5}}>
-                ⚠️ This will update the grades of <strong>{regradeModalQ.attempted} student{regradeModalQ.attempted!==1?"s":""}</strong> who took this question.
-              </div>
-            )}
-            {regradeModalError && (
-              <div style={{margin:"0.75rem 1.5rem 0",padding:"0.75rem 1rem",background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:T.xs,fontSize:"0.88rem",fontWeight:600,color:T.dangerText}}>
-                ⚠ {regradeModalError}
-              </div>
-            )}
-            <div style={{padding:"1.1rem 1.5rem",marginTop:"0.5rem",borderTop:`1px solid ${T.border}`}}>
-              <button disabled={regradeLoading||!pendingCorrect||pendingCorrect===regradeModalQ.correct}
-                onClick={()=>handleSaveRegrade(regradeModalQ)}
-                style={{width:"100%",background:T.success,border:"none",borderRadius:T.r,
-                  padding:"1rem",fontSize:"1rem",fontWeight:800,
-                  cursor:(regradeLoading||!pendingCorrect||pendingCorrect===regradeModalQ.correct)?"default":"pointer",
-                  color:T.white,opacity:(regradeLoading||!pendingCorrect||pendingCorrect===regradeModalQ.correct)?0.4:1,
-                  transition:"opacity .15s"}}>
-                {regradeLoading ? "Saving…" : "✓  Save Correction & Update Student Grades"}
-              </button>
-              {(!pendingCorrect||pendingCorrect===regradeModalQ.correct) && (
-                <div style={{textAlign:"center",fontSize:"0.78rem",color:T.textMuted,marginTop:"0.6rem"}}>
-                  Tap an answer above to continue.
-                </div>
-              )}
-            </div>
+                  )}
+                  {regradeModalError && (
+                    <div style={{margin:"0.75rem 1.5rem 0",padding:"0.75rem 1rem",background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:T.xs,fontSize:"0.88rem",fontWeight:600,color:T.dangerText}}>
+                      ⚠ {regradeModalError}
+                    </div>
+                  )}
+                  <div style={{padding:"1.1rem 1.5rem",marginTop:"0.5rem",borderTop:`1px solid ${T.border}`}}>
+                    <button disabled={regradeLoading||!isReady}
+                      onClick={()=>handleSaveRegrade(regradeModalQ)}
+                      style={{width:"100%",background:T.success,border:"none",borderRadius:T.r,
+                        padding:"1rem",fontSize:"1rem",fontWeight:800,
+                        cursor:(regradeLoading||!isReady)?"default":"pointer",
+                        color:T.white,opacity:(regradeLoading||!isReady)?0.4:1,
+                        transition:"opacity .15s"}}>
+                      {regradeLoading ? "Saving…" : "✓  Save Correction & Update Student Grades"}
+                    </button>
+                    {!isReady && !regradeLoading && (
+                      <div style={{textAlign:"center",fontSize:"0.78rem",color:T.textMuted,marginTop:"0.6rem"}}>
+                        {isMulti ? "Select at least one answer above to continue." : "Tap an answer above to continue."}
+                      </div>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}
