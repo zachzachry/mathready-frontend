@@ -1924,14 +1924,13 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
         </div>
       }/>
 
-      <div style={{background:"#004e94",color:"#cce0f5",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 0.75rem",height:"30px",flexShrink:0,fontSize:"0.8rem"}}>
-        <div style={{display:"flex",gap:"0.75rem",alignItems:"center"}}>
-          <button onClick={()=>setNav(o=>!o)} style={{background:"none",border:"none",color:"#cce0f5",cursor:"pointer",fontSize:"0.7rem",padding:0}}>{nav?"◀ Hide":"▶ Nav"}</button>
-          <span style={{opacity:.5}}>|</span>
-          <span>{ansCount}/{TOTAL} answered</span>
-          {flgCount>0&&<><span style={{opacity:.5}}>|</span><span style={{color:T.warningBd}}>🚩{flgCount}</span></>}
+      <div style={{background:"#1b3455",color:"#c8dff0",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 0.85rem",height:"34px",flexShrink:0,fontSize:"0.72rem",borderBottom:"1px solid #2a4870"}}>
+        <div style={{display:"flex",gap:"0.6rem",alignItems:"center"}}>
+          <button onClick={()=>setNav(o=>!o)} style={{background:"none",border:"1px solid rgba(255,255,255,0.18)",borderRadius:"3px",color:"#c8dff0",cursor:"pointer",fontSize:"0.65rem",padding:"2px 7px",letterSpacing:"0.05em"}}>{nav?"◀ Collapse":"▶ Nav"}</button>
+          <span style={{opacity:.3}}>|</span>
+          <span style={{opacity:.75}}>Question {cur+1} <span style={{opacity:.5}}>of</span> {TOTAL}</span>
         </div>
-        <span style={{opacity:.65,fontSize:"0.78rem"}}>No Calculator</span>
+        <span style={{opacity:.55,letterSpacing:"0.06em",fontSize:"0.65rem"}}>NO CALCULATOR</span>
       </div>
 
       <div style={{display:"flex",flex:1,overflow:"hidden"}}>
@@ -1967,26 +1966,18 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
         )}
 
         <div style={{flex:1,overflowY:"auto",padding:window.innerWidth>640?"1.25rem 1.75rem":"0.75rem",display:"flex",flexDirection:"column",gap:"0.75rem"}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <div style={{display:"flex",alignItems:"center",gap:"0.75rem"}}>
-              <span style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.midnight,background:"#ddeaf7",padding:"3px 8px",borderRadius:"2px",border:"1px solid #b3cde8"}}>{q.standard}</span>
-              <span style={{fontSize:"0.78rem",color:T.textSecondary}}>Question {cur+1} of {TOTAL}</span>
-            </div>
-            <button onClick={()=>setFlg(p=>({...p,[q.id]:!p[q.id]}))}
-              style={{display:"flex",alignItems:"center",gap:"5px",background:isFl?T.warningBg:"#f8f9fa",border:`1px solid ${isFl?"#ffc107":"#bcc8d4"}`,borderRadius:T.xs,padding:"5px 12px",cursor:"pointer",fontSize:"0.73rem",color:isFl?T.warning:T.textSecondary,fontWeight:isFl?700:400}}>
-              🚩 {isFl?"Flagged":"Flag for Review"}
-            </button>
+          <div style={{display:"flex",alignItems:"center",gap:"0.6rem"}}>
+            <span style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:T.midnight,background:"#ddeaf7",padding:"2px 7px",borderRadius:"2px",border:"1px solid #b3cde8"}}>{q.standard}</span>
+            {isFl&&<span style={{fontSize:"0.6rem",fontWeight:700,color:T.warning,background:T.warningBg,border:"1px solid #ffc107",borderRadius:"2px",padding:"2px 7px"}}>🚩 Flagged for Review</span>}
           </div>
-          <div style={{height:"1px",background:T.border}}/>
-          <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"1.25rem 1.5rem"}}>
-            <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"0.65rem"}}>QUESTION</div>
-            <p style={{fontSize:"1.05rem",fontFamily:"Georgia,serif",color:"#0f0f0f",lineHeight:1.72,margin:0}}><MathText text={q.question}/></p>
+          <div style={{background:T.white,borderTop:`3px solid ${T.midnight}`,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"1.1rem 1.4rem"}}>
+            <p style={{fontSize:"0.95rem",fontFamily:"Georgia,serif",color:"#0f0f0f",lineHeight:1.7,margin:0}}><MathText text={q.question}/></p>
             {q.questionImage&&q.type!=="hotspot"&&<img src={q.questionImage} alt="diagram" style={{maxWidth:"100%",maxHeight:"200px",marginTop:"0.75rem",borderRadius:T.xs,display:"block"}}/>}
           </div>
           <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"1.1rem 1.5rem"}}>
             {q.type === "plotpoint" ? (
               <>
-                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"0.9rem"}}>PLOT YOUR ANSWER</div>
+                <div style={{fontSize:"0.78rem",color:T.textSecondary,marginBottom:"0.65rem",fontStyle:"italic"}}>Plot your answer on the grid below.</div>
                 <div style={{display:"flex",justifyContent:"center"}}>
                   <PlotGrid
                     placed={sel ? (() => { try { return JSON.parse(sel); } catch { return null; } })() : null}
@@ -2001,7 +1992,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
               </>
             ) : q.type === "keypad" ? (
               <>
-                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"0.9rem"}}>TYPE YOUR ANSWER</div>
+                <div style={{fontSize:"0.78rem",color:T.textSecondary,marginBottom:"0.65rem",fontStyle:"italic"}}>Enter your answer in the box below.</div>
                 <div style={{display:"flex",flexDirection:"column",gap:"0.65rem",alignItems:"flex-start"}}>
                   <input
                     type="text" inputMode="decimal"
@@ -2038,8 +2029,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
               />
             ) : q.type === "multiselect" ? (
               <>
-                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"4px"}}>SELECT ALL CORRECT ANSWERS</div>
-                <div style={{fontSize:"0.7rem",color:T.textSecondary,marginBottom:"0.75rem"}}>Choose all that apply — there may be more than one correct answer.</div>
+                <div style={{fontSize:"0.78rem",color:T.textSecondary,marginBottom:"0.75rem",fontStyle:"italic"}}>Select all that apply.</div>
                 <div style={{display:"flex",flexDirection:"column",gap:"0.55rem"}}>
                   {(q.choices||[]).filter(c=>c).map((choice,i)=>{
                     const selArr = (() => { try { return sel ? JSON.parse(sel) : []; } catch { return []; } })();
@@ -2062,7 +2052,6 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
               </>
             ) : (
               <>
-                <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"0.9rem"}}>SELECT ONE ANSWER</div>
                 <div style={{display:"flex",flexDirection:"column",gap:"0.55rem"}}>
                   {(q.choices||[]).filter(c=>c).length === 0 ? (
                     <div style={{color:T.textSecondary,fontSize:"0.85rem",padding:"1rem",textAlign:"center",border:`1px dashed ${T.border}`,borderRadius:"4px"}}>
@@ -2085,18 +2074,53 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
         </div>
       </div>
 
-      <div style={{background:T.white,borderTop:`2px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0.65rem 1.5rem",flexShrink:0}}>
-        <button onClick={()=>setCur(c=>Math.max(0,c-1))} disabled={cur===0}
-          style={{background:cur===0?"#e8edf2":T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"7px 20px",fontSize:"0.83rem",cursor:cur===0?"not-allowed":"pointer",color:cur===0?T.textSecondary:"#333",fontWeight:600}}>◀ Back</button>
-        <div style={{display:"flex",gap:"0.75rem",alignItems:"center",fontSize:"0.75rem"}}>
-          <span style={{color:T.success,fontWeight:700}}>✓ {ansCount} answered</span>
-          {flgCount>0&&<span style={{color:T.warning,fontWeight:700}}>🚩 {flgCount} flagged</span>}
-          {TOTAL-ansCount>0&&<span style={{color:T.textSecondary}}>{TOTAL-ansCount} left</span>}
+      {/* ── Navigation toolbar — styled like a standardized test platform ── */}
+      <div style={{background:"#1b3455",borderTop:"1px solid #2a4870",display:"flex",alignItems:"center",padding:"0 0.75rem",height:"46px",flexShrink:0,gap:"4px"}}>
+        {/* Back arrow */}
+        <button onClick={()=>setCur(c=>Math.max(0,c-1))} disabled={cur===0} title="Back"
+          style={{width:"38px",height:"34px",border:`1px solid ${cur===0?"#2f4f6a":"#5a82a8"}`,borderRadius:"3px",background:cur===0?"transparent":"rgba(255,255,255,0.07)",color:cur===0?"#3a5570":"#c8dff0",cursor:cur===0?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.05rem",flexShrink:0,transition:"background .12s"}}>
+          ←
+        </button>
+        {/* Next arrow */}
+        <button onClick={()=>setCur(c=>Math.min(c+1,TOTAL-1))} disabled={cur===TOTAL-1} title="Next"
+          style={{width:"38px",height:"34px",border:`1px solid ${cur===TOTAL-1?"#2f4f6a":"#5a82a8"}`,borderRadius:"3px",background:cur===TOTAL-1?"transparent":T.midnight,color:cur===TOTAL-1?"#3a5570":"#c8dff0",cursor:cur===TOTAL-1?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.05rem",flexShrink:0,transition:"background .12s"}}>
+          →
+        </button>
+
+        {/* Divider */}
+        <div style={{width:"1px",height:"22px",background:"rgba(255,255,255,0.15)",margin:"0 4px",flexShrink:0}}/>
+
+        {/* Flag for Review */}
+        <button onClick={()=>setFlg(p=>({...p,[q.id]:!p[q.id]}))} title={isFl?"Remove Flag":"Flag for Review"}
+          style={{width:"38px",height:"34px",border:`1px solid ${isFl?"#fbbf24":"rgba(255,255,255,0.18)"}`,borderRadius:"3px",background:isFl?"rgba(251,191,36,0.18)":"transparent",color:isFl?"#fbbf24":"rgba(255,255,255,0.5)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.9rem",flexShrink:0}}>
+          ⚑
+        </button>
+
+        {/* Divider */}
+        <div style={{width:"1px",height:"22px",background:"rgba(255,255,255,0.15)",margin:"0 4px",flexShrink:0}}/>
+
+        {/* Status counts */}
+        <div style={{display:"flex",gap:"0.65rem",alignItems:"center",fontSize:"0.7rem"}}>
+          <span style={{color:"#86efac",fontWeight:600}}>✓ {ansCount}</span>
+          {flgCount>0&&<span style={{color:"#fbbf24",fontWeight:600}}>⚑ {flgCount}</span>}
+          <span style={{color:"rgba(255,255,255,0.35)"}}>/{TOTAL}</span>
         </div>
-        {cur<TOTAL-1
-          ?<button onClick={()=>setCur(c=>c+1)} style={{background:T.midnight,border:"none",borderRadius:T.xs,padding:"7px 20px",fontSize:"0.83rem",cursor:"pointer",color:T.white,fontWeight:600}}>Next ▶</button>
-          :<button onClick={()=>setModal(true)} style={{background:T.success,border:"none",borderRadius:T.xs,padding:"7px 20px",fontSize:"0.83rem",cursor:"pointer",color:T.white,fontWeight:700}}>Submit Test ✓</button>
-        }
+
+        {/* Submit button — right side, only on last question */}
+        <div style={{marginLeft:"auto",display:"flex",gap:"0.5rem",alignItems:"center"}}>
+          {cur===TOTAL-1&&(
+            <button onClick={()=>setModal(true)}
+              style={{background:T.success,border:"none",borderRadius:"3px",padding:"6px 18px",color:T.white,fontSize:"0.78rem",fontWeight:700,cursor:"pointer",letterSpacing:"0.03em"}}>
+              Submit ✓
+            </button>
+          )}
+          {cur<TOTAL-1&&(
+            <button onClick={()=>setModal(true)}
+              style={{background:"transparent",border:"1px solid rgba(255,255,255,0.2)",borderRadius:"3px",padding:"4px 10px",color:"rgba(255,255,255,0.4)",fontSize:"0.65rem",cursor:"pointer"}}>
+              End Test
+            </button>
+          )}
+        </div>
       </div>
 
       {modal&&(
