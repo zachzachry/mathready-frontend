@@ -40,7 +40,11 @@ function gradeAnswer(q, ans) {
 
 function formatStudentAnswer(q, ans) {
   if (ans === undefined || ans === null) return { text: "—", label: null };
-  if (!q) return { text: String(ans), label: null };
+  if (!q) {
+    // Try to detect JSON blob and show nicely
+    try { const p = JSON.parse(ans); if (Array.isArray(p) && p.length && typeof p[0] === "object") return { text: "Response recorded", label: null }; } catch {}
+    return { text: String(ans), label: null };
+  }
 
   if (q.type === "multiselect") {
     try {
@@ -54,10 +58,22 @@ function formatStudentAnswer(q, ans) {
   }
   if (q.type === "keypad") return { text: String(ans), label: null };
   if (q.type === "plotpoint") {
-    try { const parsed = JSON.parse(ans); return { text: `(${parsed.join(", ")})`, label: null }; }
-    catch { return { text: String(ans), label: null }; }
+    try {
+      const parsed = JSON.parse(ans);
+      if (Array.isArray(parsed) && parsed.length === 2 && typeof parsed[0] === "number") {
+        return { text: `(${parsed[0]}, ${parsed[1]})`, label: null };
+      }
+      return { text: "Point plotted", label: null };
+    } catch { return { text: "Point plotted", label: null }; }
   }
-  if (q.type === "dragdrop") return { text: "Drag & drop response", label: null };
+  if (q.type === "hotspot") {
+    try {
+      const pts = JSON.parse(ans);
+      if (Array.isArray(pts) && pts.length) return { text: `${pts.length} point${pts.length!==1?"s":""} placed`, label: null };
+    } catch {}
+    return { text: "Response recorded", label: null };
+  }
+  if (q.type === "dragdrop") return { text: "Items arranged", label: null };
 
   // MCQ — find index in choices
   const idx = (q.choices||[]).indexOf(ans);
@@ -78,9 +94,11 @@ function formatCorrectAnswer(q) {
   if (q.type === "plotpoint") {
     try {
       const a = Array.isArray(q.answer) ? q.answer : JSON.parse(q.answer);
-      return `(${a.join(", ")})`;
-    } catch { return String(q.answer ?? "—"); }
+      if (Array.isArray(a) && a.length === 2 && typeof a[0] === "number") return `(${a[0]}, ${a[1]})`;
+    } catch {}
+    return "Correct position on grid";
   }
+  if (q.type === "hotspot") return "Correct placement on image";
   if (q.type === "dragdrop") return "See key";
   // MCQ
   const idx = (q.choices||[]).indexOf(q.correct);
@@ -156,7 +174,10 @@ export default function StudentQuestionReport({ session, bankQ, teacherName, onC
     const ans = (session.answers || {})[qId];
     const qt = qtMap[qId];
     const isAnswered = ans !== undefined && ans !== null;
-    const isCorrect = isAnswered ? gradeAnswer(q, ans) : false;
+    // Prefer qt.correct (computed at submission time) over local regrade
+    const isCorrect = isAnswered
+      ? (qt?.correct !== undefined ? Boolean(qt.correct) : gradeAnswer(q, ans))
+      : false;
     const studentAns = formatStudentAnswer(q, ans);
     const correctAns = q ? formatCorrectAnswer(q) : "—";
     const timeSecs = qt?.timeSecs ?? null;
@@ -164,8 +185,14 @@ export default function StudentQuestionReport({ session, bankQ, teacherName, onC
     return { idx, qId, q, ans, isAnswered, isCorrect, studentAns, correctAns, timeSecs, qt };
   });
 
-  const correctCount = rows.filter(r => r.isCorrect).length;
+  // Use stored session.score/session.total as authoritative; fall back to local count
+  const storedScore = session.score ?? null;
+  const storedTotal = session.total ?? rows.length;
+  const correctCount = storedScore !== null ? storedScore : rows.filter(r => r.isCorrect).length;
   const skippedCount = rows.filter(r => !r.isAnswered).length;
+  const wrongCount = storedScore !== null
+    ? storedTotal - storedScore - skippedCount
+    : rows.length - correctCount - skippedCount;
 
   return (
     <div
@@ -203,10 +230,10 @@ export default function StudentQuestionReport({ session, bankQ, teacherName, onC
         {/* Summary bar */}
         <div style={{ background:T.surfaceAlt, borderBottom:`1px solid ${T.border}`, padding:"0.6rem 1.5rem", display:"flex", gap:"1.5rem", flexShrink:0 }}>
           {[
-            ["Correct",  correctCount,              T.success],
-            ["Wrong",    rows.length - correctCount - skippedCount, T.dangerText],
-            ["Skipped",  skippedCount,              T.textSecondary],
-            ["Total",    rows.length,               T.midnight],
+            ["Correct",  correctCount,    T.success],
+            ["Wrong",    wrongCount,      T.dangerText],
+            ["Skipped",  skippedCount,    T.textSecondary],
+            ["Total",    storedTotal,     T.midnight],
           ].map(([lbl, val, c]) => (
             <div key={lbl} style={{ textAlign:"center" }}>
               <div style={{ fontSize:"1.1rem", fontWeight:700, color:c }}>{val}</div>
