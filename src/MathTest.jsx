@@ -217,6 +217,7 @@ function DragDropAnswer({ zones=[], items=[], value, onChange, revealed, correct
 export function HotspotAnswer({ questionImage, snapPoints=[], assets=[], assetType="tile", assetReuse=true, assetSize="md", value, onChange, revealed, answer }) {
   const isDot = assetType === "dot" || assetType === "pin";
   const imgContainerRef = useRef(null);
+  const [snapFlash, setSnapFlash] = useState(false);
 
   // All placements stored as [ {x, y, val} ] — val is "●" for dots, the tile value for tiles
   const placements = (() => {
@@ -263,10 +264,17 @@ export function HotspotAnswer({ questionImage, snapPoints=[], assets=[], assetTy
       const img = imgContainerRef.current?.querySelector("img");
       if (!img) { setDragState(null); return; }
       const rect = img.getBoundingClientRect();
-      const x = Math.round(((fx - rect.left) / rect.width) * 1000) / 10;
-      const y = Math.round(((fy - rect.top) / rect.height) * 1000) / 10;
+      let x = Math.round(((fx - rect.left) / rect.width) * 1000) / 10;
+      let y = Math.round(((fy - rect.top) / rect.height) * 1000) / 10;
       setDragState(null);
       if (x < 0 || x > 100 || y < 0 || y > 100) return;
+      // Snap to nearest snap point within 15% — generous for young students on touch
+      const SNAP_R = 15;
+      if (snapPoints?.length) {
+        let best = null, bestD = Infinity;
+        snapPoints.forEach(sp => { const d = Math.sqrt((sp.x-x)**2+(sp.y-y)**2); if (d < bestD) { bestD = d; best = sp; } });
+        if (best && bestD <= SNAP_R) { x = best.x; y = best.y; setSnapFlash(true); setTimeout(() => setSnapFlash(false), 400); }
+      }
       let next = [...pts];
       // For dots: replace oldest if at max; for tiles with reuse: replace oldest if at max
       if (isDot) {
@@ -294,7 +302,7 @@ export function HotspotAnswer({ questionImage, snapPoints=[], assets=[], assetTy
 
   // ── Grading helpers ──
   const correctMap = answer || {};
-  const TOLERANCE = 2.5; // % of image — how close a placed item must be
+  const TOLERANCE = 8; // % of image — generous for touch/tablet use by young students
 
   function pointResult(pt) {
     if (!revealed) return null;
@@ -340,6 +348,7 @@ export function HotspotAnswer({ questionImage, snapPoints=[], assets=[], assetTy
 
   return (
     <div>
+      <style>{`@keyframes snapPulse{0%{transform:scale(1)}50%{transform:scale(1.5)}100%{transform:scale(1)}}`}</style>
       <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"0.5rem"}}>
         {pts.length < maxItems
           ? `DRAG ${isDot ? "THE DOT" : "A VALUE"} ONTO THE IMAGE (${pts.length}/${maxItems})`
@@ -355,6 +364,7 @@ export function HotspotAnswer({ questionImage, snapPoints=[], assets=[], assetTy
           const res = pointResult(pt);
           const isRight = res === "correct";
           const isWrong = res === "wrong";
+          const isLatest = i === pts.length - 1;
           return (
             <div key={i}
               onClick={() => removePoint(i)}
@@ -363,7 +373,7 @@ export function HotspotAnswer({ questionImage, snapPoints=[], assets=[], assetTy
                 transform:"translate(-50%,-50%)", zIndex:3,
                 cursor: revealed ? "default" : "pointer",
               }}>
-              <span style={chipStyle(pt.val, true, isRight, isWrong)}>
+              <span style={{...chipStyle(pt.val, true, isRight, isWrong), animation: isLatest && snapFlash ? "snapPulse 0.35s ease-out" : undefined}}>
                 {isDot ? "●" : pt.val}
               </span>
             </div>
@@ -1510,7 +1520,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
       try {
         const g = JSON.parse(given); const c = q.answer || {};
         const sps = q.snapPoints || []; const correctSps = sps.filter(sp => c[sp.id]);
-        const isDot = q.assetType === "dot" || q.assetType === "pin"; const TOL = 2.5;
+        const isDot = q.assetType === "dot" || q.assetType === "pin"; const TOL = 8;
         if (!Array.isArray(g) || g.length !== correctSps.length) return false;
         const matched = correctSps.filter(sp => g.some(pt => {
           const d = Math.sqrt((sp.x-pt.x)**2+(sp.y-pt.y)**2);
@@ -1776,7 +1786,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
       try {
         const g = JSON.parse(given); const c = q.answer || {};
         const sps = q.snapPoints || []; const correctSps = sps.filter(sp => c[sp.id]);
-        const isDot = q.assetType === "dot" || q.assetType === "pin"; const TOL = 2.5;
+        const isDot = q.assetType === "dot" || q.assetType === "pin"; const TOL = 8;
         if (!Array.isArray(g) || g.length !== correctSps.length) return false;
         const matched = correctSps.filter(sp => g.some(pt => {
           const d = Math.sqrt((sp.x-pt.x)**2+(sp.y-pt.y)**2);

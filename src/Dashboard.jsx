@@ -524,6 +524,7 @@ export default function Dashboard({ teacher, readOnly }) {
     if (q.type === "keypad") return String(q.answer??"").trim().toLowerCase() === String(ans).trim().toLowerCase();
     if (q.type === "plotpoint") { try { return ans === JSON.stringify(Array.isArray(q.answer)?q.answer:JSON.parse(q.answer)); } catch { return false; } }
     if (q.type === "dragdrop") { try { const g=JSON.parse(ans); const cm=q.correct||q.answer||{}; return (q.items||[]).every(item=>{const c=cm[item]; if(c==="distractor") return g[item]===undefined; return g[item]===c;}); } catch { return false; } }
+    if (q.type === "hotspot") { try { const g=Array.isArray(ans)?ans:JSON.parse(ans); const c=q.answer||{}; const sps=q.snapPoints||[]; const correctSps=sps.filter(sp=>c[sp.id]); const isDot=q.assetType==="dot"||q.assetType==="pin"; const TOL=8; if(!Array.isArray(g)||g.length!==correctSps.length) return false; return correctSps.every(sp=>g.some(pt=>{const d=Math.sqrt((sp.x-pt.x)**2+(sp.y-pt.y)**2); return d<=TOL&&(isDot||pt.val===c[sp.id]);})); } catch { return false; } }
     // MCQ: compare by choice index (robust against encoding/whitespace differences)
     const correctVal = q.correct ?? q.answer;
     const choices = q.choices || [];

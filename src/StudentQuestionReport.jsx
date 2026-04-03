@@ -35,6 +35,21 @@ function gradeAnswer(q, ans) {
       });
     } catch { return false; }
   }
+  if (q.type === "hotspot") {
+    try {
+      const g = Array.isArray(ans) ? ans : JSON.parse(ans);
+      const c = q.answer || {};
+      const sps = q.snapPoints || []; const correctSps = sps.filter(sp => c[sp.id]);
+      if (!correctSps.length) return null; // not configured — caller falls back to qt.correct
+      const isDot = q.assetType === "dot" || q.assetType === "pin"; const TOL = 8;
+      if (!Array.isArray(g) || g.length !== correctSps.length) return false;
+      const matched = correctSps.filter(sp => g.some(pt => {
+        const d = Math.sqrt((sp.x-pt.x)**2+(sp.y-pt.y)**2);
+        return d <= TOL && (isDot || pt.val === c[sp.id]);
+      }));
+      return matched.length === correctSps.length;
+    } catch { return false; }
+  }
   // MCQ: compare by choice index (robust against encoding/whitespace differences
   // between stored answer and current bank value)
   const correctVal = q.correct ?? q.answer;
@@ -182,9 +197,11 @@ export default function StudentQuestionReport({ session, bankQ, teacherName, onC
     const qt = qtMap[qId];
     const isAnswered = ans !== undefined && ans !== null;
     // Regrade against current bank when question exists (authoritative).
-    // Fall back to qt.correct only when question has been deleted from bank.
+    // gradeAnswer returns null when question can't be graded (e.g. unconfigured hotspot)
+    // — fall back to qt.correct in that case.
+    const grade = q ? gradeAnswer(q, ans) : null;
     const isCorrect = isAnswered
-      ? (q ? gradeAnswer(q, ans) : (qt?.correct !== undefined ? Boolean(qt.correct) : false))
+      ? (grade !== null ? Boolean(grade) : (qt?.correct !== undefined ? Boolean(qt.correct) : false))
       : false;
     const studentAns = formatStudentAnswer(q, ans);
     const correctAns = q ? formatCorrectAnswer(q) : "—";
