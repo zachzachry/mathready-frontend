@@ -325,7 +325,7 @@ export default function StudentQuestionReport({ session, bankQ, teacherName, onC
                                     {LETTERS[idx2]}
                                   </span>
                                 )}
-                                {correctAns}
+                                {idx2 >= 0 ? q.correct : correctAns}
                               </>
                             );
                           })()}
