@@ -230,7 +230,7 @@ export default function StudentQuestionReport({ session, bankQ, teacherName, onC
             ["Correct",  correctCount,    T.success],
             ["Wrong",    wrongCount,      T.dangerText],
             ["Skipped",  skippedCount,    T.textSecondary],
-            ["Total",    storedTotal,     T.midnight],
+            ["Total",    rows.length,     T.midnight],
           ].map(([lbl, val, c]) => (
             <div key={lbl} style={{ textAlign:"center" }}>
               <div style={{ fontSize:"1.1rem", fontWeight:700, color:c }}>{val}</div>
