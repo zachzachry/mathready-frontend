@@ -644,7 +644,10 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
     return (
     <div style={{...S.page,background:"linear-gradient(155deg,#0d1b2a 0%,#0f2d4a 55%,#133a5e 100%)"}}>
       <div style={{background:"rgba(0,0,0,.25)",width:"100%",padding:"0.75rem 2rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
-        <button onClick={()=>{setStep("google");setErr("");}} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:T.white,borderRadius:T.xs,padding:"6px 14px",cursor:"pointer",fontSize:"0.8rem"}}>← Sign Out</button>
+        {impersonateStudent
+          ? <button onClick={onBack} style={{background:"rgba(124,58,237,.5)",border:"1px solid rgba(167,139,250,.5)",color:T.white,borderRadius:T.xs,padding:"6px 14px",cursor:"pointer",fontSize:"0.8rem",fontWeight:700}}>← Teacher View</button>
+          : <button onClick={()=>{setStep("google");setErr("");}} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:T.white,borderRadius:T.xs,padding:"6px 14px",cursor:"pointer",fontSize:"0.8rem"}}>← Sign Out</button>
+        }
         <div style={{flex:1,color:T.white,fontSize:"0.95rem",fontWeight:700}}>MathReady</div>
         {student && <div style={{color:"rgba(255,255,255,.7)",fontSize:"0.82rem"}}>{student.name}</div>}
       </div>
@@ -1394,7 +1397,7 @@ function normalizeQuestion(q) {
   return { ...q, type, answer };
 }
 
-function StudentTest({ studentName, studentId, testCode, questions: initialQuestions, adaptive, onFinish, untimed=false, timeLimitSecs=1800, warnSecs=300 }) {
+function StudentTest({ studentName, studentId, testCode, questions: initialQuestions, adaptive, onFinish, untimed=false, timeLimitSecs=1800, warnSecs=300, onReturnToTeacher=null }) {
   // ── Session persistence key ──
   const sessionKey = testCode && studentId ? `mathready_test_${testCode}_${studentId}` : null;
 
@@ -1812,7 +1815,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
   }
 
   return (
-    <div ref={containerRef} style={{display:"flex",flexDirection:"column",height:"100vh",fontFamily:T.font,background:"#e8edf2",overflow:"hidden",userSelect:"none",WebkitUserSelect:"none"}}>
+    <div ref={containerRef} style={{display:"flex",flexDirection:"column",height:"100vh",fontFamily:T.font,background:"linear-gradient(155deg,#0d1b2a 0%,#0f2d4a 55%,#133a5e 100%)",overflow:"hidden",userSelect:"none",WebkitUserSelect:"none"}}>
 
       {/* Teacher stopped the test */}
       {stopped && (
@@ -1924,6 +1927,17 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
         </div>
       }/>
 
+      {/* Teacher preview banner */}
+      {onReturnToTeacher && (
+        <div style={{background:"#7c3aed",color:"#fff",padding:"5px 1rem",display:"flex",alignItems:"center",justifyContent:"space-between",fontSize:"0.7rem",flexShrink:0,gap:"0.5rem"}}>
+          <span style={{opacity:.85}}>👁 Teacher Preview — answers will not be recorded</span>
+          <button onClick={onReturnToTeacher}
+            style={{background:"rgba(255,255,255,.2)",border:"1px solid rgba(255,255,255,.35)",color:"#fff",borderRadius:"3px",padding:"3px 10px",cursor:"pointer",fontWeight:700,fontSize:"0.7rem",whiteSpace:"nowrap"}}>
+            ← Teacher View
+          </button>
+        </div>
+      )}
+
       <div style={{background:"#1b3455",color:"#c8dff0",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 0.85rem",height:"34px",flexShrink:0,fontSize:"0.72rem",borderBottom:"1px solid #2a4870"}}>
         <div style={{display:"flex",gap:"0.6rem",alignItems:"center"}}>
           <button onClick={()=>setNav(o=>!o)} style={{background:"none",border:"1px solid rgba(255,255,255,0.18)",borderRadius:"3px",color:"#c8dff0",cursor:"pointer",fontSize:"0.65rem",padding:"2px 7px",letterSpacing:"0.05em"}}>{nav?"◀ Collapse":"▶ Nav"}</button>
@@ -1935,29 +1949,29 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
 
       <div style={{display:"flex",flex:1,overflow:"hidden"}}>
         {nav&&(
-          <div style={{width:"156px",background:T.white,borderRight:`1px solid ${T.border}`,display:"flex",flexDirection:"column",flexShrink:0,overflowY:"auto"}}>
-            <div style={{padding:"0.65rem 0.9rem",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.14em",color:T.textSecondary}}>QUESTIONS</div>
+          <div style={{width:"156px",background:"rgba(0,0,0,0.3)",borderRight:"1px solid rgba(255,255,255,0.1)",display:"flex",flexDirection:"column",flexShrink:0,overflowY:"auto"}}>
+            <div style={{padding:"0.65rem 0.9rem",background:"rgba(0,0,0,0.2)",borderBottom:"1px solid rgba(255,255,255,0.08)",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.14em",color:"rgba(255,255,255,0.45)"}}>QUESTIONS</div>
             <div style={{padding:"0.5rem",display:"flex",flexWrap:"wrap",gap:"4px"}}>
               {questions.map((item,i)=>{
                 const isAns=!!ans[item.id]; const isCur=i===cur; const isFg=!!flg[item.id];
-                let bg=T.surface, border="#bcc8d4", color="#445";
-                if (isCur)       { bg=T.midnight; border=T.midnight; color=T.white; }
-                else if (isFg)   { bg=T.warningBg; border="#ffc107"; color=T.warning; }
-                else if (isAns)  { bg="#d4edda"; border=T.success; color="#1a5c28"; }
+                let bg="rgba(255,255,255,0.05)", border="rgba(255,255,255,0.15)", color="rgba(255,255,255,0.5)";
+                if (isCur)       { bg="#1e4d8c"; border="#5b9bd5"; color="#fff"; }
+                else if (isFg)   { bg="rgba(251,191,36,0.15)"; border="#fbbf24"; color="#fbbf24"; }
+                else if (isAns)  { bg="rgba(52,211,153,0.15)"; border="#34d399"; color="#34d399"; }
                 return <button key={item.id} onClick={()=>setCur(i)}
                   style={{width:"44px",height:"44px",borderRadius:T.xs,border:`2px solid ${border}`,background:bg,color,fontSize:"0.75rem",fontWeight:700,cursor:"pointer",position:"relative",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  {isFg && !isCur ? <span style={{position:"absolute",top:"-4px",right:"-4px",fontSize:"0.55rem",lineHeight:1}}>🚩</span> : null}
+                  {isFg && !isCur ? <span style={{position:"absolute",top:"-4px",right:"-4px",fontSize:"0.55rem",lineHeight:1}}>⚑</span> : null}
                   {i+1}
                 </button>;
               })}
             </div>
-            <div style={{padding:"0.65rem 0.9rem",borderTop:`1px solid ${T.border}`,marginTop:"auto"}}>
+            <div style={{padding:"0.65rem 0.9rem",borderTop:"1px solid rgba(255,255,255,0.08)",marginTop:"auto"}}>
               {[
-                ["#d4edda",T.success,"Answered"],
-                [T.warningBg,"#ffc107","Flagged for Review"],
-                [T.surface,"#bcc8d4","Not Answered"],
+                ["rgba(52,211,153,0.15)","#34d399","Answered"],
+                ["rgba(251,191,36,0.15)","#fbbf24","Flagged"],
+                ["rgba(255,255,255,0.05)","rgba(255,255,255,0.15)","Not Answered"],
               ].map(([bg,bd,lbl])=>(
-                <div key={lbl} style={{display:"flex",alignItems:"center",gap:"6px",marginBottom:"4px",fontSize:"0.75rem",color:T.textSecondary}}>
+                <div key={lbl} style={{display:"flex",alignItems:"center",gap:"6px",marginBottom:"4px",fontSize:"0.72rem",color:"rgba(255,255,255,0.45)"}}>
                   <div style={{width:"13px",height:"13px",background:bg,border:`2px solid ${bd}`,borderRadius:"2px",flexShrink:0}}/>{lbl}
                 </div>
               ))}
@@ -1967,17 +1981,17 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
 
         <div style={{flex:1,overflowY:"auto",padding:window.innerWidth>640?"1.25rem 1.75rem":"0.75rem",display:"flex",flexDirection:"column",gap:"0.75rem"}}>
           <div style={{display:"flex",alignItems:"center",gap:"0.6rem"}}>
-            <span style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:T.midnight,background:"#ddeaf7",padding:"2px 7px",borderRadius:"2px",border:"1px solid #b3cde8"}}>{q.standard}</span>
-            {isFl&&<span style={{fontSize:"0.6rem",fontWeight:700,color:T.warning,background:T.warningBg,border:"1px solid #ffc107",borderRadius:"2px",padding:"2px 7px"}}>🚩 Flagged for Review</span>}
+            <span style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:"#93c5fd",background:"rgba(147,197,253,0.12)",padding:"2px 7px",borderRadius:"2px",border:"1px solid rgba(147,197,253,0.25)"}}>{q.standard}</span>
+            {isFl&&<span style={{fontSize:"0.6rem",fontWeight:700,color:"#fbbf24",background:"rgba(251,191,36,0.12)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:"2px",padding:"2px 7px"}}>⚑ Flagged for Review</span>}
           </div>
-          <div style={{background:T.white,borderTop:`3px solid ${T.midnight}`,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"1.1rem 1.4rem"}}>
-            <p style={{fontSize:"0.95rem",fontFamily:"Georgia,serif",color:"#0f0f0f",lineHeight:1.7,margin:0}}><MathText text={q.question}/></p>
+          <div style={{background:"rgba(255,255,255,0.06)",borderTop:"3px solid #5b9bd5",border:"1px solid rgba(255,255,255,0.12)",borderRadius:T.xs,padding:"1.1rem 1.4rem"}}>
+            <p style={{fontSize:"0.95rem",fontFamily:"Georgia,serif",color:"#e8f0f8",lineHeight:1.7,margin:0}}><MathText text={q.question}/></p>
             {q.questionImage&&q.type!=="hotspot"&&<img src={q.questionImage} alt="diagram" style={{maxWidth:"100%",maxHeight:"200px",marginTop:"0.75rem",borderRadius:T.xs,display:"block"}}/>}
           </div>
-          <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"1.1rem 1.5rem"}}>
+          <div style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.10)",borderRadius:T.xs,padding:"1.1rem 1.5rem"}}>
             {q.type === "plotpoint" ? (
               <>
-                <div style={{fontSize:"0.78rem",color:T.textSecondary,marginBottom:"0.65rem",fontStyle:"italic"}}>Plot your answer on the grid below.</div>
+                <div style={{fontSize:"0.78rem",color:"rgba(255,255,255,0.45)",marginBottom:"0.65rem",fontStyle:"italic"}}>Plot your answer on the grid below.</div>
                 <div style={{display:"flex",justifyContent:"center"}}>
                   <PlotGrid
                     placed={sel ? (() => { try { return JSON.parse(sel); } catch { return null; } })() : null}
@@ -1992,14 +2006,14 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
               </>
             ) : q.type === "keypad" ? (
               <>
-                <div style={{fontSize:"0.78rem",color:T.textSecondary,marginBottom:"0.65rem",fontStyle:"italic"}}>Enter your answer in the box below.</div>
+                <div style={{fontSize:"0.78rem",color:"rgba(255,255,255,0.45)",marginBottom:"0.65rem",fontStyle:"italic"}}>Enter your answer in the box below.</div>
                 <div style={{display:"flex",flexDirection:"column",gap:"0.65rem",alignItems:"flex-start"}}>
                   <input
                     type="text" inputMode="decimal"
                     value={sel ?? ""}
                     onChange={e => { setAns(p=>({...p,[q.id]:e.target.value})); handleAdaptiveAnswer(q.id, e.target.value); }}
                     placeholder="Enter your answer…"
-                    style={{width:"100%",maxWidth:"260px",padding:"0.8rem 1rem",fontSize:"1.3rem",fontFamily:"monospace",fontWeight:700,border:`2px solid ${T.midnight}`,borderRadius:"4px",outline:"none",background:T.surface,color:"#0f0f0f",letterSpacing:"0.05em"}}
+                    style={{width:"100%",maxWidth:"260px",padding:"0.8rem 1rem",fontSize:"1.3rem",fontFamily:"monospace",fontWeight:700,border:"2px solid #5b9bd5",borderRadius:"4px",outline:"none",background:"rgba(255,255,255,0.07)",color:"#e8f0f8",letterSpacing:"0.05em"}}
                   />
                   {sel && <div style={{fontSize:"0.72rem",color:T.textSecondary}}>Your answer: <strong>{sel}</strong></div>}
                 </div>
@@ -2029,7 +2043,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
               />
             ) : q.type === "multiselect" ? (
               <>
-                <div style={{fontSize:"0.78rem",color:T.textSecondary,marginBottom:"0.75rem",fontStyle:"italic"}}>Select all that apply.</div>
+                <div style={{fontSize:"0.78rem",color:"rgba(255,255,255,0.45)",marginBottom:"0.75rem",fontStyle:"italic"}}>Select all that apply.</div>
                 <div style={{display:"flex",flexDirection:"column",gap:"0.55rem"}}>
                   {(q.choices||[]).filter(c=>c).map((choice,i)=>{
                     const selArr = (() => { try { return sel ? JSON.parse(sel) : []; } catch { return []; } })();
@@ -2041,11 +2055,11 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
                       handleAdaptiveAnswer(q.id, next.length ? v : null);
                     }
                     return <label key={i} onClick={toggleChoice}
-                      style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.8rem 1rem",border:`2px solid ${chosen?T.midnight:T.border}`,borderRadius:T.xs,background:chosen?"#ddeaf7":T.surface,cursor:"pointer"}}>
-                      <div style={{width:"22px",height:"22px",borderRadius:T.xs,border:`2px solid ${chosen?T.midnight:"#9aabba"}`,background:chosen?T.midnight:T.white,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                        {chosen && <span style={{color:T.white,fontSize:"0.8rem",fontWeight:900}}>✓</span>}
+                      style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.75rem 1rem",border:`2px solid ${chosen?"#5b9bd5":"rgba(255,255,255,0.15)"}`,borderRadius:T.xs,background:chosen?"rgba(91,155,213,0.2)":"rgba(255,255,255,0.04)",cursor:"pointer",transition:"border-color .12s,background .12s"}}>
+                      <div style={{width:"22px",height:"22px",borderRadius:T.xs,border:`2px solid ${chosen?"#5b9bd5":"rgba(255,255,255,0.3)"}`,background:chosen?"#5b9bd5":"rgba(255,255,255,0.07)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        {chosen && <span style={{color:"#fff",fontSize:"0.8rem",fontWeight:900}}>✓</span>}
                       </div>
-                      <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color:"#0f0f0f"}}><MathText text={choice}/></span>
+                      <span style={{fontSize:"0.95rem",fontFamily:"Georgia,serif",color:"#e8f0f8"}}><MathText text={choice}/></span>
                     </label>;
                   })}
                 </div>
@@ -2054,17 +2068,17 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
               <>
                 <div style={{display:"flex",flexDirection:"column",gap:"0.55rem"}}>
                   {(q.choices||[]).filter(c=>c).length === 0 ? (
-                    <div style={{color:T.textSecondary,fontSize:"0.85rem",padding:"1rem",textAlign:"center",border:`1px dashed ${T.border}`,borderRadius:"4px"}}>
+                    <div style={{color:"rgba(255,255,255,0.45)",fontSize:"0.85rem",padding:"1rem",textAlign:"center",border:"1px dashed rgba(255,255,255,0.2)",borderRadius:"4px"}}>
                       ⚠ This question has no answer choices. Contact your teacher.
                     </div>
                   ) : (q.choices||[]).map((choice,i)=>{
                     const chosen = sel===choice;
                     return <label key={i} onClick={()=>{ setAns(p=>({...p,[q.id]:choice})); handleAdaptiveAnswer(q.id, choice); }}
-                      style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.8rem 1rem",border:`2px solid ${chosen?T.midnight:T.border}`,borderRadius:T.xs,background:chosen?"#ddeaf7":T.surface,cursor:"pointer"}}>
-                      <div style={{width:"26px",height:"26px",borderRadius:"50%",border:`2px solid ${chosen?T.midnight:"#9aabba"}`,background:chosen?T.midnight:T.white,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                        <span style={{fontSize:"0.7rem",fontWeight:700,color:chosen?T.white:"#667"}}>{LETTERS[i]}</span>
+                      style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.75rem 1rem",border:`2px solid ${chosen?"#5b9bd5":"rgba(255,255,255,0.15)"}`,borderRadius:T.xs,background:chosen?"rgba(91,155,213,0.2)":"rgba(255,255,255,0.04)",cursor:"pointer",transition:"border-color .12s,background .12s"}}>
+                      <div style={{width:"26px",height:"26px",borderRadius:"50%",border:`2px solid ${chosen?"#5b9bd5":"rgba(255,255,255,0.3)"}`,background:chosen?"#5b9bd5":"rgba(255,255,255,0.07)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <span style={{fontSize:"0.7rem",fontWeight:700,color:"#fff"}}>{LETTERS[i]}</span>
                       </div>
-                      <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color:"#0f0f0f"}}><MathText text={choice}/></span>
+                      <span style={{fontSize:"0.95rem",fontFamily:"Georgia,serif",color:"#e8f0f8"}}><MathText text={choice}/></span>
                     </label>;
                   })}
                 </div>
@@ -3434,7 +3448,7 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
               }}/>;
 
   if (screen === "test")
-    return <StudentTest studentName={student?.name || ""} studentId={student?.id || ""} testCode={testCode} questions={questions} adaptive={isAdaptive} onFinish={handleFinishTest} untimed={untimed} timeLimitSecs={timeLimitSecs} warnSecs={warnSecs}/>;
+    return <StudentTest studentName={student?.name || ""} studentId={student?.id || ""} testCode={testCode} questions={questions} adaptive={isAdaptive} onFinish={handleFinishTest} untimed={untimed} timeLimitSecs={timeLimitSecs} warnSecs={warnSecs} onReturnToTeacher={impersonateStudent ? onBack : null}/>;
 
   if (screen === "results")
     return <StudentResults session={finalSession} questions={questions} onReset={()=>{ reset(); onBack(); }}/>;
