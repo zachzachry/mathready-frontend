@@ -486,11 +486,22 @@ export default function Dashboard({ teacher, readOnly }) {
     });
     return Object.values(map);
   })();
-  // Recompute pct from qt.correct when stored values are stale
+  // Regrade from bankQ (authoritative); fall back to qt.correct for deleted questions
   function effPct(s) {
-    const qtC = (s.questionTimes||[]).filter(q => q.correct !== undefined);
-    if (!qtC.length) return s.pct;
-    return Math.round(qtC.filter(q=>q.correct).length / s.questionTimes.length * 100);
+    const answers = s.answers || {};
+    const qIds = (s.questionTimes||[]).length
+      ? s.questionTimes.map(qt => qt.qId)
+      : Object.keys(answers);
+    if (!qIds.length) return s.pct;
+    const correct = qIds.filter(qid => {
+      const q = bankQ.find(x => x.id === qid);
+      const ans = answers[qid];
+      if (ans === undefined || ans === null) return false;
+      if (q) return gradeSessionAnswer(q, ans);
+      const qt = (s.questionTimes||[]).find(t => t.qId === qid);
+      return Boolean(qt?.correct);
+    }).length;
+    return Math.round(correct / qIds.length * 100);
   }
   const sorted  = [...latestByStudent].sort((a,b)=>effPct(b)-effPct(a));
   const sel     = latestByStudent.find(s => s.name===selected || s.studentName===selected);
@@ -513,7 +524,12 @@ export default function Dashboard({ teacher, readOnly }) {
     if (q.type === "keypad") return String(q.answer??"").trim().toLowerCase() === String(ans).trim().toLowerCase();
     if (q.type === "plotpoint") { try { return ans === JSON.stringify(Array.isArray(q.answer)?q.answer:JSON.parse(q.answer)); } catch { return false; } }
     if (q.type === "dragdrop") { try { const g=JSON.parse(ans); const cm=q.correct||q.answer||{}; return (q.items||[]).every(item=>{const c=cm[item]; if(c==="distractor") return g[item]===undefined; return g[item]===c;}); } catch { return false; } }
-    return ans === q.correct;
+    // MCQ: compare by choice index (robust against encoding/whitespace differences)
+    const correctVal = q.correct ?? q.answer;
+    const choices = q.choices || [];
+    const ansIdx = choices.indexOf(ans); const correctIdx = choices.indexOf(correctVal);
+    if (ansIdx >= 0 && correctIdx >= 0) return ansIdx === correctIdx;
+    return String(ans).trim() === String(correctVal ?? "").trim();
   }
   const allQIds = [...new Set(filteredTestSessions.flatMap(s=>Object.keys(s.answers||{})))];
   const itemData = bankQ.map(q => {

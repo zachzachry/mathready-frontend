@@ -181,10 +181,10 @@ export default function StudentQuestionReport({ session, bankQ, teacherName, onC
     const ans = (session.answers || {})[qId];
     const qt = qtMap[qId];
     const isAnswered = ans !== undefined && ans !== null;
-    // Use qt.correct (recorded at submission time) as primary source so the
-    // report matches the dashboard. Fall back to gradeAnswer only when not set.
+    // Regrade against current bank when question exists (authoritative).
+    // Fall back to qt.correct only when question has been deleted from bank.
     const isCorrect = isAnswered
-      ? (qt?.correct !== undefined ? Boolean(qt.correct) : gradeAnswer(q, ans))
+      ? (q ? gradeAnswer(q, ans) : (qt?.correct !== undefined ? Boolean(qt.correct) : false))
       : false;
     const studentAns = formatStudentAnswer(q, ans);
     const correctAns = q ? formatCorrectAnswer(q) : "—";
