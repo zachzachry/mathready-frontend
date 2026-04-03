@@ -486,12 +486,18 @@ export default function Dashboard({ teacher, readOnly }) {
     });
     return Object.values(map);
   })();
-  const sorted  = [...latestByStudent].sort((a,b)=>b.pct - a.pct);
+  // Recompute pct from qt.correct when stored values are stale
+  function effPct(s) {
+    const qtC = (s.questionTimes||[]).filter(q => q.correct !== undefined);
+    if (!qtC.length) return s.pct;
+    return Math.round(qtC.filter(q=>q.correct).length / s.questionTimes.length * 100);
+  }
+  const sorted  = [...latestByStudent].sort((a,b)=>effPct(b)-effPct(a));
   const sel     = latestByStudent.find(s => s.name===selected || s.studentName===selected);
-  const avgP    = latestByStudent.length ? Math.round(latestByStudent.reduce((a,s)=>a+s.pct,0)/latestByStudent.length) : 0;
-  const profC   = latestByStudent.filter(s=>s.pct>=80).length;
-  const devC    = latestByStudent.filter(s=>s.pct>=60&&s.pct<80).length;
-  const begC    = latestByStudent.filter(s=>s.pct<60).length;
+  const avgP    = latestByStudent.length ? Math.round(latestByStudent.reduce((a,s)=>a+effPct(s),0)/latestByStudent.length) : 0;
+  const profC   = latestByStudent.filter(s=>effPct(s)>=80).length;
+  const devC    = latestByStudent.filter(s=>effPct(s)>=60&&effPct(s)<80).length;
+  const begC    = latestByStudent.filter(s=>effPct(s)<60).length;
 
   // ── DOK breakdown from questionTimes across filtered sessions ──
   const dokBuckets = {1:{c:0,t:0}, 2:{c:0,t:0}, 3:{c:0,t:0}};
@@ -666,11 +672,10 @@ export default function Dashboard({ teacher, readOnly }) {
             </div>
             {sorted.map((s,i)=>{
               const name = s.studentName||s.name;
-              // Recompute score from qt.correct flags when stored values are stale (e.g. score=0, total=0)
               const qtC = (s.questionTimes||[]).filter(q => q.correct !== undefined);
               const effScore = qtC.length > 0 ? qtC.filter(q=>q.correct).length : s.score;
               const effTotal = qtC.length > 0 ? s.questionTimes.length : s.total;
-              const p = effTotal > 0 ? Math.round(effScore/effTotal*100) : s.pct;
+              const p = effPct(s);
               const isOpen = name===selected;
               return (
                 <React.Fragment key={i}>
