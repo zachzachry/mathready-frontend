@@ -185,14 +185,11 @@ export default function StudentQuestionReport({ session, bankQ, teacherName, onC
     return { idx, qId, q, ans, isAnswered, isCorrect, studentAns, correctAns, timeSecs, qt };
   });
 
-  // Use stored session.score/session.total as authoritative; fall back to local count
-  const storedScore = session.score ?? null;
-  const storedTotal = session.total ?? rows.length;
-  const correctCount = storedScore !== null ? storedScore : rows.filter(r => r.isCorrect).length;
+  // Use per-question qt.correct flags (already applied in isCorrect) — most accurate
+  // session.score can be stale; row-level isCorrect uses submission-time qt.correct
+  const correctCount = rows.filter(r => r.isCorrect).length;
   const skippedCount = rows.filter(r => !r.isAnswered).length;
-  const wrongCount = storedScore !== null
-    ? storedTotal - storedScore - skippedCount
-    : rows.length - correctCount - skippedCount;
+  const wrongCount = rows.length - correctCount - skippedCount;
 
   return (
     <div
