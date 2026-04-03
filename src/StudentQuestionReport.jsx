@@ -325,7 +325,8 @@ export default function StudentQuestionReport({ session, bankQ, teacherName, onC
                         <div style={{ fontSize:"0.58rem", fontWeight:700, letterSpacing:"0.1em", color:T.textSecondary, marginBottom:"2px" }}>CORRECT ANSWER</div>
                         <div style={{ fontSize:"0.82rem", fontWeight:600, color:T.success }}>
                           {(() => {
-                            const idx2 = (q.choices||[]).indexOf(q.correct);
+                            const isMCQ = !["keypad","multiselect","plotpoint","hotspot","dragdrop"].includes(q.type);
+                            const idx2 = isMCQ ? (q.choices||[]).indexOf(q.correct) : -1;
                             return (
                               <>
                                 {idx2 >= 0 && (
