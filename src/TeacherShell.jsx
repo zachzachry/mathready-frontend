@@ -240,11 +240,11 @@ export default function TeacherShell({ onBack, teacher, onUpdateClassIds, onView
                 </button>
               );
             })}
-            {/* View-as buttons for super_admin */}
-            {onViewAsTeacher && (
+            {/* View-as buttons */}
+            {(onViewAsTeacher || onViewAsStudent) && (
               <div style={{marginTop:"auto",borderTop:"1px solid rgba(255,255,255,.06)",padding:"0.65rem 0.75rem",display:"flex",flexDirection:"column",gap:"0.35rem"}}>
-                <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.12em",color:"rgba(255,255,255,.3)",marginBottom:"2px"}}>IMPERSONATE</div>
-                <button onClick={async () => {
+                <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.12em",color:"rgba(255,255,255,.3)",marginBottom:"2px"}}>{onViewAsTeacher?"IMPERSONATE":"PREVIEW"}</div>
+                {onViewAsTeacher && <button onClick={async () => {
                   try {
                     const r = await fetch(`${API}/teachers`);
                     const list = await r.json();
@@ -256,8 +256,8 @@ export default function TeacherShell({ onBack, teacher, onUpdateClassIds, onView
                     background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.1)",borderRadius:T.xs,
                     cursor:"pointer",width:"100%",textAlign:"left",color:"rgba(255,255,255,.65)",fontSize:"0.75rem",fontWeight:600,transition:"background .15s"}}>
                   👁 View as Teacher
-                </button>
-                <button onClick={()=>{
+                </button>}
+                {onViewAsStudent && <button onClick={()=>{
                   const classFilter = teacher?.classIds?.length ? `?classIds=${teacher.classIds.join(",")}` : "";
                   fetch(`${API}/roster${classFilter}`).then(r=>r.json()).then(d=>{setPickerClasses(Array.isArray(d)?d:[]);setShowStudentPicker(true);}).catch(()=>{});
                 }}
@@ -265,7 +265,7 @@ export default function TeacherShell({ onBack, teacher, onUpdateClassIds, onView
                     background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.1)",borderRadius:T.xs,
                     cursor:"pointer",width:"100%",textAlign:"left",color:"rgba(255,255,255,.65)",fontSize:"0.75rem",fontWeight:600,transition:"background .15s"}}>
                   🎒 View as Student
-                </button>
+                </button>}
               </div>
             )}
           </div>

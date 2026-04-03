@@ -179,7 +179,7 @@ export default function App() {
       onBack={reset}
       onUpdateClassIds={handleTeacherClassIdsUpdate}
       onViewAsTeacher={teacherIdentity?.teacherRole === "super_admin" ? handleViewAsTeacher : undefined}
-      onViewAsStudent={teacherIdentity?.teacherRole === "super_admin" ? handleViewAsStudent : undefined}
+      onViewAsStudent={handleViewAsStudent}
     />
   );
   if (screen === "student") return <MathTest onBack={reset} prefillCode={urlCode||undefined}
