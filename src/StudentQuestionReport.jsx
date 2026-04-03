@@ -35,7 +35,14 @@ function gradeAnswer(q, ans) {
       });
     } catch { return false; }
   }
-  return ans === q.correct;
+  // MCQ: compare by choice index (robust against encoding/whitespace differences
+  // between stored answer and current bank value)
+  const correctVal = q.correct ?? q.answer;
+  const choices = q.choices || [];
+  const ansIdx = choices.indexOf(ans);
+  const correctIdx = choices.indexOf(correctVal);
+  if (ansIdx >= 0 && correctIdx >= 0) return ansIdx === correctIdx;
+  return String(ans).trim() === String(correctVal ?? "").trim();
 }
 
 function formatStudentAnswer(q, ans) {
