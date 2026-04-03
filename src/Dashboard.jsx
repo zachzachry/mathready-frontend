@@ -665,7 +665,12 @@ export default function Dashboard({ teacher, readOnly }) {
               {overviewTest !== "all" && <span style={{marginLeft:"0.5rem",background:T.midnight,color:T.white,padding:"1px 6px",borderRadius:"3px",fontSize:"0.6rem"}}>{testCodeNames[overviewTest]!==overviewTest?`${testCodeNames[overviewTest]} · `:""}<span style={{fontFamily:"monospace"}}>{overviewTest}</span></span>}
             </div>
             {sorted.map((s,i)=>{
-              const name = s.studentName||s.name; const p=s.pct;
+              const name = s.studentName||s.name;
+              // Recompute score from qt.correct flags when stored values are stale (e.g. score=0, total=0)
+              const qtC = (s.questionTimes||[]).filter(q => q.correct !== undefined);
+              const effScore = qtC.length > 0 ? qtC.filter(q=>q.correct).length : s.score;
+              const effTotal = qtC.length > 0 ? s.questionTimes.length : s.total;
+              const p = effTotal > 0 ? Math.round(effScore/effTotal*100) : s.pct;
               const isOpen = name===selected;
               return (
                 <React.Fragment key={i}>
@@ -687,7 +692,7 @@ export default function Dashboard({ teacher, readOnly }) {
                     )}
                     <div style={{textAlign:"right"}}>
                       <div style={{fontSize:"1rem",fontWeight:700,color:lvlC(p)}}>{p}%</div>
-                      <div style={{fontSize:"0.65rem",color:T.textSecondary}}>{s.score}/{s.total} · {s.timeUsed}</div>
+                      <div style={{fontSize:"0.65rem",color:T.textSecondary}}>{effScore}/{effTotal} · {s.timeUsed}</div>
                       {(() => {
                         const qt = s.questionTimes||[];
                         if (!qt.length) return null;
