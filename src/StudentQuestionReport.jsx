@@ -186,10 +186,11 @@ export default function StudentQuestionReport({ session, bankQ, teacherName, onC
   });
 
   // Use per-question qt.correct flags (already applied in isCorrect) — most accurate
-  // session.score can be stale; row-level isCorrect uses submission-time qt.correct
+  // session.score/pct can be stale; recompute from row-level isCorrect
   const correctCount = rows.filter(r => r.isCorrect).length;
   const skippedCount = rows.filter(r => !r.isAnswered).length;
   const wrongCount = rows.length - correctCount - skippedCount;
+  const displayPct = rows.length > 0 ? Math.round(correctCount / rows.length * 100) : pct;
 
   return (
     <div
@@ -205,12 +206,12 @@ export default function StudentQuestionReport({ session, bankQ, teacherName, onC
           <div>
             <div style={{ fontSize:"1.05rem", fontWeight:800 }}>📄 Question Report</div>
             <div style={{ fontSize:"0.72rem", opacity:0.8, marginTop:"2px" }}>
-              {studentName} · {testCode && `Test ${testCode} · `}Score: {pct}%{submitted && ` · ${submitted}`}
+              {studentName} · {testCode && `Test ${testCode} · `}Score: {displayPct}%{submitted && ` · ${submitted}`}
             </div>
           </div>
           <div style={{ display:"flex", gap:"0.5rem", alignItems:"center" }} className="no-print">
             <button
-              onClick={() => printReport(bodyRef, studentName, testCode, pct)}
+              onClick={() => printReport(bodyRef, studentName, testCode, displayPct)}
               style={{ background:"rgba(255,255,255,.15)", border:"1px solid rgba(255,255,255,.3)", color:T.white, borderRadius:T.xs, padding:"5px 12px", fontSize:"0.72rem", fontWeight:600, cursor:"pointer" }}
             >
               🖨 Print
