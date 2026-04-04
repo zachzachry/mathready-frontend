@@ -492,9 +492,13 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
     : prefillCredential ? (prefillCode ? "code" : "choice")
     : "google"
   );
-  const [enrollStep,   setEnrollStep]  = useState(false);
-  const [joinCode,     setJoinCode]    = useState("");
-  const [pendingDrill, setPendingDrill]= useState(false);
+  const [enrollStep,      setEnrollStep]      = useState(false);
+  const [joinCode,        setJoinCode]        = useState("");
+  const [pendingDrill,    setPendingDrill]    = useState(false);
+  const [identityLoading, setIdentityLoading] = useState(
+    // True when we need to check identity before showing choice screen
+    !impersonateStudent && !!( prefillCredential || false )
+  );
   const googleBtnRef = useRef(null);
   const [googleReady, setGoogleReady] = useState(!!window.google);
 
@@ -534,7 +538,9 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
           setStudent(impersonateStudent.student);
           setCls(impersonateStudent.cls);
           sid = impersonateStudent.student.id;
+          setIdentityLoading(false);
         } else if (credential) {
+          setIdentityLoading(true);
           const r = await fetch(`${API}/auth/google/drill`, {
             method:"POST", headers:{"Content-Type":"application/json"},
             body: JSON.stringify({ token: credential }),
@@ -544,12 +550,18 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
             setStudent(d.student);
             setCls(d.cls);
             sid = d.student.id;
+            setIdentityLoading(false);
           } else if (r.status === 403) {
             // Brand-new student — prompt for class code immediately
             setPendingDrill(false);
             setEnrollStep(true);
+            setIdentityLoading(false);
             return;
+          } else {
+            setIdentityLoading(false);
           }
+        } else {
+          setIdentityLoading(false);
         }
         if (sid) {
           try {
@@ -713,6 +725,13 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
           </div>
         </div>
       </div>
+    </div>
+  );
+
+  // Block choice screen from rendering until identity is resolved
+  if (step === "choice" && identityLoading) return (
+    <div style={{...S.page, alignItems:"center", justifyContent:"center"}}>
+      <div style={{color:T.textSecondary, fontSize:"0.9rem"}}>Signing in…</div>
     </div>
   );
 
