@@ -492,6 +492,9 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
     : prefillCredential ? (prefillCode ? "code" : "choice")
     : "google"
   );
+  const [enrollStep,   setEnrollStep]  = useState(false);
+  const [joinCode,     setJoinCode]    = useState("");
+  const [pendingDrill, setPendingDrill]= useState(false);
   const googleBtnRef = useRef(null);
   const [googleReady, setGoogleReady] = useState(!!window.google);
 
@@ -581,6 +584,11 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
       });
       const vd = await vr.json();
       if (!vr.ok) {
+        if (vr.status === 403) {
+          setPendingDrill(false);
+          setEnrollStep(true);
+          setChecking(false); return;
+        }
         setErr(vd.detail || "Your Google account is not on the roster for this test. Check with your teacher.");
         setChecking(false); return;
       }
@@ -607,6 +615,72 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
     } catch { setErr("Could not connect to server. Try again."); }
     setChecking(false);
   }
+
+  // ── Self-enrollment screen (shown when student not yet on roster) ──
+  async function doEnroll() {
+    setChecking(true); setErr("");
+    try {
+      const res = await fetch(`${API}/auth/google/enroll`, {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ token: credential, joinCode: joinCode.trim().toUpperCase() }),
+      });
+      const vd = await res.json();
+      if (res.ok && vd.student) {
+        setStudent(vd.student); setCls(vd.cls);
+        setEnrollStep(false); setJoinCode("");
+        if (pendingDrill) {
+          setPendingDrill(false);
+          onStartDrill(vd.student, vd.cls);
+        } else {
+          // Re-run checkCode now that the student is enrolled
+          await checkCode();
+        }
+        return;
+      }
+      setErr(vd.detail || "Class code not found. Check with your teacher.");
+    } catch { setErr("Could not connect. Try again."); }
+    setChecking(false);
+  }
+
+  if (enrollStep) return (
+    <div style={S.page}>
+      <div style={{background:T.midnight,width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
+        <button onClick={()=>{setEnrollStep(false);setJoinCode("");setErr("");}}
+          style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:T.white,borderRadius:T.xs,padding:"6px 14px",cursor:"pointer",fontSize:"0.8rem"}}>← Back</button>
+        <div style={{color:T.white,fontSize:"0.95rem",fontWeight:700}}>Georgia Milestones Readiness Trainer</div>
+      </div>
+      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem 1rem",width:"100%"}}>
+        <div style={S.card}>
+          <div style={S.hdr}>
+            <div style={S.hdrSub}>FIRST TIME HERE?</div>
+            <div style={S.hdrTitle}>Enter Your Class Code</div>
+          </div>
+          <div style={{padding:"1.75rem 2rem",display:"flex",flexDirection:"column",gap:"1rem"}}>
+            <div style={{fontSize:"0.85rem",color:T.textSecondary,lineHeight:1.6}}>
+              Your teacher will give you a short code. Enter it below to join the class. You'll only need to do this once.
+            </div>
+            <input
+              style={{...S.inp,fontFamily:"monospace",fontSize:"1.2rem",letterSpacing:"0.2em",textTransform:"uppercase",textAlign:"center"}}
+              placeholder="e.g. ABC123"
+              value={joinCode}
+              onChange={e => setJoinCode(e.target.value.toUpperCase())}
+              maxLength={8}
+              onKeyDown={e => { if (e.key === "Enter" && joinCode.length >= 4) doEnroll(); }}
+              autoFocus
+            />
+            {err && <div style={{...S.errBox}}>⚠ {err}</div>}
+            <button
+              style={{...S.btnPri, width:"100%", opacity: (joinCode.length < 4 || checking) ? 0.5 : 1}}
+              disabled={joinCode.length < 4 || checking}
+              onClick={doEnroll}
+            >
+              {checking ? "Joining…" : "Join Class →"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   // ── Google Sign-In screen ──
   if (step === "google") return (
@@ -714,7 +788,10 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
                   body: JSON.stringify({ token: credential }),
                 });
                 const d = await r.json();
-                if (!r.ok) { setErr(d.detail || "Sign-in failed."); setChecking(false); return; }
+                if (!r.ok) {
+                  if (r.status === 403) { setPendingDrill(true); setEnrollStep(true); setChecking(false); return; }
+                  setErr(d.detail || "Sign-in failed."); setChecking(false); return;
+                }
                 onStartDrill(d.student, d.cls);
               } catch { setErr("Could not connect. Try again."); }
               setChecking(false);

@@ -907,6 +907,12 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
                 <div style={{fontSize:"1rem",fontWeight:700,color:T.text,marginTop:"2px"}}>
                   {activeClassData.students.length} student{activeClassData.students.length!==1?"s":""}
                 </div>
+                {activeClassData.joinCode && (
+                  <div style={{marginTop:"6px",display:"inline-flex",alignItems:"center",gap:"0.4rem",background:"#e0f2fe",border:"1px solid #7dd3fc",borderRadius:"5px",padding:"2px 10px"}}>
+                    <span style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#0369a1"}}>CLASS CODE</span>
+                    <span style={{fontFamily:"monospace",fontSize:"1rem",fontWeight:800,letterSpacing:"0.18em",color:"#0c4a6e"}}>{activeClassData.joinCode}</span>
+                  </div>
+                )}
               </div>
               {!readOnly && (
                 <div style={{display:"flex",alignItems:"center",gap:"1.25rem",flexWrap:"wrap"}}>
