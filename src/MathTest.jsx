@@ -804,6 +804,15 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
 
           {/* Quick actions row */}
           <div style={{display:"flex",gap:"0.75rem",marginBottom:"1.25rem",flexWrap:"wrap"}}>
+            {studentAssignments.length > 0 ? (
+              <div style={{flex:1,minWidth:"140px",background:"rgba(245,158,11,.12)",border:"1px solid rgba(245,158,11,.35)",borderRadius:"10px",padding:"1rem 1.25rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+                <span style={{fontSize:"1.5rem"}}>⚡</span>
+                <div style={{textAlign:"left"}}>
+                  <div style={{fontSize:"0.95rem",fontWeight:800,color:"rgba(255,255,255,.35)"}}>Fluency Drill</div>
+                  <div style={{fontSize:"0.7rem",color:"rgba(245,158,11,.7)"}}>Complete your test first</div>
+                </div>
+              </div>
+            ) : (
             <button onClick={async () => {
               if (student && cls) { onStartDrill(student, cls); return; }
               setChecking(true); setErr("");
@@ -828,6 +837,7 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
                 <div style={{fontSize:"0.7rem",color:"rgba(255,255,255,.8)"}}>Adaptive fact practice</div>
               </div>
             </button>
+            )}
             <button onClick={()=>{setErr("");setStep("code");}}
               style={{flex:1,minWidth:"140px",background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.2)",borderRadius:"10px",padding:"1rem 1.25rem",cursor:"pointer",display:"flex",alignItems:"center",gap:"0.75rem"}}>
               <span style={{fontSize:"1.5rem"}}>🔑</span>
