@@ -153,12 +153,12 @@ export async function saveSession(session) {
 export async function clearSessions() {
   try { await fetch(`${API}/sessions`,{method:"DELETE"}); } catch {}
 }
-export async function sendHeartbeat(name, current) {
+export async function sendHeartbeat(name, current, code="", phase="testing") {
   try {
     await fetch(`${API}/heartbeat`, {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({name,current}),
+      body:JSON.stringify({name, current, code, phase}),
     });
   } catch {}
 }

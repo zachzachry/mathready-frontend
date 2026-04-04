@@ -571,6 +571,10 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
         setErr("Invalid test code. Check with your teacher.");
         setChecking(false); return;
       }
+      if (data.closeDate && Date.now() > new Date(data.closeDate).getTime()) {
+        setErr("This test is no longer open. Please see your teacher.");
+        setChecking(false); return;
+      }
       const vr = await fetch(`${API}/auth/google/verify`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token: credential, code: c }),
@@ -587,6 +591,17 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
           if (ad.attempted) { setErr("You have already submitted this test. Only one attempt is allowed."); setChecking(false); return; }
         } catch { setErr("Something went wrong checking attempt status. Please try again."); setChecking(false); return; }
       }
+      // Check if teacher has launched a gated session for this code
+      try {
+        const ctrlRes = await fetch(`${API}/test/control?code=${encodeURIComponent(c)}`);
+        const ctrl = ctrlRes.ok ? await ctrlRes.json() : {};
+        if (ctrl.gate && !ctrl.testing) {
+          // Session is gated — go straight to waiting room, skip confirm screen
+          onStartTest(vd.student, vd.cls, c, { ...data, gated: true });
+          setChecking(false); return;
+        }
+      } catch { /* silently ignore — proceed to confirm as normal */ }
+
       setTestInfo(data); setStudent(vd.student); setCls(vd.cls);
       setStep("confirm");
     } catch { setErr("Could not connect to server. Try again."); }
@@ -1407,15 +1422,29 @@ function normalizeQuestion(q) {
   return { ...q, type, answer };
 }
 
-function StudentTest({ studentName, studentId, testCode, questions: initialQuestions, adaptive, onFinish, untimed=false, timeLimitSecs=1800, warnSecs=300, onReturnToTeacher=null }) {
+function StudentTest({ studentName, studentId, testCode, questions: initialQuestions, adaptive, onFinish, untimed=false, timeLimitSecs=1800, warnSecs=300, onReturnToTeacher=null, initialDraft=null, gated=false }) {
   // ── Session persistence key ──
   const sessionKey = testCode && studentId ? `mathready_test_${testCode}_${studentId}` : null;
 
-  // Restore saved state from sessionStorage (runs once, synchronously before first render)
+  // Restore saved state — prefer server draft (crash recovery), fall back to sessionStorage
   const restored = useRef(null);
   if (restored.current === null) {
     restored.current = false;
-    if (sessionKey) {
+    // Server draft takes priority (survives Chromebook reboots / device switches)
+    if (initialDraft && initialDraft.student_id) {
+      const draftEndTime = initialDraft.end_time;
+      // Only restore if timer hasn't already expired
+      if (untimed || !draftEndTime || draftEndTime > Date.now()) {
+        restored.current = {
+          ans:     initialDraft.answers || {},
+          cur:     initialDraft.cur     || 0,
+          flg:     initialDraft.flags   || {},
+          endTime: draftEndTime || null,
+        };
+      }
+    }
+    // Fall back to sessionStorage if no valid server draft
+    if (!restored.current && sessionKey) {
       try {
         const raw = sessionStorage.getItem(sessionKey);
         if (raw) {
@@ -1438,10 +1467,19 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
   const [secs,     setSecs]     = useState(untimed ? 0 : timeLimitSecs);
   const [paused,   setPaused]   = useState(false);
   const [stopped,  setStopped]  = useState(false);
+  // Phase: "waiting_room" | "instructions" | "testing"
+  // - waiting_room: teacher has launched a gated session; student waits
+  // - instructions: pre-test screen (timer not running)
+  // - testing: questions + timer running
+  const [phase, setPhase] = useState(
+    gated ? "waiting_room"
+    : restored.current ? "testing"
+    : "instructions"
+  );
   const endTimeRef    = useRef(
     untimed ? null
     : restored.current?.endTime ? restored.current.endTime
-    : Date.now() + timeLimitSecs * 1000
+    : null   // will be set when student clicks "I'm Ready"
   );
   const pausedAtRef   = useRef(null);   // timestamp when pause started
   const submittedRef  = useRef(false);
@@ -1451,6 +1489,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
   const qTimeRef    = useRef({});   // {questionId: accumulatedMs}
   const prevCurRef  = useRef(cur);
   const qEnteredRef = useRef(Date.now());
+  const draftSaveRef = useRef(null);  // debounce timer for server draft saves
 
   // Auto-submit if restored endTime is already in the past
   useEffect(() => {
@@ -1468,7 +1507,23 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
         endTime: endTimeRef.current,
       }));
     } catch (e) { console.warn("Could not persist test state to sessionStorage:", e); }
-  }, [ans, cur, flg, sessionKey]);
+
+    // Also autosave to server (debounced 5s) for crash/reboot recovery
+    if (studentId && testCode && phase === "testing") {
+      clearTimeout(draftSaveRef.current);
+      draftSaveRef.current = setTimeout(() => {
+        fetch(`${API}/sessions/draft`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            studentId, testCode,
+            answers: ans, cur, flags: flg,
+            endTime: endTimeRef.current,
+          }),
+        }).catch(() => {}); // fire-and-forget; sessionStorage is the fallback
+      }, 5000);
+    }
+  }, [ans, cur, flg, sessionKey, phase]); // eslint-disable-line
 
   // Track time spent per question as cur changes
   useEffect(() => {
@@ -1560,9 +1615,9 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
     });
   }
 
-  // Countdown timer (skipped if untimed) — uses Date.now() to avoid drift
+  // Countdown timer (skipped if untimed or still on instructions screen)
   useEffect(()=>{
-    if (untimed) return;
+    if (untimed || phase !== "testing") return;
     if (paused) {
       // Record when we paused so we can shift endTime on resume
       if (!pausedAtRef.current) pausedAtRef.current = Date.now();
@@ -1579,30 +1634,43 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
       setSecs(remaining);
     }, 250);
     return () => clearInterval(t);
-  }, [paused, untimed]);
+  }, [paused, untimed, phase]); // eslint-disable-line
 
   // Auto-submit when timer reaches 0
   const hasStartedRef = useRef(false);
   useEffect(()=>{
-    if (untimed) return;
+    if (untimed || phase !== "testing") return;
     // Skip the initial render (secs starts at timeLimitSecs, not 0, but guard anyway)
     if (!hasStartedRef.current) { hasStartedRef.current = true; return; }
     if (secs === 0 && !submittedRef.current) {
       submittedRef.current = true;
       doSubmit();
     }
-  }, [secs]); // eslint-disable-line
+  }, [secs, phase]); // eslint-disable-line
 
-  // Poll for teacher pause/stop/extensions every 5s
+  // Poll for teacher pause/stop/extensions/gate every 5s (scoped to testCode)
   const appliedExtRef = useRef(0); // total seconds already added to timer
   useEffect(()=>{
     const t = setInterval(async () => {
       try {
-        const r = await fetch(`${API}/test/control`);
+        const url = testCode
+          ? `${API}/test/control?code=${encodeURIComponent(testCode)}`
+          : `${API}/test/control`;
+        const r = await fetch(url);
         const d = await r.json();
+
+        // Gate: teacher launched session but hasn't clicked Begin Testing yet
+        if (d.gate && !d.testing && phase !== "testing") {
+          setPhase("waiting_room"); return;
+        }
+        // Begin Testing: teacher released the gate
+        if (!d.gate && d.testing && phase === "waiting_room") {
+          setPhase("instructions"); return;
+        }
+
+        // Standard pause / stop / extension handling
         setPaused(!!d.paused);
         if (d.stopped && !stopped) { setStopped(true); }
-        // Apply any new time extension granted for this student
         if (!untimed && d.extensions) {
           const granted = d.extensions[studentName] || 0;
           if (granted > appliedExtRef.current) {
@@ -1614,12 +1682,17 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
       } catch (e) { console.warn("Teacher control poll failed:", e); }
     }, 5000);
     return () => clearInterval(t);
-  }, [stopped, untimed, studentName]);
+  }, [stopped, untimed, studentName, phase, testCode]); // eslint-disable-line
+
+  // Heartbeat — includes testCode and current phase so teacher can see waiting-room students
   useEffect(()=>{
-    sendHeartbeat(studentName, cur);
-    const t = setInterval(()=>sendHeartbeat(studentName, cur), 30000);
+    const ph = phase === "waiting_room" ? "waiting"
+             : phase === "instructions" ? "instructions"
+             : "testing";
+    sendHeartbeat(studentName, cur, testCode, ph);
+    const t = setInterval(()=>sendHeartbeat(studentName, cur, testCode, ph), 30000);
     return()=>clearInterval(t);
-  },[studentName, cur]);
+  },[studentName, cur, testCode, phase]); // eslint-disable-line
 
   // ── Lockdown ────────────────────────────────────────────
   const containerRef = useRef();
@@ -1801,8 +1874,13 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
   async function doSubmit() {
     if (submittedRef.current) return;   // guard against double-submit
     submittedRef.current = true;
+    clearTimeout(draftSaveRef.current); // cancel any pending draft save
     // Clear persisted session state on submit
     if (sessionKey) { try { sessionStorage.removeItem(sessionKey); } catch (e) { console.warn("Could not clear session state:", e); } }
+    // Delete server draft (fire-and-forget — server also deletes it on /submit)
+    if (studentId && testCode) {
+      fetch(`${API}/sessions/draft/${encodeURIComponent(studentId)}/${encodeURIComponent(testCode)}`, { method: "DELETE" }).catch(() => {});
+    }
     const score = questions.reduce((a,q) => {
       const given = ans[q.id] ?? null;
       return a + (gradeAnswer(q, given) ? 1 : 0);
@@ -1822,6 +1900,105 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
 
     const session = { score, total:TOTAL, pct:pct(score,TOTAL), submitted:now(), timeUsed:untimed ? fmtTime(0) : fmtTime(timeLimitSecs-secs), answers:{...ans}, violations, violationLog, questionTimes };
     onFinish(session);
+  }
+
+  // ── Pre-test instructions screen ───────────────────────────
+  const questionTypeLabels = {
+    mcq:       { icon: "🔘", label: "Multiple Choice" },
+    multiselect:{ icon: "☑️", label: "Select All That Apply" },
+    keypad:    { icon: "🔢", label: "Short Answer" },
+    plotpoint: { icon: "📍", label: "Plot a Point" },
+    hotspot:   { icon: "🖱️", label: "Tap the Answer" },
+    dragdrop:  { icon: "↔️", label: "Drag & Drop" },
+  };
+  const typesInTest = [...new Set(questions.map(q => q.type))].filter(t => questionTypeLabels[t]);
+
+  // ── Waiting room (teacher has launched but not yet clicked Begin Testing) ──
+  if (phase === "waiting_room") {
+    return (
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100vh",background:"linear-gradient(155deg,#0d1b2a 0%,#0f2d4a 55%,#133a5e 100%)",fontFamily:T.font,padding:"1.5rem"}}>
+        <style>{`@keyframes waitPulse{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
+        <div style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:T.r,maxWidth:"440px",width:"100%",padding:"2.5rem",textAlign:"center"}}>
+          <div style={{fontSize:"2.5rem",marginBottom:"1rem",animation:"waitPulse 2s ease-in-out infinite"}}>🟡</div>
+          <div style={{fontWeight:700,color:"#fff",fontSize:"1.15rem",marginBottom:"0.5rem"}}>
+            Waiting for your teacher to start the test…
+          </div>
+          <div style={{color:"rgba(255,255,255,0.55)",fontSize:"0.85rem",lineHeight:1.5,marginBottom:"1.75rem"}}>
+            Stay on this screen. Your teacher will release everyone at the same time.
+          </div>
+          <div style={{fontSize:"0.72rem",color:"rgba(255,255,255,0.3)",borderTop:"1px solid rgba(255,255,255,0.1)",paddingTop:"1rem"}}>
+            {studentName}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "instructions") {
+    return (
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100vh",background:"linear-gradient(155deg,#0d1b2a 0%,#0f2d4a 55%,#133a5e 100%)",fontFamily:T.font,padding:"1.5rem"}}>
+        <div style={{background:T.white,borderRadius:T.r,maxWidth:"480px",width:"100%",overflow:"hidden",boxShadow:"0 8px 40px rgba(0,0,0,.5)"}}>
+          <div style={{background:T.midnight,color:T.white,padding:"1.25rem 1.5rem"}}>
+            <div style={{fontSize:"0.75rem",opacity:0.7,marginBottom:"2px",letterSpacing:"0.05em",textTransform:"uppercase"}}>Get Ready</div>
+            <div style={{fontWeight:700,fontSize:"1.15rem"}}>{testCode || "Test"}</div>
+          </div>
+          <div style={{padding:"1.5rem"}}>
+            <div style={{display:"flex",gap:"2rem",marginBottom:"1.25rem",flexWrap:"wrap"}}>
+              <div style={{textAlign:"center"}}>
+                <div style={{fontSize:"1.75rem",fontWeight:700,color:T.midnight}}>{TOTAL}</div>
+                <div style={{fontSize:"0.78rem",color:"#666"}}>Questions</div>
+              </div>
+              {!untimed && (
+                <div style={{textAlign:"center"}}>
+                  <div style={{fontSize:"1.75rem",fontWeight:700,color:T.midnight}}>{Math.round(timeLimitSecs/60)}</div>
+                  <div style={{fontSize:"0.78rem",color:"#666"}}>Minutes</div>
+                </div>
+              )}
+              {untimed && (
+                <div style={{textAlign:"center"}}>
+                  <div style={{fontSize:"1.75rem",fontWeight:700,color:T.teal}}>∞</div>
+                  <div style={{fontSize:"0.78rem",color:"#666"}}>Untimed</div>
+                </div>
+              )}
+            </div>
+
+            {typesInTest.length > 0 && (
+              <div style={{marginBottom:"1.25rem"}}>
+                <div style={{fontSize:"0.78rem",fontWeight:600,color:"#888",marginBottom:"0.5rem",textTransform:"uppercase",letterSpacing:"0.05em"}}>Question Types</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:"0.4rem"}}>
+                  {typesInTest.map(t => (
+                    <span key={t} style={{background:"#f0f4f8",border:"1px solid #dde3ea",borderRadius:"20px",padding:"0.25rem 0.7rem",fontSize:"0.82rem",color:"#444"}}>
+                      {questionTypeLabels[t].icon} {questionTypeLabels[t].label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div style={{fontSize:"0.83rem",color:"#555",lineHeight:1.6,marginBottom:"1.5rem"}}>
+              <div>• You can flag questions to review before submitting</div>
+              <div>• You can navigate back to change answers</div>
+              {!untimed && <div>• The timer starts when you click <strong>I'm Ready</strong></div>}
+            </div>
+
+            <button
+              onClick={() => {
+                if (!untimed) {
+                  endTimeRef.current = Date.now() + timeLimitSecs * 1000;
+                  setSecs(timeLimitSecs);
+                }
+                setPhase("testing");
+              }}
+              style={{width:"100%",background:T.midnight,color:T.white,border:"none",borderRadius:"6px",padding:"0.9rem",fontSize:"1rem",fontWeight:700,cursor:"pointer",letterSpacing:"0.03em"}}>
+              I'm Ready — Start Test →
+            </button>
+          </div>
+        </div>
+        <div style={{marginTop:"1rem",fontSize:"0.8rem",color:"rgba(255,255,255,0.5)"}}>
+          {studentName}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -3278,6 +3455,8 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
   const [untimed,         setUntimed]         = useState(false);
   const [timeLimitSecs,   setTimeLimitSecs]   = useState(1800);
   const [warnSecs,        setWarnSecs]        = useState(300);
+  const [initialDraft,    setInitialDraft]    = useState(null);
+  const [testGated,       setTestGated]       = useState(false);
 
   // Keep sessionStorage in sync with login state
   useEffect(() => {
@@ -3317,7 +3496,7 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
     setScreen("login");
   }
 
-  function handleStartTest(studentObj, classObj, code, testInfo) {
+  async function handleStartTest(studentObj, classObj, code, testInfo) {
     setStudent(studentObj); setCls(classObj); setTestCode(code); setTestTitle(testInfo?.title || "");
     const drill = testInfo?.type === "drill";
     setIsDrill(drill);
@@ -3358,6 +3537,20 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
     const baseTime = testInfo?.timeLimitSecs ?? 1800;
     setTimeLimitSecs(Math.round(baseTime * extFactor));
     setWarnSecs(testInfo?.warnSecs ?? 300);
+
+    // Fetch server-side draft for crash recovery before rendering StudentTest
+    let draft = null;
+    if (studentObj?.id && code) {
+      try {
+        const dr = await fetch(`${API}/sessions/draft/${encodeURIComponent(studentObj.id)}/${encodeURIComponent(code)}`);
+        if (dr.ok) {
+          const dd = await dr.json();
+          if (dd && dd.student_id) draft = dd;
+        }
+      } catch { /* silently fall back to sessionStorage */ }
+    }
+    setInitialDraft(draft);
+    setTestGated(!!testInfo?.gated);
     setScreen("test");
   }
 
@@ -3458,7 +3651,7 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
               }}/>;
 
   if (screen === "test")
-    return <StudentTest studentName={student?.name || ""} studentId={student?.id || ""} testCode={testCode} questions={questions} adaptive={isAdaptive} onFinish={handleFinishTest} untimed={untimed} timeLimitSecs={timeLimitSecs} warnSecs={warnSecs} onReturnToTeacher={impersonateStudent ? onBack : null}/>;
+    return <StudentTest studentName={student?.name || ""} studentId={student?.id || ""} testCode={testCode} questions={questions} adaptive={isAdaptive} onFinish={handleFinishTest} untimed={untimed} timeLimitSecs={timeLimitSecs} warnSecs={warnSecs} onReturnToTeacher={impersonateStudent ? onBack : null} initialDraft={initialDraft} gated={testGated}/>;
 
   if (screen === "results")
     return <StudentResults session={finalSession} questions={questions} onReset={()=>{ reset(); onBack(); }}/>;

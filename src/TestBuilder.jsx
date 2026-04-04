@@ -886,6 +886,10 @@ export default function TestBuilder({ teacher, readOnly }) {
   const [rightTab, setRightTab]       = useState("current");
   const [testAssignments, setTestAssignments] = useState([]);
   const [editingTestId, setEditingTestId]   = useState(null); // non-null = editing existing test
+  const [activeSessions,  setActiveSessions] = useState({}); // testCode → control dict
+  const [waitingCounts,   setWaitingCounts]  = useState({}); // testCode → # students waiting
+  const [expandedAssign,  setExpandedAssign] = useState(null); // assignment id with expanded not-completed list
+  const [makeupLoading,   setMakeupLoading]  = useState(null); // student id being processed
 
   const [subject,      setSubject]    = useState("math");
   const [filterStd,    setFilterStd]  = useState("");
@@ -926,6 +930,70 @@ export default function TestBuilder({ teacher, readOnly }) {
     } catch { setTestAssignments([]); }
   }, [teacher]);
 
+  const loadActiveSessions = useCallback(async () => {
+    try {
+      const codes = [...new Set((testAssignments||[]).map(a=>a.testCode).filter(Boolean))];
+      if (!codes.length) return;
+      const results = {}; const counts = {};
+      await Promise.all(codes.map(async code => {
+        try {
+          const r = await fetch(`${API}/test/control?code=${encodeURIComponent(code)}`);
+          const d = await r.json();
+          if (d.launchedAt) results[code] = d;
+          const ar = await fetch(`${API}/active?code=${encodeURIComponent(code)}`);
+          const ad = await ar.json();
+          counts[code] = (Array.isArray(ad)?ad:[]).filter(s=>s.phase==="waiting").length;
+        } catch {}
+      }));
+      setActiveSessions(results);
+      setWaitingCounts(counts);
+    } catch {}
+  }, [testAssignments]);
+
+  async function launchSession(testCode, classId) {
+    try {
+      await fetch(`${API}/test/control`, {
+        method:"POST", headers:teacherHeaders(),
+        body: JSON.stringify({ code:testCode, classId, action:"launch" }),
+      });
+      await loadActiveSessions();
+    } catch {}
+  }
+
+  async function beginTesting(testCode) {
+    try {
+      await fetch(`${API}/test/control`, {
+        method:"POST", headers:teacherHeaders(),
+        body: JSON.stringify({ code:testCode, action:"begin" }),
+      });
+      await loadActiveSessions();
+    } catch {}
+  }
+
+  async function endSession(testCode) {
+    if (!window.confirm(`End the live session for code ${testCode}?`)) return;
+    try {
+      await fetch(`${API}/test/control`, {
+        method:"POST", headers:teacherHeaders(),
+        body: JSON.stringify({ code:testCode, action:"end" }),
+      });
+      setActiveSessions(s=>{ const n={...s}; delete n[testCode]; return n; });
+      setWaitingCounts(s=>{ const n={...s}; delete n[testCode]; return n; });
+    } catch {}
+  }
+
+  async function giveMakeup(assignmentId, studentId) {
+    setMakeupLoading(studentId);
+    try {
+      await fetch(`${API}/assignments/${assignmentId}/makeup`, {
+        method:"PATCH", headers:teacherHeaders(),
+        body: JSON.stringify({ studentId }),
+      });
+      await loadAssignments();
+    } catch {}
+    setMakeupLoading(null);
+  }
+
   useEffect(()=>{
     loadBank(); loadActive(); loadSavedTests(); loadAssignments();
     const classFilter = teacher?.classIds !== null
@@ -933,6 +1001,14 @@ export default function TestBuilder({ teacher, readOnly }) {
       : "";
     fetch(`${API}/roster${classFilter}`).then(r=>r.json()).then(d=>setAllClasses(Array.isArray(d)?d:[])).catch(()=>{});
   },[loadBank,loadActive,loadSavedTests,loadAssignments]);
+
+  // Poll active sessions every 5s when library tab is open
+  useEffect(()=>{
+    if (rightTab !== "library") return;
+    loadActiveSessions();
+    const t = setInterval(loadActiveSessions, 5000);
+    return ()=>clearInterval(t);
+  },[rightTab, loadActiveSessions]);
 
   const filtered = bank.filter(q => {
     const qSubject = q.subject || "math";
@@ -1343,17 +1419,85 @@ export default function TestBuilder({ teacher, readOnly }) {
                           <span onClick={()=>setAssigningTest(t)} style={{cursor:"pointer"}}>⚠ Not assigned — click Assign to push to students</span>
                         </div>
                       );
-                      return assigns.map(a=>(
-                        <div key={a.id} style={{marginTop:"0.35rem",display:"flex",alignItems:"center",gap:"0.5rem",fontSize:"0.68rem",background:"#e8f5e9",borderRadius:"3px",padding:"0.3rem 0.5rem"}}>
-                          <span style={{fontWeight:600,color:"#2e7d32"}}>📋 {a.className}</span>
-                          <span style={{color:T.textSecondary}}>{a.completedCount||0}/{a.totalStudents||0} completed</span>
-                          <div style={{flex:1,height:"4px",background:"#c8e6c9",borderRadius:"2px",overflow:"hidden"}}>
-                            <div style={{width:`${a.totalStudents?(a.completedCount||0)/a.totalStudents*100:0}%`,height:"100%",background:"#2e7d32",borderRadius:"2px"}}/>
+                      return assigns.map(a=>{
+                        const sess = activeSessions[t.code];
+                        const isWaiting = sess?.gate && !sess?.testing;
+                        const isTesting = sess?.testing && !sess?.gate;
+                        const waitCount = waitingCounts[t.code] || 0;
+                        const notCompleted = (allClasses.find(c=>c.id===a.classId)?.students||[])
+                          .filter(s=>!(a.completedIds||[]).includes(s.id) && (a.studentIds||[]).includes(s.id));
+                        const isExpanded = expandedAssign === a.id;
+                        return (
+                          <div key={a.id} style={{marginTop:"0.35rem",fontSize:"0.68rem",background:"#e8f5e9",borderRadius:"3px",padding:"0.3rem 0.5rem"}}>
+                            {/* Main row */}
+                            <div style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
+                              <span style={{fontWeight:600,color:"#2e7d32"}}>📋 {a.className}</span>
+                              <span style={{color:T.textSecondary}}>{a.completedCount||0}/{a.totalStudents||0} completed</span>
+                              <div style={{flex:1,height:"4px",background:"#c8e6c9",borderRadius:"2px",overflow:"hidden"}}>
+                                <div style={{width:`${a.totalStudents?(a.completedCount||0)/a.totalStudents*100:0}%`,height:"100%",background:"#2e7d32",borderRadius:"2px"}}/>
+                              </div>
+                              {/* Session control button */}
+                              {!sess ? (
+                                <button onClick={()=>launchSession(t.code, a.classId)}
+                                  style={{border:"1px solid #a5d6a7",background:"#e8f5e9",cursor:"pointer",fontSize:"0.62rem",fontWeight:700,color:"#2e7d32",padding:"2px 8px",borderRadius:"3px",whiteSpace:"nowrap"}}>
+                                  🟢 Launch
+                                </button>
+                              ) : isWaiting ? (
+                                <button onClick={()=>beginTesting(t.code)}
+                                  style={{border:"1px solid #90caf9",background:"#e3f2fd",cursor:"pointer",fontSize:"0.62rem",fontWeight:700,color:"#1565c0",padding:"2px 8px",borderRadius:"3px",whiteSpace:"nowrap"}}>
+                                  ▶ Begin{waitCount>0?` (${waitCount} waiting)`:""}
+                                </button>
+                              ) : isTesting ? (
+                                <button onClick={()=>endSession(t.code)}
+                                  style={{border:"1px solid #f0b8b8",background:"#fdf2f2",cursor:"pointer",fontSize:"0.62rem",fontWeight:600,color:"#8b1a1a",padding:"2px 8px",borderRadius:"3px",whiteSpace:"nowrap"}}>
+                                  End Session
+                                </button>
+                              ) : null}
+                              {/* Makeup expander */}
+                              {notCompleted.length > 0 && (
+                                <button onClick={()=>setExpandedAssign(isExpanded ? null : a.id)}
+                                  style={{border:"1px solid #ffcc02",background:"#fff8e1",cursor:"pointer",fontSize:"0.62rem",fontWeight:600,color:"#e65100",padding:"2px 8px",borderRadius:"3px",whiteSpace:"nowrap"}}>
+                                  ＋ Makeup ({notCompleted.length})
+                                </button>
+                              )}
+                              <button onClick={()=>{if(window.confirm(`Unassign from ${a.className}?`))deleteAssignment(a.id);}} title="Remove assignment"
+                                style={{border:"1px solid #f0b8b8",background:"#fdf2f2",cursor:"pointer",fontSize:"0.62rem",fontWeight:600,color:"#8b1a1a",padding:"2px 8px",borderRadius:"3px"}}>Unassign</button>
+                            </div>
+                            {/* Session code display when live */}
+                            {sess && (
+                              <div style={{marginTop:"0.3rem",fontSize:"0.62rem",color:"#1565c0",fontWeight:600}}>
+                                Session code: <span style={{fontFamily:"monospace",letterSpacing:"0.05em"}}>{t.code}</span>
+                                {isWaiting && " · Waiting room open"}
+                                {isTesting && " · Testing in progress"}
+                              </div>
+                            )}
+                            {/* Not-completed student list for makeup */}
+                            {isExpanded && notCompleted.length > 0 && (
+                              <div style={{marginTop:"0.5rem",borderTop:"1px solid #c8e6c9",paddingTop:"0.4rem"}}>
+                                <div style={{fontSize:"0.6rem",fontWeight:700,color:"#888",marginBottom:"0.3rem",textTransform:"uppercase",letterSpacing:"0.08em"}}>
+                                  Not completed — click Give Makeup to add &amp; extend window to end of today
+                                </div>
+                                <div style={{display:"flex",flexDirection:"column",gap:"3px"}}>
+                                  {notCompleted.map(s=>(
+                                    <div key={s.id} style={{display:"flex",alignItems:"center",gap:"0.4rem"}}>
+                                      <span style={{flex:1,color:"#333"}}>{s.name}</span>
+                                      <button
+                                        disabled={makeupLoading===s.id}
+                                        onClick={()=>giveMakeup(a.id, s.id)}
+                                        style={{border:"1px solid #ffcc02",background:"#fff8e1",cursor:"pointer",fontSize:"0.6rem",fontWeight:700,color:"#e65100",padding:"2px 7px",borderRadius:"3px",opacity:makeupLoading===s.id?0.6:1}}>
+                                        {makeupLoading===s.id ? "…" : "Give Makeup →"}
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                                <div style={{marginTop:"0.35rem",fontSize:"0.6rem",color:"#888"}}>
+                                  Test code: <strong style={{fontFamily:"monospace"}}>{t.code}</strong> · Share with student after clicking Give Makeup
+                                </div>
+                              </div>
+                            )}
                           </div>
-                          <button onClick={()=>{if(window.confirm(`Unassign from ${a.className}?`))deleteAssignment(a.id);}} title="Remove assignment"
-                            style={{border:`1px solid #f0b8b8`,background:"#fdf2f2",cursor:"pointer",fontSize:"0.62rem",fontWeight:600,color:"#8b1a1a",padding:"2px 8px",borderRadius:"3px"}}>Unassign</button>
-                        </div>
-                      ));
+                        );
+                      });
                     })()}
                   </div>
                   );

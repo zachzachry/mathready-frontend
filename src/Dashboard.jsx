@@ -104,41 +104,60 @@ function LineChart({ points, width=320, height=80, color=T.midnight }) {
 
 // ── Test Controls ─────────────────────────────────────────
 function TestControls() {
-  const [ctrl,       setCtrl]       = useState({ paused: false, stopped: false, extensions: {} });
-  const [active,     setActive]     = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [saving,     setSaving]     = useState(false);
-  const [msg,        setMsg]        = useState("");
-  const [extMsgs,    setExtMsgs]    = useState({});  // per-student flash messages
+  const [allSessions,  setAllSessions]  = useState([]);  // all active test sessions
+  const [selectedCode, setSelectedCode] = useState("");   // which session is being managed
+  const [ctrl,         setCtrl]         = useState({ paused: false, stopped: false, gate: false, testing: true, extensions: {} });
+  const [active,       setActive]       = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [saving,       setSaving]       = useState(false);
+  const [msg,          setMsg]          = useState("");
+  const [extMsgs,      setExtMsgs]      = useState({});  // per-student flash messages
 
-  // Poll control state + active students every 5s
+  // Poll all sessions + control state + active students every 5s
   useEffect(() => {
     async function poll() {
       try {
-        const [c, a] = await Promise.all([
-          fetch(`${API}/test/control`).then(r=>r.json()),
-          fetch(`${API}/active`).then(r=>r.json()).catch(()=>[]),
-        ]);
-        setCtrl(c);
-        setActive(Array.isArray(a) ? a : []);
+        // Get all active sessions (teacher-auth required)
+        const sessions = await fetch(`${API}/test/control/all`, {
+          headers: teacherHeaders(),
+        }).then(r=>r.ok?r.json():[]).catch(()=>[]);
+        setAllSessions(Array.isArray(sessions) ? sessions : []);
+
+        // Auto-select if only one session active
+        const code = selectedCode || (sessions.length === 1 ? sessions[0].code : "");
+        if (code !== selectedCode && sessions.length === 1) setSelectedCode(code);
+
+        if (code) {
+          const [c, a] = await Promise.all([
+            fetch(`${API}/test/control?code=${encodeURIComponent(code)}`).then(r=>r.json()),
+            fetch(`${API}/active?code=${encodeURIComponent(code)}`).then(r=>r.json()).catch(()=>[]),
+          ]);
+          setCtrl(c);
+          setActive(Array.isArray(a) ? a : []);
+        } else {
+          setCtrl({ paused: false, stopped: false, gate: false, testing: true, extensions: {} });
+          setActive([]);
+        }
       } catch {}
       setLoading(false);
     }
     poll();
     const t = setInterval(poll, 5000);
     return () => clearInterval(t);
-  }, []);
+  }, [selectedCode]); // eslint-disable-line
 
   async function send(patch) {
+    if (!selectedCode) return;
     setSaving(true);
     try {
       const r = await fetch(`${API}/test/control`, {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify(patch),
+        method:"POST", headers: teacherHeaders(),
+        body: JSON.stringify({ ...patch, code: selectedCode }),
       });
       const d = await r.json();
       setCtrl(d);
-      setMsg(patch.paused != null
+      setMsg(patch.action === "begin" ? "Testing started — students released from waiting room."
+        : patch.paused != null
         ? (patch.paused ? "Test paused — students see a waiting screen." : "Test resumed.")
         : (patch.stopped ? "Test stopped — students prompted to submit." : "Stop cleared. Extensions reset."));
       setTimeout(() => setMsg(""), 4000);
@@ -147,16 +166,16 @@ function TestControls() {
   }
 
   async function grantExtension(studentName, extraSecs) {
+    if (!selectedCode) return;
     try {
       await fetch(`${API}/test/control/extend`, {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ studentName, extraSecs }),
+        method:"POST", headers: teacherHeaders(),
+        body: JSON.stringify({ code: selectedCode, studentName, extraSecs }),
       });
       const mins = extraSecs / 60;
       setExtMsgs(prev => ({ ...prev, [studentName]: `+${mins} min granted` }));
       setTimeout(() => setExtMsgs(prev => { const n={...prev}; delete n[studentName]; return n; }), 3000);
-      // Refresh ctrl to show updated extensions
-      const d = await fetch(`${API}/test/control`).then(r=>r.json());
+      const d = await fetch(`${API}/test/control?code=${encodeURIComponent(selectedCode)}`).then(r=>r.json());
       setCtrl(d);
     } catch {}
   }
@@ -164,17 +183,66 @@ function TestControls() {
   if (loading) return <div style={{padding:"2rem",color:T.textMuted}}>Loading…</div>;
 
   const extensions = ctrl.extensions || {};
+  const waitingStudents = active.filter(s => s.phase === "waiting");
+  const testingStudents = active.filter(s => s.phase === "testing");
+  const isWaiting = ctrl.gate && !ctrl.testing;
 
   return (
     <div style={{padding:"1.25rem",maxWidth:"620px",fontFamily:T.font}}>
       <div style={{fontSize:"1rem",fontWeight:700,color:T.midnight,marginBottom:"4px"}}>Live Test Controls</div>
-      <div style={{fontSize:"0.75rem",color:T.textSecondary,marginBottom:"1.5rem"}}>
-        Controls apply to all students currently taking a test. Students poll every 5 seconds.
-      </div>
+
+      {/* Session picker */}
+      {allSessions.length === 0 ? (
+        <div style={{fontSize:"0.78rem",color:T.textMuted,marginBottom:"1.25rem",background:T.surface,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"0.65rem 0.9rem"}}>
+          No live sessions. Go to the Test Library and click <strong>Launch</strong> on an assignment to start a session.
+        </div>
+      ) : allSessions.length > 1 ? (
+        <div style={{marginBottom:"1.25rem"}}>
+          <label style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,textTransform:"uppercase",display:"block",marginBottom:"5px"}}>Active Session</label>
+          <select value={selectedCode} onChange={e=>setSelectedCode(e.target.value)}
+            style={{width:"100%",padding:"0.6rem 0.85rem",border:`1px solid ${T.border}`,borderRadius:T.xs,fontSize:"0.88rem",color:T.text,background:T.white}}>
+            <option value="">— Select a session —</option>
+            {allSessions.map(s=>(
+              <option key={s.code} value={s.code}>{s.code}{s.classId ? ` · ${s.classId}` : ""}</option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <div style={{fontSize:"0.75rem",color:T.textSecondary,marginBottom:"1.25rem"}}>
+          Session: <strong>{selectedCode || allSessions[0]?.code}</strong> · Students poll every 5 seconds.
+        </div>
+      )}
+
+      {selectedCode && (<>
 
       {msg && (
         <div style={{background:T.successBg,border:`1px solid ${T.successBd}`,borderRadius:T.xs,padding:"0.6rem 0.9rem",fontSize:"0.78rem",color:T.success,fontWeight:700,marginBottom:"1rem"}}>
           ✓ {msg}
+        </div>
+      )}
+
+      {/* Waiting Room — shown when teacher has launched but not yet clicked Begin Testing */}
+      {isWaiting && (
+        <div style={{background:"#fff8e1",border:"1px solid #ffc107",borderRadius:T.r,padding:"1.1rem 1.25rem",marginBottom:"0.85rem"}}>
+          <div style={{fontWeight:700,fontSize:"0.92rem",color:"#e65100",marginBottom:"4px"}}>
+            🟡 Waiting Room — {waitingStudents.length} student{waitingStudents.length !== 1 ? "s" : ""} ready
+          </div>
+          <div style={{fontSize:"0.72rem",color:T.textSecondary,marginBottom:"0.75rem"}}>
+            Students have entered the test code and are waiting for your signal. Click Begin Testing to release them all at once.
+          </div>
+          {waitingStudents.length > 0 && (
+            <div style={{display:"flex",flexWrap:"wrap",gap:"0.35rem",marginBottom:"0.85rem"}}>
+              {waitingStudents.map(s=>(
+                <span key={s.name} style={{background:"#fff",border:"1px solid #ffc107",borderRadius:T.full,padding:"3px 10px",fontSize:"0.78rem",fontWeight:600,color:"#555"}}>
+                  {s.name}
+                </span>
+              ))}
+            </div>
+          )}
+          <button onClick={()=>send({action:"begin"})} disabled={saving}
+            style={{background:"#1565c0",color:"#fff",border:"none",borderRadius:T.xs,padding:"0.65rem 1.25rem",fontWeight:700,fontSize:"0.88rem",cursor:"pointer",opacity:saving?0.5:1}}>
+            ▶ Begin Testing for All
+          </button>
         </div>
       )}
 
@@ -272,8 +340,9 @@ function TestControls() {
       </div>
 
       <div style={{fontSize:"0.7rem",color:T.textMuted}}>
-        Pause/stop controls affect all students school-wide. Extensions are per-student and reset when stop is cleared.
+        Controls are scoped to the selected session. Extensions are per-student and reset when stop is cleared.
       </div>
+      </>)}
     </div>
   );
 }
