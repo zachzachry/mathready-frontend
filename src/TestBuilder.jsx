@@ -1400,7 +1400,8 @@ export default function TestBuilder({ teacher, readOnly }) {
                     : vis==="grade"
                     ? {icon:"👥",label:"Grade",bg:"#e3f2fd",color:"#1565c0",bd:"#90caf9"}
                     : {icon:"🔒",label:"Private",bg:T.surfaceAlt,color:T.textSecondary,bd:T.border};
-                  const canHardDelete = canEdit && (t.classIds||[]).length === 0;
+                  const hasAssignment = (testAssignments||[]).some(a => a.testId === t.id);
+                  const canHardDelete = canEdit && !hasAssignment;
                   return (
                   <div key={t.id} style={{background:T.white,border:`1px solid ${t.archived?"#cbd5e1":T.border}`,borderRadius:"6px",padding:"0.85rem 1rem",marginBottom:"0.6rem",transition:"box-shadow .15s",boxShadow:"0 1px 3px rgba(0,0,0,.04)",opacity:t.archived?0.6:1}}>
                     <div style={{display:"flex",alignItems:"flex-start",gap:"0.75rem"}}>
