@@ -544,6 +544,11 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
             setStudent(d.student);
             setCls(d.cls);
             sid = d.student.id;
+          } else if (r.status === 403) {
+            // Brand-new student — prompt for class code immediately
+            setPendingDrill(false);
+            setEnrollStep(true);
+            return;
           }
         }
         if (sid) {
