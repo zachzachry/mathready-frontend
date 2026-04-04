@@ -880,8 +880,10 @@ export default function TestBuilder({ teacher, readOnly }) {
   const [allClasses,  setAllClasses]  = useState([]);
   const [assigningTest, setAssigningTest] = useState(null); // test id being assigned
   const [savedMsg, setSavedMsg]       = useState("");
-  const [libSearch, setLibSearch]     = useState("");
-  const [libSort,   setLibSort]       = useState("newest");
+  const [libSearch,     setLibSearch]     = useState("");
+  const [libSort,       setLibSort]       = useState("newest");
+  const [showArchived,  setShowArchived]  = useState(false);
+  const [myTestsOnly,   setMyTestsOnly]   = useState(true);
   const [previewTest, setPreviewTest] = useState(null); // test object to preview
   const [rightTab, setRightTab]       = useState("current");
   const [testAssignments, setTestAssignments] = useState([]);
@@ -914,10 +916,12 @@ export default function TestBuilder({ teacher, readOnly }) {
     } catch {}
   }, []);
 
-  const loadSavedTests = useCallback(async () => {
+  const loadSavedTests = useCallback(async (archived = false) => {
     try {
-      const p = teacher?.teacherId ? `?teacherId=${teacher.teacherId}&role=${teacher.teacherRole||"teacher"}` : "";
-      const r = await fetch(`${API}/tests/saved${p}`);
+      const params = new URLSearchParams();
+      if (teacher?.teacherId) { params.set("teacherId", teacher.teacherId); params.set("role", teacher.teacherRole||"teacher"); }
+      if (archived) params.set("showArchived", "true");
+      const r = await fetch(`${API}/tests/saved?${params}`);
       setSavedTests(await r.json());
     } catch { setSavedTests([]); }
   }, [teacher]);
@@ -995,12 +999,12 @@ export default function TestBuilder({ teacher, readOnly }) {
   }
 
   useEffect(()=>{
-    loadBank(); loadActive(); loadSavedTests(); loadAssignments();
+    loadBank(); loadActive(); loadSavedTests(showArchived); loadAssignments();
     const classFilter = teacher?.classIds !== null
       ? `?classIds=${teacher.classIds.join(",")}`
       : "";
     fetch(`${API}/roster${classFilter}`).then(r=>r.json()).then(d=>setAllClasses(Array.isArray(d)?d:[])).catch(()=>{});
-  },[loadBank,loadActive,loadSavedTests,loadAssignments]);
+  },[loadBank,loadActive,loadSavedTests,loadAssignments,showArchived]);
 
   // Poll active sessions every 5s when library tab is open
   useEffect(()=>{
@@ -1116,8 +1120,29 @@ export default function TestBuilder({ teacher, readOnly }) {
   async function deleteSavedTest(id) {
     try {
       const p = teacher?.teacherId ? `?teacherId=${teacher.teacherId}&role=${teacher.teacherRole||"teacher"}` : "";
-      await fetch(`${API}/tests/saved/${id}${p}`,{method:"DELETE",headers:teacherHeaders()});
+      const r = await fetch(`${API}/tests/saved/${id}${p}`,{method:"DELETE",headers:teacherHeaders()});
+      if (!r.ok) {
+        const d = await r.json().catch(()=>({}));
+        alert(d.detail || "Cannot delete this test.");
+        return;
+      }
       setSavedTests(s=>s.filter(t=>t.id!==id));
+    } catch {}
+  }
+
+  async function archiveTest(t) {
+    const newVal = !t.archived;
+    try {
+      await fetch(`${API}/tests/saved/${t.id}/archive`, {
+        method: "PATCH",
+        headers: {"Content-Type":"application/json", ...teacherHeaders()},
+        body: JSON.stringify({ archived: newVal }),
+      });
+      if (newVal && !showArchived) {
+        setSavedTests(s => s.filter(x => x.id !== t.id));
+      } else {
+        setSavedTests(s => s.map(x => x.id === t.id ? {...x, archived: newVal} : x));
+      }
     } catch {}
   }
 
@@ -1310,8 +1335,9 @@ export default function TestBuilder({ teacher, readOnly }) {
           const q = libSearch.trim().toLowerCase();
           const filtered = savedTests.filter(t => {
             if ((t.subject||"math") !== subject) return false;
-            if (!q) return true;
-            return (t.name||"").toLowerCase().includes(q) || (t.code||"").toLowerCase().includes(q);
+            if (myTestsOnly && t.createdBy && t.createdBy !== teacher?.teacherId) return false;
+            if (q && !(t.name||"").toLowerCase().includes(q) && !(t.code||"").toLowerCase().includes(q)) return false;
+            return true;
           });
           const sorted = [...filtered].sort((a,b) => {
             if (libSort==="oldest")  return (a.saved_at||"").localeCompare(b.saved_at||"");
@@ -1328,6 +1354,17 @@ export default function TestBuilder({ teacher, readOnly }) {
                   <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.midnight}}>TEST LIBRARY</div>
                   <div style={{fontSize:"0.68rem",color:T.textSecondary,marginTop:"1px"}}>{filtered.length} test{filtered.length!==1?"s":""}{q?` · ${filtered.length} match${filtered.length!==1?"es":""}`:""}</div>
                 </div>
+              </div>
+              <div style={{display:"flex",gap:"0.4rem",flexWrap:"wrap",marginBottom:"0.4rem"}}>
+                {[
+                  {label: myTestsOnly?"👤 My Tests":"🌐 All Tests", active: myTestsOnly, onClick:()=>setMyTestsOnly(v=>!v)},
+                  {label: showArchived?"📦 Hide Archived":"📦 Archived", active: showArchived, onClick:()=>setShowArchived(v=>!v)},
+                ].map(btn=>(
+                  <button key={btn.label} onClick={btn.onClick}
+                    style={{fontSize:"0.68rem",fontWeight:700,padding:"3px 9px",borderRadius:"12px",cursor:"pointer",border:`1px solid ${btn.active?T.teal:T.border}`,background:btn.active?T.tealLight:"transparent",color:btn.active?T.teal:T.textSecondary}}>
+                    {btn.label}
+                  </button>
+                ))}
               </div>
               <div style={{display:"flex",gap:"0.4rem",alignItems:"center"}}>
                 <input value={libSearch} onChange={e=>setLibSearch(e.target.value)} placeholder="Search by name or code..."
@@ -1363,13 +1400,15 @@ export default function TestBuilder({ teacher, readOnly }) {
                     : vis==="grade"
                     ? {icon:"👥",label:"Grade",bg:"#e3f2fd",color:"#1565c0",bd:"#90caf9"}
                     : {icon:"🔒",label:"Private",bg:T.surfaceAlt,color:T.textSecondary,bd:T.border};
+                  const canHardDelete = canEdit && (t.classIds||[]).length === 0;
                   return (
-                  <div key={t.id} style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:"6px",padding:"0.85rem 1rem",marginBottom:"0.6rem",transition:"box-shadow .15s",boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+                  <div key={t.id} style={{background:T.white,border:`1px solid ${t.archived?"#cbd5e1":T.border}`,borderRadius:"6px",padding:"0.85rem 1rem",marginBottom:"0.6rem",transition:"box-shadow .15s",boxShadow:"0 1px 3px rgba(0,0,0,.04)",opacity:t.archived?0.6:1}}>
                     <div style={{display:"flex",alignItems:"flex-start",gap:"0.75rem"}}>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:"flex",alignItems:"center",gap:"0.5rem",flexWrap:"wrap"}}>
                           <span style={{fontSize:"0.9rem",fontWeight:700,color:T.text}}>{t.name||"Untitled"}</span>
                           <span style={{fontSize:"0.58rem",fontWeight:700,background:visBadge.bg,color:visBadge.color,border:`1px solid ${visBadge.bd}`,borderRadius:"3px",padding:"1px 6px"}}>{visBadge.icon} {visBadge.label}</span>
+                          {t.archived&&<span style={{fontSize:"0.58rem",fontWeight:700,background:"#f1f5f9",color:"#64748b",border:"1px solid #cbd5e1",borderRadius:"3px",padding:"1px 6px"}}>📦 ARCHIVED</span>}
                           {t.createdByName&&<span style={{fontSize:"0.58rem",color:T.textSecondary}}>by {t.createdByName}</span>}
                         </div>
                         <div style={{fontSize:"0.7rem",color:T.textSecondary,marginTop:"2px"}}>
@@ -1390,8 +1429,10 @@ export default function TestBuilder({ teacher, readOnly }) {
                           style={{...S.smBtn,background:"#7c3aed",color:"#fff",borderColor:"#7c3aed",padding:"5px 12px"}}>🔍 Preview</button>
                         {canDupe&&<button onClick={()=>duplicateSavedTest(t.id)} title="Duplicate test"
                           style={{...S.smBtn,padding:"5px 8px",background:T.surfaceAlt,borderColor:T.border,color:T.text}}>📄</button>}
-                        {canEdit&&<button onClick={()=>setConfirmDeleteTest(t)} title="Delete test"
+                        {canEdit&&canHardDelete&&<button onClick={()=>setConfirmDeleteTest(t)} title="Delete test"
                           style={{...S.smBtn,color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",padding:"5px 8px"}}>🗑</button>}
+                        {canEdit&&!canHardDelete&&<button onClick={()=>archiveTest(t)} title={t.archived?"Restore test":"Archive test"}
+                          style={{...S.smBtn,color:t.archived?T.teal:"#64748b",borderColor:t.archived?"#99e6da":"#cbd5e1",background:t.archived?T.tealLight:"#f8fafc",padding:"5px 8px"}}>{t.archived?"↩":"📦"}</button>}
                       </div>
                     </div>
                     {/* Direct link (backup access) */}
