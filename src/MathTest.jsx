@@ -496,8 +496,8 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
   const [joinCode,        setJoinCode]        = useState("");
   const [pendingDrill,    setPendingDrill]    = useState(false);
   const [identityLoading, setIdentityLoading] = useState(
-    // True when we need to check identity before showing choice screen
-    !impersonateStudent && !!( prefillCredential || false )
+    // Start true when we already have a credential and are going straight to choice
+    !impersonateStudent && !!prefillCredential && !prefillCode
   );
   const googleBtnRef = useRef(null);
   const [googleReady, setGoogleReady] = useState(!!window.google);
@@ -516,6 +516,7 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
       callback: (resp) => {
         setCredential(resp.credential);
         setErr("");
+        if (!prefillCode) setIdentityLoading(true);
         setStep(prefillCode ? "code" : "choice");
       },
       ux_mode: "popup",
