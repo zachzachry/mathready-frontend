@@ -596,13 +596,13 @@ function AssignTestModal({ test, onDone, onClose, teacher, existingAssignments }
       if (existing) {
         // Update student list
         await fetch(`${API}/assignments/${existing.id}/students`, {
-          method:"PATCH", headers:{"Content-Type":"application/json"},
+          method:"PATCH", headers:teacherHeaders(),
           body: JSON.stringify({studentIds})
         });
       } else {
         // Create new assignment
         await fetch(`${API}/assignments`, {
-          method:"POST", headers:{"Content-Type":"application/json"},
+          method:"POST", headers:teacherHeaders(),
           body: JSON.stringify({
             testId: test.id,
             classId: selectedCls.id,
@@ -919,9 +919,9 @@ export default function TestBuilder({ teacher, readOnly }) {
   const loadSavedTests = useCallback(async (archived = false) => {
     try {
       const params = new URLSearchParams();
-      if (teacher?.teacherId) { params.set("teacherId", teacher.teacherId); params.set("role", teacher.teacherRole||"teacher"); }
+      if (teacher?.teacherId) { params.set("teacherId", teacher.teacherId); }
       if (archived) params.set("showArchived", "true");
-      const r = await fetch(`${API}/tests/saved?${params}`);
+      const r = await fetch(`${API}/tests/saved?${params}`, { headers: teacherHeaders() });
       setSavedTests(await r.json());
     } catch { setSavedTests([]); }
   }, [teacher]);
@@ -929,7 +929,7 @@ export default function TestBuilder({ teacher, readOnly }) {
   const loadAssignments = useCallback(async () => {
     try {
       const classFilter = teacher?.classIds?.length ? `?classIds=${teacher.classIds.join(",")}` : "";
-      const r=await fetch(`${API}/assignments${classFilter}`);
+      const r=await fetch(`${API}/assignments${classFilter}`, { headers: teacherHeaders() });
       setTestAssignments(await r.json());
     } catch { setTestAssignments([]); }
   }, [teacher]);
@@ -1095,8 +1095,8 @@ export default function TestBuilder({ teacher, readOnly }) {
 
   async function loadSavedTest(id, forEdit=false) {
     try {
-      const p = teacher?.teacherId ? `?teacherId=${teacher.teacherId}&role=${teacher.teacherRole||"teacher"}` : "";
-      const r = await fetch(`${API}/tests/saved/${id}${p}`);
+      const p = teacher?.teacherId ? `?teacherId=${teacher.teacherId}` : "";
+      const r = await fetch(`${API}/tests/saved/${id}${p}`, { headers: teacherHeaders() });
       const t = await r.json();
       setSelected((t.questions||[]).map(q=>q.id));
       setTestTitle(t.title||t.name||"");
@@ -1113,13 +1113,13 @@ export default function TestBuilder({ teacher, readOnly }) {
   }
 
   async function deleteAssignment(aid) {
-    try { await fetch(`${API}/assignments/${aid}`,{method:"DELETE"}); await loadAssignments(); }
+    try { await fetch(`${API}/assignments/${aid}`,{method:"DELETE",headers:teacherHeaders()}); await loadAssignments(); }
     catch {}
   }
 
   async function deleteSavedTest(id) {
     try {
-      const p = teacher?.teacherId ? `?teacherId=${teacher.teacherId}&role=${teacher.teacherRole||"teacher"}` : "";
+      const p = teacher?.teacherId ? `?teacherId=${teacher.teacherId}` : "";
       const r = await fetch(`${API}/tests/saved/${id}${p}`,{method:"DELETE",headers:teacherHeaders()});
       if (!r.ok) {
         const d = await r.json().catch(()=>({}));
@@ -1148,8 +1148,8 @@ export default function TestBuilder({ teacher, readOnly }) {
 
   async function duplicateSavedTest(id) {
     try {
-      const p = teacher?.teacherId ? `?teacherId=${teacher.teacherId}&role=${teacher.teacherRole||"teacher"}` : "";
-      const r = await fetch(`${API}/tests/saved/${id}${p}`);
+      const p = teacher?.teacherId ? `?teacherId=${teacher.teacherId}` : "";
+      const r = await fetch(`${API}/tests/saved/${id}${p}`, { headers: teacherHeaders() });
       const t = await r.json();
       const body = {
         name: `${t.name} (copy)`, questions: t.questions||[], title: t.title||"",

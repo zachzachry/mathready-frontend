@@ -403,18 +403,17 @@ export default function Dashboard({ teacher, readOnly }) {
   // Build URL params once (stable across renders)
   const classFilter  = teacher && teacher.classIds !== null && teacher.classIds.length > 0
     ? "?classIds="+teacher.classIds.join(",") : teacher && teacher.classIds !== null ? "?classIds=" : "";
-  const roleParam    = teacher?.teacherRole ? `&role=${teacher.teacherRole}` : "";
   const tidParam     = teacher?.teacherId   ? `&teacherId=${teacher.teacherId}` : "";
   const sessionParam = classFilter
-    ? `${classFilter}${roleParam}${tidParam}`
-    : (roleParam||tidParam) ? `?${(roleParam+tidParam).slice(1)}` : "";
+    ? `${classFilter}${tidParam}`
+    : tidParam ? `?${tidParam.slice(1)}` : "";
   const savedParam   = teacher?.teacherId
-    ? `?teacherId=${teacher.teacherId}&role=${teacher.teacherRole||"teacher"}` : "";
+    ? `?teacherId=${teacher.teacherId}` : "";
 
   // ── Fast poll: sessions only (every 3 s) ──────────────────
   const refreshSessions = useCallback(async () => {
     try {
-      const s = await fetch(`${API}/sessions${sessionParam}`).then(r=>r.ok?r.json():[]).catch(()=>[]);
+      const s = await fetch(`${API}/sessions${sessionParam}`, { headers: teacherHeaders() }).then(r=>r.ok?r.json():[]).catch(()=>[]);
       setSessions(Array.isArray(s) ? s : []);
     } catch {}
   }, [sessionParam]);
@@ -423,9 +422,9 @@ export default function Dashboard({ teacher, readOnly }) {
   const refresh = useCallback(async () => {
     try {
       const [s, r, st] = await Promise.all([
-        fetch(`${API}/sessions${sessionParam}`).then(r=>r.ok?r.json():[]).catch(()=>[]),
+        fetch(`${API}/sessions${sessionParam}`, { headers: teacherHeaders() }).then(r=>r.ok?r.json():[]).catch(()=>[]),
         fetch(`${API}/roster${classFilter}`).then(r=>r.ok?r.json():[]).catch(()=>[]),
-        fetch(`${API}/tests/saved${savedParam}`).then(r=>r.ok?r.json():[]).catch(()=>[]),
+        fetch(`${API}/tests/saved${savedParam}`, { headers: teacherHeaders() }).then(r=>r.ok?r.json():[]).catch(()=>[]),
       ]);
       setSessions(Array.isArray(s) ? s : []);
       if (Array.isArray(st)) setSavedTests(st);
@@ -504,7 +503,7 @@ export default function Dashboard({ teacher, readOnly }) {
   async function handleClearByTest(code) {
     setClearing(true); setClearError("");
     try {
-      const r = await fetch(`${API}/sessions/test/${encodeURIComponent(code)}`, { method: "DELETE" });
+      const r = await fetch(`${API}/sessions/test/${encodeURIComponent(code)}`, { method: "DELETE", headers: teacherHeaders() });
       if (!r.ok) { setClearError(`Delete failed (${r.status}). Try again or refresh.`); setClearing(false); return; }
       setClearTestCode("");
       setSessions(prev => prev.filter(s => (s.testCode||s.code||"").toUpperCase() !== code.toUpperCase()));
@@ -517,12 +516,12 @@ export default function Dashboard({ teacher, readOnly }) {
     setClearing(true); setClearModal(false);
     try {
       if (mode === "fluency") {
-        await fetch(`${API}/fluency/all`, { method: "DELETE" });
+        await fetch(`${API}/fluency/all`, { method: "DELETE", headers: teacherHeaders() });
         setFluencyReport([]); setLeaderboard([]);
       } else {
         const url = mode === "all" ? `${API}/sessions` : `${API}/sessions?mode=${mode}`;
-        await fetch(url, { method: "DELETE" });
-        if (mode === "all") { setSessions([]); await fetch(`${API}/fluency/all`, { method: "DELETE" }); setFluencyReport([]); setLeaderboard([]); }
+        await fetch(url, { method: "DELETE", headers: teacherHeaders() });
+        if (mode === "all") { setSessions([]); await fetch(`${API}/fluency/all`, { method: "DELETE", headers: teacherHeaders() }); setFluencyReport([]); setLeaderboard([]); }
         else if (mode === "tests") setSessions(prev => prev.filter(s => s.mode === "drill" || s.mode === "practice"));
         else if (mode === "drills") setSessions(prev => prev.filter(s => s.mode !== "drill" && s.mode !== "practice"));
       }
@@ -1516,7 +1515,7 @@ export default function Dashboard({ teacher, readOnly }) {
                       <button onClick={async()=>{
                         if(!window.confirm(`Clear test scores for "${c.name}"? Drill data is kept. This cannot be undone.`)) return;
                         try {
-                          await fetch(`${API}/sessions/class/${c.id}`,{method:"DELETE"});
+                          await fetch(`${API}/sessions/class/${c.id}`,{method:"DELETE",headers:teacherHeaders()});
                           refresh();
                         } catch {}
                       }} title="Clear test data for this class"

@@ -1744,7 +1744,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
     const t = setInterval(()=>{
       const remaining = Math.max(0, Math.round((endTimeRef.current - Date.now()) / 1000));
       setSecs(remaining);
-    }, 250);
+    }, 1000);
     return () => clearInterval(t);
   }, [paused, untimed, phase]); // eslint-disable-line
 
@@ -1817,7 +1817,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
 
   function addViolation(reason) {
     setViolations(v => v + 1);
-    setViolationLog(log => [...log, { reason, time: new Date().toISOString(), questionNum: cur + 1 }]);
+    setViolationLog(log => [...log, { reason, time: new Date().toISOString(), questionNum: cur + 1 }].slice(-50));
     setLockWarning(reason);
   }
 
@@ -2803,7 +2803,7 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
     const t = setInterval(() => {
       const remaining = Math.max(0, Math.round((drillEndTime.current - Date.now()) / 1000));
       setTimeLeft(remaining);
-    }, 250);
+    }, 1000);
     return () => clearInterval(t);
   }, [phase]);
 
