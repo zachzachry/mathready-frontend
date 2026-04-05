@@ -922,7 +922,8 @@ export default function TestBuilder({ teacher, readOnly }) {
       if (teacher?.teacherId) { params.set("teacherId", teacher.teacherId); }
       if (archived) params.set("showArchived", "true");
       const r = await fetch(`${API}/tests/saved?${params}`, { headers: teacherHeaders() });
-      setSavedTests(await r.json());
+      const data = await r.json();
+      setSavedTests(Array.isArray(data) ? data : []);
     } catch { setSavedTests([]); }
   }, [teacher]);
 
@@ -930,7 +931,8 @@ export default function TestBuilder({ teacher, readOnly }) {
     try {
       const classFilter = teacher?.classIds?.length ? `?classIds=${teacher.classIds.join(",")}` : "";
       const r=await fetch(`${API}/assignments${classFilter}`, { headers: teacherHeaders() });
-      setTestAssignments(await r.json());
+      const data = await r.json();
+      setTestAssignments(Array.isArray(data) ? data : []);
     } catch { setTestAssignments([]); }
   }, [teacher]);
 
