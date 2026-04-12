@@ -12,54 +12,11 @@
 import React, { useRef } from "react";
 import { T } from "./shared/constants";
 import MathText from "./shared/MathText";
+import { gradeAnswer } from "./grading";
 
 const LETTERS = ["a", "b", "c", "d", "e", "f"];
 
 /* ── helpers ─────────────────────────────────────────────────── */
-function gradeAnswer(q, ans) {
-  if (!q || ans === undefined || ans === null) return false;
-  if (q.type === "multiselect") {
-    try { return JSON.stringify([...JSON.parse(ans)].sort()) === JSON.stringify([...(Array.isArray(q.answer)?q.answer:[])].sort()); }
-    catch { return false; }
-  }
-  if (q.type === "keypad") return String(q.answer??"").trim().toLowerCase() === String(ans).trim().toLowerCase();
-  if (q.type === "plotpoint") { try { return ans === JSON.stringify(Array.isArray(q.answer)?q.answer:JSON.parse(q.answer)); } catch { return false; } }
-  if (q.type === "dragdrop") {
-    try {
-      const g = JSON.parse(ans);
-      const cm = q.correct || q.answer || {};
-      return (q.items||[]).every(item => {
-        const c = cm[item];
-        if (c === "distractor") return g[item] === undefined;
-        return g[item] === c;
-      });
-    } catch { return false; }
-  }
-  if (q.type === "hotspot") {
-    try {
-      const g = Array.isArray(ans) ? ans : JSON.parse(ans);
-      const c = q.answer || {};
-      const sps = q.snapPoints || []; const correctSps = sps.filter(sp => c[sp.id]);
-      if (!correctSps.length) return null; // not configured — caller falls back to qt.correct
-      const isDot = q.assetType === "dot" || q.assetType === "pin"; const TOL = 8;
-      if (!Array.isArray(g) || g.length !== correctSps.length) return false;
-      const matched = correctSps.filter(sp => g.some(pt => {
-        const d = Math.sqrt((sp.x-pt.x)**2+(sp.y-pt.y)**2);
-        return d <= TOL && (isDot || pt.val === c[sp.id]);
-      }));
-      return matched.length === correctSps.length;
-    } catch { return false; }
-  }
-  // MCQ: compare by choice index (robust against encoding/whitespace differences
-  // between stored answer and current bank value)
-  const correctVal = q.correct ?? q.answer;
-  const choices = q.choices || [];
-  const ansIdx = choices.indexOf(ans);
-  const correctIdx = choices.indexOf(correctVal);
-  if (ansIdx >= 0 && correctIdx >= 0) return ansIdx === correctIdx;
-  return String(ans).trim() === String(correctVal ?? "").trim();
-}
-
 function formatStudentAnswer(q, ans) {
   if (ans === undefined || ans === null) return { text: "—", label: null };
   if (!q) {
@@ -138,7 +95,7 @@ function printReport(ref, studentName, testCode, pct) {
   const win = window.open("", "_blank");
   if (!win) { alert("Please allow popups to print."); return; }
   win.document.write(`<!DOCTYPE html>
-<html><head><title>MathReady — Question Report: ${studentName}</title>
+<html><head><title>MilestoneReady — Question Report: ${studentName}</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:#fff; font-size:12px; }

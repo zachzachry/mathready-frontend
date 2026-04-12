@@ -57,7 +57,7 @@ function printReport() {
   const win = window.open("", "_blank");
   if (!win) { alert("Please allow popups to print."); return; }
   win.document.write(`<!DOCTYPE html>
-<html><head><title>MathReady — Test Report</title>
+<html><head><title>MilestoneReady — Test Report</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:#fff; }

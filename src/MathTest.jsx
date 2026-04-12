@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from "react";
+import { gradeAnswer } from "./grading";
 // Pet/avatar placeholder — EggScene removed, will be replaced later
 import { AreaChart, Area, LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import MathText from "./shared/MathText";
 import TopBar from "./shared/TopBar";
-import { QUESTIONS as FALLBACK_QUESTIONS, START_SECS, LETTERS, S, T, pct, lvl, lvlC, lvlBg, lvlBd, fmtTime, now, saveSession, sendHeartbeat, API } from "./shared/constants";
+import { QUESTIONS as FALLBACK_QUESTIONS, LETTERS, S, T, pct, lvl, lvlC, lvlBg, lvlBd, fmtTime, now, sendHeartbeat, API, TEACHER_POLL_MS, HEARTBEAT_MS, DRAFT_SAVE_DEBOUNCE_MS, FS_GRACE_MS, DEVTOOLS_THRESHOLD_PX } from "./shared/constants";
 import { buildWeightMap, updateSessionWeights, pickAdaptiveQuestion, ALL_STANDARDS } from "./adaptive";
+import MulDivPractice from "./MulDivPractice";
 import PlotGrid from "./shared/PlotGrid";
 
 /* ── Drag-and-Drop Answer Component ─────────────────────── */
@@ -344,8 +346,6 @@ export function HotspotAnswer({ questionImage, snapPoints=[], assets=[], assetTy
     };
   }
 
-  function chipLabel(val) { return isDot ? "●" : val; }
-
   return (
     <div>
       <style>{`@keyframes snapPulse{0%{transform:scale(1)}50%{transform:scale(1.5)}100%{transform:scale(1)}}`}</style>
@@ -475,7 +475,7 @@ const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
 
 // ── Student Login ──────────────────────────────────────────
 // Flow: google → choice (drill | test code) → [code → confirm] or [drill start]
-function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillCredential, impersonateStudent }) {
+function StudentLogin({ onStartTest, onStartDrill, onStartMulDiv, onBack, prefillCode, prefillCredential, impersonateStudent }) {
   const [credential, setCredential] = useState(prefillCredential || null);
   const [code,       setCode]       = useState(prefillCode || "");
   const [err,        setErr]        = useState("");
@@ -749,7 +749,6 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
     // Standard mastery from test history
     const stdMap = {};
     testHistory.forEach(s => {
-      const ans = s.answers || {};
       // We don't have full question data here, so use questionTimes if available
       (s.questionTimes || []).forEach(qt => {
         if (!qt.standard) return;
@@ -772,7 +771,7 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
           ? <button onClick={onBack} style={{background:"rgba(124,58,237,.5)",border:"1px solid rgba(167,139,250,.5)",color:T.white,borderRadius:T.xs,padding:"6px 14px",cursor:"pointer",fontSize:"0.8rem",fontWeight:700}}>← Teacher View</button>
           : <button onClick={()=>{setStep("google");setErr("");}} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:T.white,borderRadius:T.xs,padding:"6px 14px",cursor:"pointer",fontSize:"0.8rem"}}>← Sign Out</button>
         }
-        <div style={{flex:1,color:T.white,fontSize:"0.95rem",fontWeight:700}}>MathReady</div>
+        <div style={{flex:1,color:T.white,fontSize:"0.95rem",fontWeight:700}}>MilestoneReady</div>
         {student && <div style={{color:"rgba(255,255,255,.7)",fontSize:"0.82rem"}}>{student.name}</div>}
       </div>
 
@@ -837,6 +836,32 @@ function StudentLogin({ onStartTest, onStartDrill, onBack, prefillCode, prefillC
                 <div style={{fontSize:"0.7rem",color:"rgba(255,255,255,.8)"}}>Adaptive fact practice</div>
               </div>
             </button>
+            )}
+            {studentAssignments.length > 0 ? (
+              <div style={{flex:1,minWidth:"140px",background:"rgba(13,148,136,.08)",border:"1px solid rgba(13,148,136,.25)",borderRadius:"10px",padding:"1rem 1.25rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+                <span style={{fontSize:"1.5rem"}}>✖÷</span>
+                <div style={{textAlign:"left"}}>
+                  <div style={{fontSize:"0.95rem",fontWeight:800,color:"rgba(255,255,255,.35)"}}>5.NR.2 Practice</div>
+                  <div style={{fontSize:"0.7rem",color:"rgba(13,148,136,.6)"}}>Complete your test first</div>
+                </div>
+              </div>
+            ) : cls?.practiceOpen === false ? (
+              <div style={{flex:1,minWidth:"140px",background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.1)",borderRadius:"10px",padding:"1rem 1.25rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+                <span style={{fontSize:"1.5rem",opacity:0.3}}>✖÷</span>
+                <div style={{textAlign:"left"}}>
+                  <div style={{fontSize:"0.95rem",fontWeight:800,color:"rgba(255,255,255,.3)"}}>5.NR.2 Practice</div>
+                  <div style={{fontSize:"0.7rem",color:"rgba(255,255,255,.25)"}}>Not available</div>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => { if (onStartMulDiv) onStartMulDiv(student, cls); }}
+                style={{flex:1,minWidth:"140px",background:"linear-gradient(135deg,#0d9488,#0f766e)",border:"none",borderRadius:"10px",padding:"1rem 1.25rem",cursor:"pointer",display:"flex",alignItems:"center",gap:"0.75rem",boxShadow:"0 4px 12px rgba(13,148,136,.3)"}}>
+                <span style={{fontSize:"1.5rem"}}>✖÷</span>
+                <div style={{textAlign:"left"}}>
+                  <div style={{fontSize:"0.95rem",fontWeight:800,color:T.white}}>5.NR.2 Practice</div>
+                  <div style={{fontSize:"0.7rem",color:"rgba(255,255,255,.8)"}}>Multiply &amp; divide</div>
+                </div>
+              </button>
             )}
             <button onClick={()=>{setErr("");setStep("code");}}
               style={{flex:1,minWidth:"140px",background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.2)",borderRadius:"10px",padding:"1rem 1.25rem",cursor:"pointer",display:"flex",alignItems:"center",gap:"0.75rem"}}>
@@ -1121,16 +1146,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
 
   function handleNext() {
     const timeSecs = Math.round((Date.now() - qStart) / 1000);
-    function gradeIt(q, sel) {
-      if (!sel) return false;
-      if (q.type === "plotpoint") return sel === JSON.stringify(Array.isArray(q.answer)?q.answer:(()=>{try{return JSON.parse(q.answer);}catch{return null;}})());
-      if (q.type === "multiselect") { try { return JSON.stringify([...JSON.parse(sel)].sort())===JSON.stringify([...(Array.isArray(q.answer)?q.answer:[])].sort()); } catch { return false; } }
-      if (q.type === "keypad") return String(q.answer??"").trim().toLowerCase()===String(sel).trim().toLowerCase();
-      if (q.type === "dragdrop") { try { const given=JSON.parse(sel); const correct=q.correct||q.answer||{}; return (q.items||[]).every(item=>{const c=correct[item]; if(c==="distractor") return given[item]===undefined; return given[item]===c;}); } catch { return false; } }
-      if (q.type === "hotspot") { try { const g=JSON.parse(sel); const c=q.answer||{}; const sps=q.snapPoints||[]; const correctSps=sps.filter(sp=>c[sp.id]); const isDot=q.assetType==="dot"||q.assetType==="pin"; const TOL=2.5; if(!Array.isArray(g)||g.length!==correctSps.length) return false; const matched=correctSps.filter(sp=>g.some(pt=>{const d=Math.sqrt((sp.x-pt.x)**2+(sp.y-pt.y)**2); return d<=TOL&&(isDot||pt.val===c[sp.id]);})); return matched.length===correctSps.length; } catch { return false; } }
-      return sel === q.correct;
-    }
-    const isCorrect = gradeIt(curQ, selected);
+    const isCorrect = gradeAnswer(curQ, selected);
     const newHistory = [...history, { q: curQ, chosen: selected, correct: isCorrect, timeSecs }];
     setHistory(newHistory);
 
@@ -1633,7 +1649,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
             endTime: endTimeRef.current,
           }),
         }).catch(() => {}); // fire-and-forget; sessionStorage is the fallback
-      }, 5000);
+      }, DRAFT_SAVE_DEBOUNCE_MS);
     }
   }, [ans, cur, flg, sessionKey, phase]); // eslint-disable-line
 
@@ -1665,40 +1681,6 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
     seedWeights();
   }, [adaptive, studentId]);  // eslint-disable-line
 
-  // Grade a single answer — handles all question types (MCQ, multiselect, keypad, plotpoint, hotspot)
-  function gradeOne(q, given) {
-    if (!given) return false;
-    if (q.type === "plotpoint") {
-      const ans = Array.isArray(q.answer) ? q.answer
-        : (()=>{ try { return JSON.parse(q.answer); } catch { return null; } })();
-      return given === JSON.stringify(ans);
-    }
-    if (q.type === "multiselect") {
-      const correct = Array.isArray(q.answer) ? q.answer : [];
-      try {
-        const given_arr = JSON.parse(given);
-        return JSON.stringify([...given_arr].sort()) === JSON.stringify([...correct].sort());
-      } catch { return false; }
-    }
-    if (q.type === "keypad") {
-      return String(q.answer ?? "").trim().toLowerCase() === String(given).trim().toLowerCase();
-    }
-    if (q.type === "hotspot") {
-      try {
-        const g = JSON.parse(given); const c = q.answer || {};
-        const sps = q.snapPoints || []; const correctSps = sps.filter(sp => c[sp.id]);
-        const isDot = q.assetType === "dot" || q.assetType === "pin"; const TOL = 8;
-        if (!Array.isArray(g) || g.length !== correctSps.length) return false;
-        const matched = correctSps.filter(sp => g.some(pt => {
-          const d = Math.sqrt((sp.x-pt.x)**2+(sp.y-pt.y)**2);
-          return d <= TOL && (isDot || pt.val === c[sp.id]);
-        }));
-        return matched.length === correctSps.length;
-      } catch { return false; }
-    }
-    return given === q.correct;
-  }
-
   // Adaptive: when student answers, swap in an adaptive next question
   function handleAdaptiveAnswer(qId, choice) {
     if (!adaptive) return;
@@ -1706,14 +1688,14 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
       const newAns = {...prev, [qId]: choice};
       // Build mini history from current answers — use gradeOne for all question types
       const miniHistory = questions.slice(0, cur+1).map(q => ({
-        q, chosen: newAns[q.id], correct: gradeOne(q, newAns[q.id])
+        q, chosen: newAns[q.id], correct: gradeAnswer(q, newAns[q.id])
       }));
       const newW = updateSessionWeights(weights, miniHistory, ALL_STANDARDS);
       setWeights(newW);
       // Replace the NEXT question in the queue if there is one
       if (cur + 1 < questions.length) {
         const newSeen = new Set([...seenIds]);
-        const nextQ = pickAdaptiveQuestion(initialQuestions, newW, newSeen, ALL_STANDARDS);
+        const nextQ = pickAdaptiveQuestion(questions, newW, newSeen, ALL_STANDARDS);
         if (nextQ && nextQ.id !== questions[cur+1].id) {
           setQuestions(qs => {
             const updated = [...qs];
@@ -1792,26 +1774,29 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
           }
         }
       } catch (e) { console.warn("Teacher control poll failed:", e); }
-    }, 5000);
+    }, TEACHER_POLL_MS);
     return () => clearInterval(t);
   }, [stopped, untimed, studentName, phase, testCode]); // eslint-disable-line
 
-  // Heartbeat — includes testCode and current phase so teacher can see waiting-room students
+  // Heartbeat — keep a ref for cur so the 30-second interval doesn't restart on every question nav
+  const curHeartbeatRef = useRef(cur);
+  useEffect(()=>{ curHeartbeatRef.current = cur; }, [cur]);
+
   useEffect(()=>{
     const ph = phase === "waiting_room" ? "waiting"
              : phase === "instructions" ? "instructions"
              : "testing";
-    sendHeartbeat(studentName, cur, testCode, ph);
-    const t = setInterval(()=>sendHeartbeat(studentName, cur, testCode, ph), 30000);
+    sendHeartbeat(studentName, curHeartbeatRef.current, testCode, ph);
+    const t = setInterval(()=>sendHeartbeat(studentName, curHeartbeatRef.current, testCode, ph), HEARTBEAT_MS);
     return()=>clearInterval(t);
-  },[studentName, cur, testCode, phase]); // eslint-disable-line
+  },[studentName, testCode, phase]); // eslint-disable-line
 
   // ── Lockdown ────────────────────────────────────────────
   const containerRef = useRef();
   const [violations,    setViolations]    = useState(0);
   const [violationLog,  setViolationLog]  = useState([]); // [{reason, time, questionNum}]
   const [lockWarning,   setLockWarning]   = useState(null); // message string or null
-  const [isFullscreen,  setIsFullscreen]  = useState(false);
+  const [,              setIsFullscreen]  = useState(false);
   const [graceWarning,  setGraceWarning]  = useState(false); // gentle "please return" prompt
   const fsGraceTimer    = useRef(null);
 
@@ -1848,7 +1833,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
             setGraceWarning(false);
             addViolation("Oops! You left the test screen. Please click below to get back to your test.");
           }
-        }, 3000);
+        }, FS_GRACE_MS);
       } else {
         // Returned to fullscreen — cancel grace timer, clear gentle prompt
         if (fsGraceTimer.current) { clearTimeout(fsGraceTimer.current); fsGraceTimer.current = null; }
@@ -1862,6 +1847,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
       document.removeEventListener("webkitfullscreenchange", onFsChange);
       if (fsGraceTimer.current) clearTimeout(fsGraceTimer.current);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Detect tab/window blur — record leave time; patch last entry with return time on focus
@@ -1885,6 +1871,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("focus", onReturn);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Block keyboard shortcuts and right-click
@@ -1894,7 +1881,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
     // Block keyboard shortcuts
     function onKey(e) {
       const bad = (
-        (e.ctrlKey || e.metaKey) && ["c","v","u","a","s","p"].includes(e.key.toLowerCase()) ||
+        ((e.ctrlKey || e.metaKey) && ["c","v","u","a","s","p"].includes(e.key.toLowerCase())) ||
         (e.ctrlKey && e.shiftKey && ["i","j","c","k"].includes(e.key.toLowerCase())) ||
         e.key === "F12" || e.key === "PrintScreen" || e.key === "F5"
       );
@@ -1906,7 +1893,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
 
     // Devtools size detection — fires when devtools panel opens/closes
     function checkDevTools() {
-      const threshold = 160;
+      const threshold = DEVTOOLS_THRESHOLD_PX;
       const widthDiff  = window.outerWidth  - window.innerWidth;
       const heightDiff = window.outerHeight - window.innerHeight;
       const open = widthDiff > threshold || heightDiff > threshold;
@@ -1946,42 +1933,6 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
   const isFl = flg[q.id] ?? false;
   const ansCount = Object.keys(ans).length;
   const flgCount = Object.values(flg).filter(Boolean).length;
-
-  function gradeAnswer(q, given) {
-    if (!given) return false;
-    if (q.type === "plotpoint") {
-      const ans = Array.isArray(q.answer) ? q.answer
-        : (()=>{ try { return JSON.parse(q.answer); } catch { return null; } })();
-      return given === JSON.stringify(ans);
-    }
-    if (q.type === "multiselect") {
-      const correct = Array.isArray(q.answer) ? q.answer : [];
-      try {
-        const given_arr = JSON.parse(given);
-        return JSON.stringify([...given_arr].sort()) === JSON.stringify([...correct].sort());
-      } catch { return false; }
-    }
-    if (q.type === "keypad") {
-      return String(q.answer ?? "").trim().toLowerCase() === String(given).trim().toLowerCase();
-    }
-    if (q.type === "dragdrop") {
-      try { const g=JSON.parse(given); const correct=q.correct||q.answer||{}; return (q.items||[]).every(item=>{const c=correct[item]; if(c==="distractor") return g[item]===undefined; return g[item]===c;}); } catch { return false; }
-    }
-    if (q.type === "hotspot") {
-      try {
-        const g = JSON.parse(given); const c = q.answer || {};
-        const sps = q.snapPoints || []; const correctSps = sps.filter(sp => c[sp.id]);
-        const isDot = q.assetType === "dot" || q.assetType === "pin"; const TOL = 8;
-        if (!Array.isArray(g) || g.length !== correctSps.length) return false;
-        const matched = correctSps.filter(sp => g.some(pt => {
-          const d = Math.sqrt((sp.x-pt.x)**2+(sp.y-pt.y)**2);
-          return d <= TOL && (isDot || pt.val === c[sp.id]);
-        }));
-        return matched.length === correctSps.length;
-      } catch { return false; }
-    }
-    return given === q.correct;
-  }
 
   async function doSubmit() {
     if (submittedRef.current) return;   // guard against double-submit
@@ -2727,8 +2678,6 @@ function pickDrillOp(levels, streaks) {
   return ops[0];
 }
 
-const STAR_LABELS = ["", "Keep going! 📚", "Nice work! 👍", "Good job! ✨", "Great work! 🌟", "PERFECT! 🏆"];
-
 // ── Drill session ───────────────────────────────────────────────────────────
 function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drillNumber = 1, parentBests, onBestsUpdate }) {
   const drillSecs = cls?.drillDuration || DRILL_SECS;
@@ -2741,7 +2690,7 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
   const [countdownNum, setCountdownNum] = useState(3);
   const [lastInput,setLastInput]= useState("");
   const [feedback, setFeedback] = useState(null); // {correct, correctAnswer}
-  const [log,      setLog]      = useState([]);
+  const [,         setLog]      = useState([]);
   const [timeLeft, setTimeLeft] = useState(drillSecs);
 
   const levelsRef         = useRef({ add:1, sub:1, mul:1, div:1 });
@@ -2795,6 +2744,7 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
     }
     const t = setTimeout(() => setCountdownNum(n => n - 1), 1000);
     return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, countdownNum]);
 
   // Countdown timer — uses Date.now() to avoid drift
@@ -3462,7 +3412,7 @@ function GoogleSignIn({ mode, codeOrClassId, onSuccess, onBack }) {
       shape: "rectangular",
       width: 280,
     });
-  // eslint-disable-line
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [CLIENT_ID]);
 
   async function handleCredential(response) {
@@ -3535,9 +3485,6 @@ function GoogleSignIn({ mode, codeOrClassId, onSuccess, onBack }) {
 
 // ── Session persistence (survives refresh, clears on tab close) ──────────────
 const SESSION_KEY = "mathready_session";
-function _loadSaved() {
-  try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null"); } catch (e) { console.warn("Could not load saved session:", e); return null; }
-}
 
 // ── Main shell ─────────────────────────────────────────────
 export default function MathTest({ onBack, prefillCode, directPracticeClassId, directDrillMode, prefillCredential, impersonateStudent }) {
@@ -3587,9 +3534,9 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
     let s = seed | 0;
     function rand() {
       s = s + 0x6D2B79F5 | 0;
-      let t = Math.imul(s ^ s >>> 15, 1 | s);
-      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      let t = Math.imul(s ^ (s >>> 15), 1 | s);
+      t = t + Math.imul(t ^ (t >>> 7), 61 | t) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     }
     const a = [...arr];
     for (let i = a.length - 1; i > 0; i--) {
@@ -3623,7 +3570,7 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
       // DrillSession generates problems internally — no question list needed
     } else if (testInfo?.questions?.length) {
       // Apply reduce choices: remove one wrong MCQ option per question
-      const qs = testInfo.questions.map(q => {
+      let qs = testInfo.questions.map(q => {
         if (!reduceChoices || q.type !== "mcq" || !q.choices || q.choices.length < 4) return q;
         const wrongIdxs = q.choices
           .map((c,i) => i)
@@ -3732,6 +3679,9 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
       onStartDrill={(studentObj, classObj) => {
         setStudent(studentObj); setCls(classObj); setIsDrill(true); setScreen("test");
       }}
+      onStartMulDiv={(studentObj, classObj) => {
+        setStudent(studentObj); setCls(classObj); setScreen("muldiv");
+      }}
       onBack={onBack}
       prefillCode={prefillCode}
       prefillCredential={prefillCredential}
@@ -3747,6 +3697,13 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
 
   if (screen === "practice-results")
     return <PracticeResults session={finalSession} history={practiceHistory} onReset={reset}/>;
+
+  if (screen === "muldiv")
+    return <MulDivPractice
+      student={student}
+      cls={cls}
+      onBack={() => setScreen("login")}
+    />;
 
   if (screen === "test" && isDrill)
     return <DrillSession

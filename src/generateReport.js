@@ -28,7 +28,7 @@ function pageFooters(doc) {
     doc.setTextColor(160, 160, 160);
     doc.setFont('helvetica', 'normal');
     doc.text(
-      `MathReady GA — Confidential   ·   Page ${i} of ${total}`,
+      `MilestoneReady — Confidential   ·   Page ${i} of ${total}`,
       W / 2, H - 22,
       { align: 'center' }
     );
@@ -93,7 +93,7 @@ export async function generateClassReport(sessions, bankQ, filterClass = 'all') 
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
-  doc.text('MathReady GA — Class Report', MARGIN, 42);
+  doc.text('MilestoneReady — Class Report', MARGIN, 42);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.text(`Generated ${now}   ·   ${clsLabel}`, MARGIN, 60);
@@ -395,5 +395,5 @@ export async function generateClassReport(sessions, bankQ, filterClass = 'all') 
   // ── Save ──
   const dateStr = new Date().toISOString().slice(0, 10);
   const clsSlug = filterClass !== 'all' ? `_${filterClass.replace(/\s+/g, '_')}` : '';
-  doc.save(`MathReady_ClassReport${clsSlug}_${dateStr}.pdf`);
+  doc.save(`MilestoneReady_ClassReport${clsSlug}_${dateStr}.pdf`);
 }

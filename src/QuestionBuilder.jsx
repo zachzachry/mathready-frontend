@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 import MathText from "./shared/MathText";
 import PlotGrid from "./shared/PlotGrid";
 import { API, QUESTIONS as BUILTIN_QUESTIONS, T, teacherHeaders } from "./shared/constants";
@@ -1047,7 +1047,7 @@ ${standards}`;
     const blob = new Blob([header + "\n" + example + "\n"], { type:"text/csv" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "mathready_questions_template.csv";
+    a.download = "milestoneready_questions_template.csv";
     a.click();
   }
 

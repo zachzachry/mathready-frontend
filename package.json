@@ -16,7 +16,11 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build"
+    "build": "react-scripts build",
+    "lint": "eslint src --ext .js,.jsx"
+  },
+  "eslintConfig": {
+    "extends": ["react-app"]
   },
   "browserslist": {
     "production": [

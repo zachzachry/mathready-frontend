@@ -47,6 +47,15 @@ export const QUESTIONS = [
     choices:["Rectangle","Rhombus","Square","Trapezoid"], correct:"Square" },
 ];
 
+// ── Timing constants ──────────────────────────────────────
+export const TEACHER_POLL_MS        = 5_000;   // how often student & teacher poll live control state
+export const HEARTBEAT_MS           = 30_000;  // how often student sends a heartbeat
+export const DRAFT_SAVE_DEBOUNCE_MS = 5_000;   // debounce before saving answer draft to server
+export const SESSION_FAST_POLL_MS   = 3_000;   // Dashboard fast-poll for sessions
+export const SLOW_POLL_MS           = 30_000;  // Dashboard slow-poll for everything else
+export const FS_GRACE_MS            = 3_000;   // grace period before a fullscreen-exit counts as violation
+export const DEVTOOLS_THRESHOLD_PX  = 160;     // pixel diff that indicates devtools are open
+
 // ── Helpers ────────────────────────────────────────────────
 export const pad     = n  => String(n).padStart(2,"0");
 export const fmtTime = s  => `${pad(Math.floor(s/60))}:${pad(s%60)}`;

@@ -46,10 +46,10 @@ function wrongFracs(correctN, correctD, count = 3) {
 const GENERATORS = {
 
   // 5.NR.2.1 — multiply multi-digit whole numbers
-  '5.NR.2.1': () => {
+  '5.NR.2.1': (opts = {}) => {
     const templates = [
       () => { const a=rnd(12,99),b=rnd(12,99); const ans=a*b;
-               const w=wrongFracs; const ws=nearInts(ans,3,a+b);
+               const ws=nearInts(ans,3,a+b);
                return { q:`What is ${a} × ${b}?`, correct:String(ans), wrongs:ws.map(String) }; },
       () => { const a=rnd(100,999),b=rnd(2,9); const ans=a*b;
                const ws=nearInts(ans,3,20);
@@ -65,7 +65,7 @@ const GENERATORS = {
   },
 
   // 5.NR.2.2 — divide multi-digit whole numbers
-  '5.NR.2.2': () => {
+  '5.NR.2.2': (opts = {}) => {
     const b = rnd(2, 12); const ans = rnd(10, 99); const a = b * ans;
     const ws = nearInts(ans, 3, 8);
     const choices = shuffle([String(ans), ...ws.slice(0,3).map(String)]);
@@ -75,7 +75,7 @@ const GENERATORS = {
   },
 
   // 5.NR.3.1 — add/subtract fractions with unlike denominators
-  '5.NR.3.1': () => {
+  '5.NR.3.1': (opts = {}) => {
     const DENOMS = [2,3,4,5,6,8,10,12];
     const d1 = shuffle(DENOMS)[0];
     const d2 = shuffle(DENOMS.filter(d=>d!==d1))[0];
@@ -98,7 +98,7 @@ const GENERATORS = {
   },
 
   // 5.NR.3.2 — multiply fractions
-  '5.NR.3.2': () => {
+  '5.NR.3.2': (opts = {}) => {
     const n1=rnd(1,5), d1=rnd(2,8), n2=rnd(1,5), d2=rnd(2,8);
     const rn=n1*n2, rd=d1*d2;
     const g=gcd(rn,rd); const fn=rn/g, fd=rd/g;
@@ -111,7 +111,7 @@ const GENERATORS = {
   },
 
   // 5.NR.3.3 — divide fractions
-  '5.NR.3.3': () => {
+  '5.NR.3.3': (opts = {}) => {
     const n1=rnd(1,5), d1=rnd(2,8), n2=rnd(1,5), d2=rnd(2,8);
     // a/b ÷ c/d = (a*d)/(b*c)
     const rn=n1*d2, rd=d1*n2;
@@ -125,7 +125,7 @@ const GENERATORS = {
   },
 
   // 5.NR.4.1 — add/subtract decimals
-  '5.NR.4.1': () => {
+  '5.NR.4.1': (opts = {}) => {
     const places = rnd(1,2);
     const mul = Math.pow(10, places);
     const a = rnd(10, 999) / mul;
@@ -142,7 +142,7 @@ const GENERATORS = {
   },
 
   // 5.NR.4.2 — multiply decimals
-  '5.NR.4.2': () => {
+  '5.NR.4.2': (opts = {}) => {
     const a = rnd(1, 99) / 10;
     const b = rnd(1, 9);
     const ans = parseFloat((a * b).toFixed(2));
@@ -154,7 +154,7 @@ const GENERATORS = {
   },
 
   // 5.NR.1.1 — place value / read & write numbers
-  '5.NR.1.1': () => {
+  '5.NR.1.1': (opts = {}) => {
     const n = rnd(10000, 999999);
     const places = ['ones','tens','hundreds','thousands','ten-thousands','hundred-thousands'];
     const digits  = String(n).split('').reverse();
@@ -168,6 +168,136 @@ const GENERATORS = {
              question:`In the number ${n.toLocaleString()}, what is the value of the digit in the ${place} place?`,
              correct:String(val), choices };
   },
+
+  // ── Multiplication & Division Practice ──────────────────────
+
+  // MUL.TRAD — multiplication computation (3 difficulty tiers, aligned to 5.NR.2.1)
+  // easy: 2-digit × 1-digit | medium: 2-digit × 2-digit or 3-digit × 1-digit | hard: 3-digit × 2-digit
+  'MUL.TRAD': (opts = {}) => {
+    const tier = opts.tier || 'easy';
+    const templates = [];
+
+    if (tier === 'easy') {
+      // 2-digit × 1-digit
+      templates.push(() => {
+        const a = rnd(10,99), b = rnd(2,9), ans = a*b;
+        return { q:`What is ${a} × ${b}?`, ans, ws: nearInts(ans,3,Math.max(5,Math.floor(a/2))) };
+      });
+    } else if (tier === 'medium') {
+      // 2-digit × 2-digit
+      templates.push(() => {
+        const a = rnd(10,99), b = rnd(10,99), ans = a*b;
+        return { q:`What is ${a} × ${b}?`, ans, ws: nearInts(ans,3,Math.max(20,Math.floor(ans*0.08))) };
+      });
+      // 3-digit × 1-digit
+      templates.push(() => {
+        const a = rnd(100,999), b = rnd(2,9), ans = a*b;
+        return { q:`What is ${a} × ${b}?`, ans, ws: nearInts(ans,3,Math.max(20,Math.floor(ans*0.08))) };
+      });
+    } else {
+      // 3-digit × 2-digit (standard level: up to 999 × 99)
+      templates.push(() => {
+        const a = rnd(100,999), b = rnd(10,99), ans = a*b;
+        return { q:`What is ${a} × ${b}?`, ans, ws: nearInts(ans,3,Math.max(50,Math.floor(ans*0.08))) };
+      });
+      // Missing factor (3-digit × 2-digit)
+      templates.push(() => {
+        const a = rnd(100,500), b = rnd(10,25), product = a*b;
+        return { q:`${a} × ___ = ${product.toLocaleString()}. What is the missing factor?`, ans: b,
+                 ws: nearInts(b,3,Math.max(3,Math.floor(b*0.2))) };
+      });
+    }
+
+    const t = shuffle(templates)[0]();
+    const choices = shuffle([String(t.ans), ...t.ws.slice(0,3).map(String)]);
+    return { id:uid(), standard:'MUL.TRAD', dok:tier==='hard'?2:1, parametric:true,
+             question:t.q, correct:String(t.ans), choices };
+  },
+
+  // MUL.WORD — multiplication word problems (3 difficulty tiers, aligned to 5.NR.2.1)
+  'MUL.WORD': (opts = {}) => {
+    const tier = opts.tier || 'easy';
+    let a, b;
+    if (tier === 'easy')        { a = rnd(10,99);  b = rnd(2,9);   }   // 2-digit × 1-digit
+    else if (tier === 'medium') { a = rnd(10,99);  b = rnd(10,99); }   // 2-digit × 2-digit
+    else                        { a = rnd(100,999);b = rnd(10,99); }   // 3-digit × 2-digit
+    const ans = a * b;
+    const ws  = nearInts(ans, 3, Math.max(10, Math.floor(ans * 0.08)));
+
+    const stems = [
+      `A teacher buys ${a} packs of pencils. Each pack has ${b} pencils. How many pencils does the teacher have in all?`,
+      `A school orders ${a} boxes of crayons. Each box contains ${b} crayons. How many crayons were ordered in all?`,
+      `A baker makes ${a} trays of muffins. Each tray holds ${b} muffins. How many muffins did the baker make in all?`,
+      `A cafeteria sets up ${a} tables. Each table seats ${b} students. How many students can be seated in all?`,
+      `Each pencil case costs $${a}. How much will ${b} pencil cases cost in all?`,
+      `Tickets to the school fair cost $${a} each. How much will ${b} tickets cost in all?`,
+      `A soccer player scores ${a} points per game. How many points will the player score after ${b} games?`,
+      `During practice, each player does ${a} push-ups. There are ${b} players on the team. How many push-ups are done in all?`,
+      `A garden has ${a} rows of flowers. Each row has ${b} flowers. How many flowers are in the garden?`,
+      `A rectangular field is ${a} meters long and ${b} meters wide. What is the area of the field in square meters?`,
+      `A school building has ${a} floors. Each floor has ${b} classrooms. How many classrooms are there in all?`,
+      `A bookshelf has ${a} shelves. Each shelf holds ${b} books. How many books can the bookshelf hold in all?`,
+    ];
+
+    const q = shuffle(stems)[0];
+    const isMoney = q.startsWith('Each') && q.includes('$') || q.startsWith('Tickets');
+    const correctStr = isMoney ? `$${ans}` : String(ans);
+    const wrongStrs  = isMoney ? ws.map(n => `$${n}`) : ws.map(String);
+    const choices    = shuffle([correctStr, ...wrongStrs.slice(0,3)]);
+    return { id:uid(), standard:'MUL.WORD', dok:2, parametric:true,
+             question:q, correct:correctStr, choices };
+  },
+
+  // DIV.TRAD — division computation (3 difficulty tiers, aligned to 5.NR.2.2)
+  // easy: basic facts ÷ 1-digit | medium: 3-digit ÷ 1-digit | hard: 4-digit ÷ 2-digit (divisor ≤ 25)
+  // All problems may have a remainder; students enter quotient + remainder (0 if none)
+  'DIV.TRAD': (opts = {}) => {
+    const tier = opts.tier || 'easy';
+    let divisor, quotient;
+    if (tier === 'easy')        { divisor = rnd(2,9);  quotient = rnd(2,9);   }
+    else if (tier === 'medium') { divisor = rnd(2,9);  quotient = rnd(10,99); }
+    else                        { divisor = rnd(11,25);quotient = rnd(40,399);}
+    const remainder = rnd(0, divisor - 1);
+    const dividend  = divisor * quotient + remainder;
+    return { id:uid(), standard:'DIV.TRAD', dok:tier==='hard'?2:1, parametric:true,
+             question:`What is ${dividend.toLocaleString()} ÷ ${divisor}?`,
+             correct:String(quotient), remainder:String(remainder), choices:[] };
+  },
+
+  // DIV.WORD — division word problems (3 difficulty tiers, aligned to 5.NR.2.2)
+  'DIV.WORD': (opts = {}) => {
+    const tier = opts.tier || 'easy';
+    let groups, quotient;
+    if (tier === 'easy')        { groups = rnd(2,9);  quotient = rnd(2,9);   }   // basic facts
+    else if (tier === 'medium') { groups = rnd(2,9);  quotient = rnd(10,99); }   // 3-digit ÷ 1-digit
+    else                        { groups = rnd(11,25);quotient = rnd(40,399);}   // 4-digit ÷ 2-digit ≤ 25
+    const total  = groups * quotient;
+    const spread = Math.max(2, Math.floor(quotient * 0.12));
+    const ws     = nearInts(quotient, 3, spread);
+
+    const stems = [
+      `A teacher has ${total} stickers to share equally among ${groups} students. How many stickers does each student get?`,
+      `A class of ${groups} students will share ${total} colored pencils equally. How many pencils does each student get?`,
+      `A chef made ${total} sandwiches for ${groups} tables. Each table gets the same number. How many sandwiches does each table get?`,
+      `There are ${total} pieces of fruit divided equally into ${groups} bowls. How many pieces of fruit are in each bowl?`,
+      `${total} chairs are arranged equally in ${groups} rows. How many chairs are in each row?`,
+      `A coach has ${total} tennis balls to put equally into ${groups} containers. How many tennis balls go in each container?`,
+      `There are ${total} students divided into ${groups} equal teams. How many students will be on each team?`,
+      `A farmer picks ${total} apples and places them equally into ${groups} baskets. How many apples go in each basket?`,
+      `A school has ${total} books to place equally on ${groups} shelves. How many books go on each shelf?`,
+      `${total} concert tickets are divided equally among ${groups} classrooms. How many tickets does each classroom get?`,
+      `A store sold ${groups} identical items for a total of $${total}. How much did each item cost?`,
+      `${groups} friends split the cost of supplies equally. The total was $${total}. How much did each friend pay?`,
+    ];
+
+    const q = shuffle(stems)[0];
+    const isMoney = q.includes(`$${total}`);
+    const correctStr = isMoney ? `$${quotient}` : String(quotient);
+    const wrongStrs  = isMoney ? ws.map(n => `$${n}`) : ws.map(String);
+    const choices    = shuffle([correctStr, ...wrongStrs.slice(0,3)]);
+    return { id:uid(), standard:'DIV.WORD', dok:2, parametric:true,
+             question:q, correct:correctStr, choices };
+  },
 };
 
 // GCD helper
@@ -177,10 +307,10 @@ function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
 export const PARAMETRIC_STANDARDS = Object.keys(GENERATORS);
 
 // Generate a fresh parametric question for a given standard
-export function generateParametric(standard) {
+export function generateParametric(standard, opts = {}) {
   const gen = GENERATORS[standard];
   if (!gen) return null;
-  try { return gen(); } catch { return null; }
+  try { return gen(opts); } catch { return null; }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -291,6 +421,9 @@ export function pickAdaptiveQuestion(bankQ, weights, seenIds, allStandards) {
   const pStd = shuffle(PARAMETRIC_STANDARDS)[0];
   return generateParametric(pStd) || bankQ[Math.floor(Math.random() * bankQ.length)];
 }
+
+// Standards for the Multiplication & Division practice mode
+export const MUL_DIV_STANDARDS = ['MUL.TRAD', 'MUL.WORD', 'DIV.TRAD', 'DIV.WORD'];
 
 // All GSE 5th grade standards (for seeding weights)
 export const ALL_STANDARDS = [

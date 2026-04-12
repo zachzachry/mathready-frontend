@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import MathTest from "./MathTest";
 import TeacherShell from "./TeacherShell";
 import PrivacyPolicy from "./PrivacyPolicy";
-import { API, T, setToken, clearToken } from "./shared/constants";
+import { API, T, S, setToken, clearToken } from "./shared/constants";
 
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
 const SESSION_KEY = "mathready_session";
@@ -45,7 +45,7 @@ function UnifiedGoogleSignIn({ onTeacher, onStudent }) {
     window.google.accounts.id.renderButton(btnRef.current, {
       theme: "outline", size: "large", text: "signin_with", shape: "rectangular", width: 300,
     });
-  // eslint-disable-line
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [GOOGLE_CLIENT_ID]);
 
   async function handleCredential(response) {
@@ -100,9 +100,6 @@ function UnifiedGoogleSignIn({ onTeacher, onStudent }) {
 }
 
 export default function App() {
-  // Serve privacy policy at /privacy without needing React Router
-  if (window.location.pathname === "/privacy") return <PrivacyPolicy />;
-
   function getUrlParams() {
     const p = new URLSearchParams(window.location.search);
     return { code: p.get("code"), practiceClass: p.get("practice") };
@@ -120,6 +117,9 @@ export default function App() {
   const [studentCredential,setStudentCredential] = useState(null);
   const [adminIdentity,    setAdminIdentity]     = useState(null); // stashed admin when impersonating
   const [impersonateStudent, setImpersonateStudent] = useState(null);
+
+  // Serve privacy policy at /privacy without needing React Router (after hooks)
+  if (window.location.pathname === "/privacy") return <PrivacyPolicy />;
 
   function reset() {
     // If impersonating, return to admin view instead of signing out

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { QUESTIONS, lvl, lvlC, lvlBg, lvlBd, loadSessions, clearSessions, API, T, teacherHeaders } from "./shared/constants";
+import { QUESTIONS, lvl, lvlC, lvlBg, lvlBd, API, T, teacherHeaders, TEACHER_POLL_MS, SESSION_FAST_POLL_MS, SLOW_POLL_MS } from "./shared/constants";
 import MathText from "./shared/MathText";
 import { generateClassReport } from "./generateReport";
 import ParentReport from "./ParentReport";
@@ -138,11 +138,11 @@ function TestControls() {
           setCtrl({ paused: false, stopped: false, gate: false, testing: true, extensions: {} });
           setActive([]);
         }
-      } catch {}
+      } catch(e) { console.error("poll failed:", e); }
       setLoading(false);
     }
     poll();
-    const t = setInterval(poll, 5000);
+    const t = setInterval(poll, TEACHER_POLL_MS);
     return () => clearInterval(t);
   }, [selectedCode]); // eslint-disable-line
 
@@ -177,14 +177,14 @@ function TestControls() {
       setTimeout(() => setExtMsgs(prev => { const n={...prev}; delete n[studentName]; return n; }), 3000);
       const d = await fetch(`${API}/test/control?code=${encodeURIComponent(selectedCode)}`).then(r=>r.json());
       setCtrl(d);
-    } catch {}
+    } catch(e) { console.error("grantExtension failed:", e); setMsg("Failed to grant extension — check your connection."); }
   }
 
   if (loading) return <div style={{padding:"2rem",color:T.textMuted}}>Loading…</div>;
 
   const extensions = ctrl.extensions || {};
   const waitingStudents = active.filter(s => s.phase === "waiting");
-  const testingStudents = active.filter(s => s.phase === "testing");
+
   const isWaiting = ctrl.gate && !ctrl.testing;
 
   return (
@@ -193,7 +193,7 @@ function TestControls() {
 
       {/* Session picker */}
       {allSessions.length === 0 ? (
-        <div style={{fontSize:"0.78rem",color:T.textMuted,marginBottom:"1.25rem",background:T.surface,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"0.65rem 0.9rem"}}>
+        <div style={{fontSize:"0.88rem",color:T.textMuted,marginBottom:"1.25rem",background:T.surface,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"0.65rem 0.9rem"}}>
           No live sessions. Go to the Test Library and click <strong>Launch</strong> on an assignment to start a session.
         </div>
       ) : allSessions.length > 1 ? (
@@ -208,7 +208,7 @@ function TestControls() {
           </select>
         </div>
       ) : (
-        <div style={{fontSize:"0.75rem",color:T.textSecondary,marginBottom:"1.25rem"}}>
+        <div style={{fontSize:"0.88rem",color:T.textSecondary,marginBottom:"1.25rem"}}>
           Session: <strong>{selectedCode || allSessions[0]?.code}</strong> · Students poll every 5 seconds.
         </div>
       )}
@@ -216,7 +216,7 @@ function TestControls() {
       {selectedCode && (<>
 
       {msg && (
-        <div style={{background:T.successBg,border:`1px solid ${T.successBd}`,borderRadius:T.xs,padding:"0.6rem 0.9rem",fontSize:"0.78rem",color:T.success,fontWeight:700,marginBottom:"1rem"}}>
+        <div style={{background:T.successBg,border:`1px solid ${T.successBd}`,borderRadius:T.xs,padding:"0.6rem 0.9rem",fontSize:"0.88rem",color:T.success,fontWeight:700,marginBottom:"1rem"}}>
           ✓ {msg}
         </div>
       )}
@@ -224,122 +224,135 @@ function TestControls() {
       {/* Waiting Room — shown when teacher has launched but not yet clicked Begin Testing */}
       {isWaiting && (
         <div style={{background:"#fff8e1",border:"1px solid #ffc107",borderRadius:T.r,padding:"1.1rem 1.25rem",marginBottom:"0.85rem"}}>
-          <div style={{fontWeight:700,fontSize:"0.92rem",color:"#e65100",marginBottom:"4px"}}>
+          <div style={{fontWeight:700,fontSize:"1.05rem",color:"#e65100",marginBottom:"4px"}}>
             🟡 Waiting Room — {waitingStudents.length} student{waitingStudents.length !== 1 ? "s" : ""} ready
           </div>
-          <div style={{fontSize:"0.72rem",color:T.textSecondary,marginBottom:"0.75rem"}}>
+          <div style={{fontSize:"0.88rem",color:T.textSecondary,marginBottom:"0.75rem"}}>
             Students have entered the test code and are waiting for your signal. Click Begin Testing to release them all at once.
           </div>
           {waitingStudents.length > 0 && (
             <div style={{display:"flex",flexWrap:"wrap",gap:"0.35rem",marginBottom:"0.85rem"}}>
               {waitingStudents.map(s=>(
-                <span key={s.name} style={{background:"#fff",border:"1px solid #ffc107",borderRadius:T.full,padding:"3px 10px",fontSize:"0.78rem",fontWeight:600,color:"#555"}}>
+                <span key={s.name} style={{background:"#fff",border:"1px solid #ffc107",borderRadius:T.full,padding:"4px 12px",fontSize:"0.88rem",fontWeight:600,color:"#555"}}>
                   {s.name}
                 </span>
               ))}
             </div>
           )}
           <button onClick={()=>send({action:"begin"})} disabled={saving}
-            style={{background:"#1565c0",color:"#fff",border:"none",borderRadius:T.xs,padding:"0.65rem 1.25rem",fontWeight:700,fontSize:"0.88rem",cursor:"pointer",opacity:saving?0.5:1}}>
+            style={{background:"#1565c0",color:"#fff",border:"none",borderRadius:T.xs,padding:"0.75rem 1.5rem",fontWeight:700,fontSize:"1rem",cursor:"pointer",opacity:saving?0.5:1}}>
             ▶ Begin Testing for All
           </button>
         </div>
       )}
 
-      {/* Pause / Resume */}
-      <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.r,padding:"1.1rem 1.25rem",marginBottom:"0.85rem",display:"flex",alignItems:"center",gap:"1rem"}}>
-        <div style={{flex:1}}>
-          <div style={{fontWeight:700,fontSize:"0.92rem",color:T.text,marginBottom:"2px"}}>
-            {ctrl.paused ? "⏸ Test is PAUSED" : "▶ Test is Running"}
-          </div>
-          <div style={{fontSize:"0.72rem",color:T.textSecondary}}>
-            {ctrl.paused
-              ? "Students see a pause screen and cannot answer questions."
-              : "Students are actively working. Click Pause to freeze the test."}
-          </div>
+      {/* Test in progress banner — visible once testing begins and test is not stopped */}
+      {!isWaiting && ctrl.testing && !ctrl.stopped && (
+        <div style={{background:"#e8f5e9",border:"1px solid #a5d6a7",borderRadius:T.xs,padding:"0.55rem 0.9rem",fontSize:"0.88rem",color:"#2e7d32",fontWeight:700,marginBottom:"0.85rem"}}>
+          ✅ Test in progress — students are working
         </div>
-        <button onClick={()=>send({paused:!ctrl.paused})} disabled={saving||ctrl.stopped}
-          style={{background:ctrl.paused?T.success:"#b8860b",color:T.white,border:"none",borderRadius:T.xs,
-            padding:"0.65rem 1.25rem",fontWeight:700,fontSize:"0.85rem",cursor:"pointer",
-            opacity:(saving||ctrl.stopped)?0.5:1,whiteSpace:"nowrap"}}>
-          {ctrl.paused ? "▶ Resume" : "⏸ Pause"}
-        </button>
-      </div>
+      )}
 
-      {/* Stop */}
-      <div style={{background:T.white,border:`1px solid ${T.dangerBd}`,borderRadius:T.r,padding:"1.1rem 1.25rem",marginBottom:"1.25rem",display:"flex",alignItems:"center",gap:"1rem"}}>
-        <div style={{flex:1}}>
-          <div style={{fontWeight:700,fontSize:"0.92rem",color:ctrl.stopped?T.dangerText:T.text,marginBottom:"2px"}}>
-            {ctrl.stopped ? "🛑 Test is STOPPED" : "🛑 Stop Test"}
+      {/* Pause / Resume — hidden while students are still in the waiting room */}
+      {!isWaiting && (
+        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.r,padding:"1.1rem 1.25rem",marginBottom:"0.85rem",display:"flex",alignItems:"center",gap:"1rem"}}>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:700,fontSize:"1.05rem",color:T.text,marginBottom:"2px"}}>
+              {ctrl.paused ? "⏸ Test is PAUSED" : "▶ Test is Running"}
+            </div>
+            <div style={{fontSize:"0.88rem",color:T.textSecondary}}>
+              {ctrl.paused
+                ? "Students see a pause screen and cannot answer questions."
+                : "Students are actively working. Click Pause to freeze the test."}
+            </div>
           </div>
-          <div style={{fontSize:"0.72rem",color:T.textSecondary}}>
-            {ctrl.stopped
-              ? "Students are prompted to submit. Click Clear to reset for next test."
-              : "Immediately prompts all students to submit their answers."}
-          </div>
+          <button onClick={()=>send({paused:!ctrl.paused})} disabled={saving||ctrl.stopped}
+            style={{background:ctrl.paused?T.success:"#b8860b",color:T.white,border:"none",borderRadius:T.xs,
+              padding:"0.65rem 1.25rem",fontWeight:700,fontSize:"0.95rem",cursor:"pointer",
+              opacity:(saving||ctrl.stopped)?0.5:1,whiteSpace:"nowrap"}}>
+            {ctrl.paused ? "▶ Resume" : "⏸ Pause"}
+          </button>
         </div>
-        {ctrl.stopped
-          ? <button onClick={()=>send({stopped:false,paused:false})} disabled={saving}
-              style={{background:T.midnight,color:T.white,border:"none",borderRadius:T.xs,
-                padding:"0.65rem 1.25rem",fontWeight:700,fontSize:"0.85rem",cursor:"pointer",opacity:saving?0.5:1}}>
-              Clear Stop
-            </button>
-          : <button onClick={()=>{ if(window.confirm("Stop the test for all students now?")) send({stopped:true,paused:false}); }}
-              disabled={saving}
-              style={{background:T.dangerText,color:T.white,border:"none",borderRadius:T.xs,
-                padding:"0.65rem 1.25rem",fontWeight:700,fontSize:"0.85rem",cursor:"pointer",opacity:saving?0.5:1}}>
-              🛑 Stop Now
-            </button>
-        }
-      </div>
+      )}
 
-      {/* IEP Time Extensions */}
-      <div style={{marginBottom:"1.25rem"}}>
-        <div style={{fontSize:"0.85rem",fontWeight:700,color:T.midnight,marginBottom:"4px"}}>⏱ Time Extensions (IEP / 504)</div>
-        <div style={{fontSize:"0.72rem",color:T.textSecondary,marginBottom:"0.85rem"}}>
-          Grant extra time to individual students currently taking the test. Their timer adds the extra minutes immediately.
-        </div>
-
-        {active.length === 0 ? (
-          <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:T.r,padding:"1rem 1.25rem",fontSize:"0.8rem",color:T.textMuted,textAlign:"center"}}>
-            No students are currently active. Extensions can only be granted during a live test.
+      {/* Stop — hidden while students are still in the waiting room */}
+      {!isWaiting && (
+        <div style={{background:T.white,border:`1px solid ${T.dangerBd}`,borderRadius:T.r,padding:"1.1rem 1.25rem",marginBottom:"1.25rem",display:"flex",alignItems:"center",gap:"1rem"}}>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:700,fontSize:"1.05rem",color:ctrl.stopped?T.dangerText:T.text,marginBottom:"2px"}}>
+              {ctrl.stopped ? "🛑 Test is STOPPED" : "🛑 Stop Test"}
+            </div>
+            <div style={{fontSize:"0.88rem",color:T.textSecondary}}>
+              {ctrl.stopped
+                ? "Students are prompted to submit. Click Clear to reset for next test."
+                : "Immediately prompts all students to submit their answers."}
+            </div>
           </div>
-        ) : (
-          <div style={{display:"flex",flexDirection:"column",gap:"0.5rem"}}>
-            {active.map(s => {
-              const totalExtra = extensions[s.name] || 0;
-              const flashMsg   = extMsgs[s.name];
-              return (
-                <div key={s.name} style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.r,padding:"0.75rem 1rem",display:"flex",alignItems:"center",gap:"0.75rem",flexWrap:"wrap"}}>
-                  <div style={{flex:1,minWidth:"120px"}}>
-                    <div style={{fontWeight:700,fontSize:"0.88rem",color:T.text}}>{s.name}</div>
-                    <div style={{fontSize:"0.68rem",color:T.textSecondary}}>
-                      Q{s.current_question+1} · {s.status === "active" ? <span style={{color:T.success}}>● Active</span> : <span style={{color:"#b8860b"}}>● Slow</span>}
-                      {totalExtra > 0 && <span style={{color:T.midnight,marginLeft:"0.5rem",fontWeight:700}}>+{totalExtra/60} min granted</span>}
+          {ctrl.stopped
+            ? <button onClick={()=>send({stopped:false,paused:false})} disabled={saving}
+                style={{background:T.midnight,color:T.white,border:"none",borderRadius:T.xs,
+                  padding:"0.65rem 1.25rem",fontWeight:700,fontSize:"0.95rem",cursor:"pointer",opacity:saving?0.5:1}}>
+                Clear Stop
+              </button>
+            : <button onClick={()=>{ if(window.confirm("Stop the test for all students now?")) send({stopped:true,paused:false}); }}
+                disabled={saving}
+                style={{background:T.dangerText,color:T.white,border:"none",borderRadius:T.xs,
+                  padding:"0.65rem 1.25rem",fontWeight:700,fontSize:"0.95rem",cursor:"pointer",opacity:saving?0.5:1}}>
+                🛑 Stop Now
+              </button>
+          }
+        </div>
+      )}
+
+      {/* IEP Time Extensions — hidden while students are still in the waiting room */}
+      {!isWaiting && (
+        <div style={{marginBottom:"1.25rem"}}>
+          <div style={{fontSize:"0.95rem",fontWeight:700,color:T.midnight,marginBottom:"4px"}}>⏱ Time Extensions (IEP / 504)</div>
+          <div style={{fontSize:"0.88rem",color:T.textSecondary,marginBottom:"0.85rem"}}>
+            Grant extra time to individual students currently taking the test. Their timer adds the extra minutes immediately.
+          </div>
+
+          {active.length === 0 ? (
+            <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:T.r,padding:"1rem 1.25rem",fontSize:"0.88rem",color:T.textMuted,textAlign:"center"}}>
+              No students are currently active. Extensions can only be granted during a live test.
+            </div>
+          ) : (
+            <div style={{display:"flex",flexDirection:"column",gap:"0.5rem"}}>
+              {active.map(s => {
+                const totalExtra = extensions[s.name] || 0;
+                const flashMsg   = extMsgs[s.name];
+                return (
+                  <div key={s.name} style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.r,padding:"0.75rem 1rem",display:"flex",alignItems:"center",gap:"0.75rem",flexWrap:"wrap"}}>
+                    <div style={{flex:1,minWidth:"120px"}}>
+                      <div style={{fontWeight:700,fontSize:"1rem",color:T.text}}>{s.name}</div>
+                      <div style={{fontSize:"0.85rem",color:T.textSecondary}}>
+                        Q{s.current_question+1} · {s.status === "active" ? <span style={{color:T.success}}>● Active</span> : <span style={{color:"#b8860b"}}>● Behind pace</span>}
+                        {totalExtra > 0 && <span style={{color:T.midnight,marginLeft:"0.5rem",fontWeight:700}}>+{totalExtra/60} min granted</span>}
+                      </div>
                     </div>
+                    {flashMsg ? (
+                      <div style={{background:T.successBg,border:`1px solid ${T.successBd}`,borderRadius:T.xs,padding:"4px 12px",fontSize:"0.85rem",color:T.success,fontWeight:700}}>
+                        ✓ {flashMsg}
+                      </div>
+                    ) : (
+                      <div style={{display:"flex",gap:"6px"}}>
+                        {[5,10,15,30].map(mins => (
+                          <button key={mins} onClick={()=>grantExtension(s.name, mins*60)}
+                            style={{background:"rgba(13,148,136,.1)",border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"8px 16px",fontSize:"0.85rem",fontWeight:700,cursor:"pointer",color:T.midnight,whiteSpace:"nowrap",minWidth:"52px"}}>
+                            +{mins}m
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  {flashMsg ? (
-                    <div style={{background:T.successBg,border:`1px solid ${T.successBd}`,borderRadius:T.xs,padding:"4px 12px",fontSize:"0.75rem",color:T.success,fontWeight:700}}>
-                      ✓ {flashMsg}
-                    </div>
-                  ) : (
-                    <div style={{display:"flex",gap:"4px"}}>
-                      {[5,10,15,30].map(mins => (
-                        <button key={mins} onClick={()=>grantExtension(s.name, mins*60)}
-                          style={{background:"rgba(13,148,136,.1)",border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"5px 10px",fontSize:"0.75rem",fontWeight:700,cursor:"pointer",color:T.midnight,whiteSpace:"nowrap"}}>
-                          +{mins}m
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
-      <div style={{fontSize:"0.7rem",color:T.textMuted}}>
+      <div style={{fontSize:"0.82rem",color:T.textMuted}}>
         Controls are scoped to the selected session. Extensions are per-student and reset when stop is cleared.
       </div>
       </>)}
@@ -359,7 +372,7 @@ export default function Dashboard({ teacher, readOnly }) {
   const [clearError, setClearError] = useState(""); // error message from failed delete
   const [clearModal, setClearModal] = useState(false);
   const [clearTestCode, setClearTestCode] = useState(""); // for per-test clear
-  const [roster,   setRoster]   = useState([]);
+  const [,         setRoster]   = useState([]);
   const [fluencyReport, setFluencyReport] = useState([]);
   const [leaderboard,   setLeaderboard]   = useState([]);
   const [parentReportId,   setParentReportId]   = useState(null); // student ID for fluency parent report
@@ -415,7 +428,7 @@ export default function Dashboard({ teacher, readOnly }) {
     try {
       const s = await fetch(`${API}/sessions${sessionParam}`, { headers: teacherHeaders() }).then(r=>r.ok?r.json():[]).catch(()=>[]);
       setSessions(Array.isArray(s) ? s : []);
-    } catch {}
+    } catch(e) { console.error("refreshSessions failed:", e); }
   }, [sessionParam]);
 
   // ── Slow refresh: everything else (on mount + every 30 s) ─
@@ -443,10 +456,11 @@ export default function Dashboard({ teacher, readOnly }) {
       } catch (e) { console.warn("Failed to load fluency reports:", e); }
       // Admin overview
       if (teacher && (teacher.teacherRole === "super_admin" || teacher.teacherRole === "school_admin")) {
-        try { const ov = await fetch(`${API}/admin/overview`); if (ov.ok) setAdminData(await ov.json()); } catch {}
+        try { const ov = await fetch(`${API}/admin/overview`); if (ov.ok) setAdminData(await ov.json()); } catch(e) { console.error("admin overview failed:", e); }
       }
-    } catch {}
+    } catch(e) { console.error("refresh failed:", e); }
     setLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionParam, classFilter, savedParam]);
 
   // Load question bank once on mount — 2.4 MB, no need to re-fetch every 30 s
@@ -459,8 +473,8 @@ export default function Dashboard({ teacher, readOnly }) {
   // Mount: full load once, then fast-poll sessions + slow-poll everything else
   useEffect(() => {
     refresh();
-    const fast = setInterval(refreshSessions, 3000);
-    const slow = setInterval(refresh, 30000);
+    const fast = setInterval(refreshSessions, SESSION_FAST_POLL_MS);
+    const slow = setInterval(refresh, SLOW_POLL_MS);
     return () => { clearInterval(fast); clearInterval(slow); };
   }, [refresh, refreshSessions]);
 
@@ -525,7 +539,7 @@ export default function Dashboard({ teacher, readOnly }) {
         else if (mode === "tests") setSessions(prev => prev.filter(s => s.mode === "drill" || s.mode === "practice"));
         else if (mode === "drills") setSessions(prev => prev.filter(s => s.mode !== "drill" && s.mode !== "practice"));
       }
-    } catch {}
+    } catch(e) { console.error("handleClearMode failed:", e); setClearError("Network error — check your connection and try again."); }
     setSelected(null); setClearing(false);
   }
 
@@ -572,7 +586,7 @@ export default function Dashboard({ teacher, readOnly }) {
     return Math.round(correct / qIds.length * 100);
   }
   const sorted  = [...latestByStudent].sort((a,b)=>effPct(b)-effPct(a));
-  const sel     = latestByStudent.find(s => s.name===selected || s.studentName===selected);
+
   const avgP    = latestByStudent.length ? Math.round(latestByStudent.reduce((a,s)=>a+effPct(s),0)/latestByStudent.length) : 0;
   const profC   = latestByStudent.filter(s=>effPct(s)>=80).length;
   const devC    = latestByStudent.filter(s=>effPct(s)>=60&&effPct(s)<80).length;
@@ -600,7 +614,7 @@ export default function Dashboard({ teacher, readOnly }) {
     if (ansIdx >= 0 && correctIdx >= 0) return ansIdx === correctIdx;
     return String(ans).trim() === String(correctVal ?? "").trim();
   }
-  const allQIds = [...new Set(filteredTestSessions.flatMap(s=>Object.keys(s.answers||{})))];
+
   const itemData = bankQ.map(q => {
     const correct = filteredTestSessions.filter(s=>gradeSessionAnswer(q, s.answers?.[q.id])).length;
     const attempted = filteredTestSessions.filter(s=>q.id in (s.answers||{})).length;
@@ -697,7 +711,7 @@ export default function Dashboard({ teacher, readOnly }) {
               ["Submitted", latestByStudent.length, T.teal],
             ].map(([lbl,val,c])=>(
               <div key={lbl} style={{background:T.white,border:`1px solid ${T.border}`,borderLeft:`3px solid ${c}`,borderRadius:T.xs,padding:"0.9rem 1.25rem",minWidth:"120px",flex:1}}>
-                <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"4px"}}>{lbl.toUpperCase()}</div>
+                <div style={{fontSize:"0.78rem",fontWeight:700,letterSpacing:"0.08em",color:T.textSecondary,marginBottom:"4px"}}>{lbl.toUpperCase()}</div>
                 <div style={{fontSize:"1.6rem",fontWeight:700,color:c}}>{val}</div>
               </div>
             ))}
@@ -709,10 +723,10 @@ export default function Dashboard({ teacher, readOnly }) {
                 const v = dokAvg(dok);
                 return (
                   <div key={dok} style={{background:T.white,border:`1px solid ${T.border}`,borderLeft:`3px solid ${c}`,borderRadius:T.xs,padding:"0.7rem 1.25rem",minWidth:"140px",flex:1}}>
-                    <div style={{fontSize:"0.55rem",fontWeight:700,letterSpacing:"0.12em",color:c,marginBottom:"2px"}}>DOK {dok} — {desc.toUpperCase()}</div>
+                    <div style={{fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.08em",color:c,marginBottom:"2px"}}>DOK {dok} — {desc.toUpperCase()}</div>
                     <div style={{display:"flex",alignItems:"baseline",gap:"0.4rem"}}>
                       <div style={{fontSize:"1.5rem",fontWeight:700,color:v==null?T.textMuted:v>=80?T.success:v>=60?T.warning:T.dangerText}}>{v != null ? `${v}%` : "—"}</div>
-                      {v != null && <div style={{fontSize:"0.6rem",color:T.textMuted}}>{dokBuckets[dok].t} qs</div>}
+                      {v != null && <div style={{fontSize:"0.78rem",color:T.textMuted}}>{dokBuckets[dok].t} qs</div>}
                     </div>
                     {v != null && (
                       <div style={{height:"4px",background:bg,borderRadius:"2px",marginTop:"6px"}}>
@@ -727,9 +741,9 @@ export default function Dashboard({ teacher, readOnly }) {
           {testCodes.length > 0 && (
             <div style={{display:"flex",alignItems:"flex-start",gap:"0.5rem",flexWrap:"wrap"}}>
               <div style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
-                <span style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary}}>FILTER BY TEST:</span>
+                <span style={{fontSize:"0.82rem",fontWeight:700,letterSpacing:"0.06em",color:T.textSecondary}}>FILTER BY TEST:</span>
                 <select value={overviewTest} onChange={e=>{setOverviewTest(e.target.value);setSelected(null);}}
-                  style={{fontSize:"0.78rem",padding:"0.3rem 0.5rem",border:`1px solid ${T.border}`,borderRadius:T.xs,background:T.white}}>
+                  style={{fontSize:"0.9rem",padding:"0.3rem 0.5rem",border:`1px solid ${T.border}`,borderRadius:T.xs,background:T.white}}>
                   <option value="all">All Tests</option>
                   {testCodes.map(c=><option key={c} value={c}>{testCodeNames[c] !== c ? `${testCodeNames[c]} (${c})` : c}</option>)}
                 </select>
@@ -737,13 +751,13 @@ export default function Dashboard({ teacher, readOnly }) {
               <div style={{display:"flex",flexWrap:"wrap",gap:"0.35rem"}}>
                 {(overviewTest === "all" ? testCodes : [overviewTest]).map(c => (
                   <button key={`rev-${c}`} onClick={()=>openReview(c)}
-                    style={{fontSize:"0.65rem",fontWeight:600,color:T.midnight,background:"rgba(13,148,136,.1)",border:`1px solid ${T.midnight}44`,borderRadius:T.xs,padding:"3px 9px",cursor:"pointer"}}>
+                    style={{fontSize:"0.82rem",fontWeight:600,color:T.midnight,background:"rgba(13,148,136,.1)",border:`1px solid ${T.midnight}44`,borderRadius:T.xs,padding:"5px 11px",cursor:"pointer"}}>
                     📖 Review {testCodeNames[c]!==c ? testCodeNames[c] : c}
                   </button>
                 ))}
                 {!readOnly && (overviewTest === "all" ? testCodes : [overviewTest]).map(c => (
                   <button key={`del-${c}`} onClick={()=>setClearTestCode(c)}
-                    style={{fontSize:"0.65rem",fontWeight:600,color:"#8b1a1a",background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:T.xs,padding:"3px 9px",cursor:"pointer"}}>
+                    style={{fontSize:"0.82rem",fontWeight:600,color:"#8b1a1a",background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:T.xs,padding:"5px 11px",cursor:"pointer"}}>
                     🗑 {testCodeNames[c]!==c ? testCodeNames[c] : c}
                   </button>
                 ))}
@@ -751,9 +765,9 @@ export default function Dashboard({ teacher, readOnly }) {
             </div>
           )}
           <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,overflow:"hidden"}}>
-            <div style={{padding:"0.75rem 1rem",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary}}>
+            <div style={{padding:"0.75rem 1rem",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,fontSize:"0.82rem",fontWeight:700,letterSpacing:"0.08em",color:T.textSecondary}}>
               TEST SCORES — {sorted.length} student{sorted.length!==1?"s":""}
-              {overviewTest !== "all" && <span style={{marginLeft:"0.5rem",background:T.midnight,color:T.white,padding:"1px 6px",borderRadius:"3px",fontSize:"0.6rem"}}>{testCodeNames[overviewTest]!==overviewTest?`${testCodeNames[overviewTest]} · `:""}<span style={{fontFamily:"monospace"}}>{overviewTest}</span></span>}
+              {overviewTest !== "all" && <span style={{marginLeft:"0.5rem",background:T.midnight,color:T.white,padding:"1px 6px",borderRadius:"3px",fontSize:"0.78rem"}}>{testCodeNames[overviewTest]!==overviewTest?`${testCodeNames[overviewTest]} · `:""}<span style={{fontFamily:"monospace"}}>{overviewTest}</span></span>}
             </div>
             {sorted.map((s,i)=>{
               const name = s.studentName||s.name;
@@ -767,31 +781,31 @@ export default function Dashboard({ teacher, readOnly }) {
                   <div onClick={()=>setSelected(isOpen?null:name)}
                     style={{padding:"0.7rem 1rem",borderBottom:`1px solid ${T.surfaceAlt}`,cursor:"pointer",background:isOpen?T.surfaceAlt:T.white,display:"flex",alignItems:"center",gap:"0.75rem",transition:"background .15s"}}>
                     <div style={{width:"28px",height:"28px",borderRadius:"50%",background:lvlBg(p),border:`2px solid ${lvlC(p)}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                      <span style={{fontSize:"0.65rem",fontWeight:700,color:lvlC(p)}}>{i+1}</span>
+                      <span style={{fontSize:"0.78rem",fontWeight:700,color:lvlC(p)}}>{i+1}</span>
                     </div>
                     <div style={{flex:1}}>
-                      <div style={{fontSize:"0.88rem",fontWeight:700,color:T.text}}>{name}</div>
-                      {s.className&&<div style={{fontSize:"0.65rem",color:T.textSecondary}}>{s.className}</div>}
+                      <div style={{fontSize:"1rem",fontWeight:700,color:T.text}}>{name}</div>
+                      {s.className&&<div style={{fontSize:"0.82rem",color:T.textSecondary}}>{s.className}</div>}
                     </div>
                     {s.violations > 0 && (
                       <div
                         title={s.violationLog?.length ? s.violationLog.map(v=>`Q${v.questionNum}: ${v.reason}`).join("\n") : `${s.violations} testing violation${s.violations!==1?"s":""} (left fullscreen)`}
-                        style={{background:T.dangerText,color:T.white,borderRadius:T.xs,padding:"2px 7px",fontSize:"0.65rem",fontWeight:700,flexShrink:0,cursor:"help"}}>
+                        style={{background:T.dangerText,color:T.white,borderRadius:T.xs,padding:"3px 8px",fontSize:"0.82rem",fontWeight:700,flexShrink:0,cursor:"help"}}>
                         ⚠ {s.violations}
                       </div>
                     )}
                     <div style={{textAlign:"right"}}>
                       <div style={{fontSize:"1rem",fontWeight:700,color:lvlC(p)}}>{p}%</div>
-                      <div style={{fontSize:"0.65rem",color:T.textSecondary}}>{effScore}/{effTotal} · {s.timeUsed}</div>
+                      <div style={{fontSize:"0.82rem",color:T.textSecondary}}>{effScore}/{effTotal} · {s.timeUsed}</div>
                       {(() => {
                         const qt = s.questionTimes||[];
                         if (!qt.length) return null;
                         const avg = (qt.reduce((a,q)=>a+(q.timeSecs||0),0)/qt.length).toFixed(1);
                         const isFast = Number(avg) < 10;
-                        return <div style={{fontSize:"0.6rem",fontWeight:700,color:isFast?"#c62828":"#888"}} title="Average seconds per question">{avg}s/q{isFast?" ⚡":""}</div>;
+                        return <div style={{fontSize:"0.78rem",fontWeight:700,color:isFast?"#c62828":"#888"}} title="Average seconds per question">{avg}s/q{isFast?" ⚡":""}</div>;
                       })()}
                     </div>
-                    <span style={{fontSize:"0.7rem",color:T.textMuted,flexShrink:0}}>{isOpen?"▲":"▼"}</span>
+                    <span style={{fontSize:"0.85rem",color:T.textMuted,flexShrink:0}}>{isOpen?"▲":"▼"}</span>
                   </div>
                   {isOpen && (()=>{
                     /* Build per-standard breakdown for this session */
@@ -811,16 +825,16 @@ export default function Dashboard({ teacher, readOnly }) {
                     return (
                     <div style={{padding:"1rem 1rem 1rem 3.5rem",background:T.surface,borderBottom:`1px solid ${T.surfaceAlt}`}}>
                       {/* Standard mastery for THIS session */}
-                      <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"0.5rem"}}>STANDARD BREAKDOWN</div>
+                      <div style={{fontSize:"0.8rem",fontWeight:700,letterSpacing:"0.08em",color:T.textSecondary,marginBottom:"0.5rem"}}>STANDARD BREAKDOWN</div>
                       <div style={{display:"flex",flexWrap:"wrap",gap:"0.4rem",marginBottom:"0.75rem"}}>
                         {stds.map(([std,v])=>{
                           const sp = Math.round((v.correct/v.total)*100);
                           return (
                             <div key={std} title={`${v.correct}/${v.total} correct`}
-                              style={{background:sp>=80?T.successBg:sp>=60?T.warningBg:T.dangerBg,border:`1px solid ${sp>=80?T.successBd:sp>=60?T.warningBd:T.dangerBd}`,borderRadius:T.xs,padding:"0.3rem 0.55rem",textAlign:"center",minWidth:"72px"}}>
-                              <div style={{fontSize:"0.58rem",fontWeight:700,color:T.textSecondary}}>{std}</div>
-                              <div style={{fontSize:"0.85rem",fontWeight:700,color:sp>=80?T.success:sp>=60?T.warning:T.dangerText}}>{sp}%</div>
-                              <div style={{fontSize:"0.55rem",color:T.textMuted}}>{v.correct}/{v.total}</div>
+                              style={{background:sp>=80?T.successBg:sp>=60?T.warningBg:T.dangerBg,border:`1px solid ${sp>=80?T.successBd:sp>=60?T.warningBd:T.dangerBd}`,borderRadius:T.xs,padding:"0.35rem 0.6rem",textAlign:"center",minWidth:"76px"}}>
+                              <div style={{fontSize:"0.75rem",fontWeight:700,color:T.textSecondary}}>{std}</div>
+                              <div style={{fontSize:"0.9rem",fontWeight:700,color:sp>=80?T.success:sp>=60?T.warning:T.dangerText}}>{sp}%</div>
+                              <div style={{fontSize:"0.72rem",color:T.textMuted}}>{v.correct}/{v.total}</div>
                             </div>
                           );
                         })}
@@ -829,20 +843,20 @@ export default function Dashboard({ teacher, readOnly }) {
                       <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap"}}>
                         {hasHistory && (
                           <button onClick={(e)=>{e.stopPropagation(); setTab("growth"); setGrowthStudent(sKey);}}
-                            style={{background:T.midnight,color:T.white,border:"none",borderRadius:T.xs,padding:"5px 12px",fontSize:"0.72rem",fontWeight:600,cursor:"pointer"}}>
+                            style={{background:T.midnight,color:T.white,border:"none",borderRadius:T.xs,padding:"7px 14px",fontSize:"0.88rem",fontWeight:600,cursor:"pointer"}}>
                             📈 View Growth History ({fullStudent.sessions.length} sessions)
                           </button>
                         )}
                         <button onClick={(e)=>{e.stopPropagation(); setDiagStudentId({id:s.studentId||s.id, name:s.studentName||s.name});}}
-                          style={{background:"#1565c0",color:T.white,border:"none",borderRadius:T.xs,padding:"5px 12px",fontSize:"0.72rem",fontWeight:600,cursor:"pointer"}}>
+                          style={{background:"#1565c0",color:T.white,border:"none",borderRadius:T.xs,padding:"7px 14px",fontSize:"0.88rem",fontWeight:600,cursor:"pointer"}}>
                           🔍 Diagnose
                         </button>
                         <button onClick={(e)=>{e.stopPropagation(); setTestReportData({session:s, fullStudent, stds, className:s.className||""});}}
-                          style={{background:T.teal,color:T.white,border:"none",borderRadius:T.xs,padding:"5px 12px",fontSize:"0.72rem",fontWeight:600,cursor:"pointer"}}>
+                          style={{background:T.teal,color:T.white,border:"none",borderRadius:T.xs,padding:"7px 14px",fontSize:"0.88rem",fontWeight:600,cursor:"pointer"}}>
                           📋 Parent Report
                         </button>
                         <button onClick={(e)=>{e.stopPropagation(); setQuestionReportSession(s);}}
-                          style={{background:"#7c3aed",color:T.white,border:"none",borderRadius:T.xs,padding:"5px 12px",fontSize:"0.72rem",fontWeight:600,cursor:"pointer"}}>
+                          style={{background:"#7c3aed",color:T.white,border:"none",borderRadius:T.xs,padding:"7px 14px",fontSize:"0.88rem",fontWeight:600,cursor:"pointer"}}>
                           📄 Question Report
                         </button>
                       </div>
@@ -885,17 +899,17 @@ export default function Dashboard({ teacher, readOnly }) {
           {/* DOK Summary Cards */}
           {dokData.length > 0 && (
             <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,overflow:"hidden"}}>
-              <div style={{padding:"0.75rem 1rem",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary}}>
+              <div style={{padding:"0.75rem 1rem",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,fontSize:"0.82rem",fontWeight:700,letterSpacing:"0.08em",color:T.textSecondary}}>
                 DOK PERFORMANCE BREAKDOWN
               </div>
               <div style={{display:"flex",gap:0,flexWrap:"wrap"}}>
                 {dokData.map((d, i) => (
                   <div key={d.dok} style={{flex:1,minWidth:"160px",padding:"1rem 1.25rem",borderRight:i<dokData.length-1?`1px solid ${T.border}`:"none"}}>
                     <div style={{display:"flex",alignItems:"center",gap:"0.5rem",marginBottom:"0.5rem"}}>
-                      <span style={{background:DOK_BG[d.dok],border:`1px solid ${DOK_COLORS[d.dok]}44`,borderRadius:T.xs,padding:"2px 8px",fontSize:"0.65rem",fontWeight:700,color:DOK_COLORS[d.dok]}}>
+                      <span style={{background:DOK_BG[d.dok],border:`1px solid ${DOK_COLORS[d.dok]}44`,borderRadius:T.xs,padding:"2px 8px",fontSize:"0.82rem",fontWeight:700,color:DOK_COLORS[d.dok]}}>
                         DOK {d.dok}
                       </span>
-                      <span style={{fontSize:"0.72rem",color:T.textSecondary}}>{DOK_LABELS[d.dok]}</span>
+                      <span style={{fontSize:"0.88rem",color:T.textSecondary}}>{DOK_LABELS[d.dok]}</span>
                     </div>
                     <div style={{fontSize:"2rem",fontWeight:700,color:d.pct>=70?T.success:d.pct>=50?"#b8860b":T.dangerText,lineHeight:1}}>
                       {d.pct}%
@@ -903,7 +917,7 @@ export default function Dashboard({ teacher, readOnly }) {
                     <div style={{height:"6px",background:"#e8edf2",borderRadius:T.xs,margin:"0.4rem 0",overflow:"hidden"}}>
                       <div style={{height:"100%",width:`${d.pct}%`,background:d.pct>=70?T.success:d.pct>=50?"#f59e0b":T.dangerText,borderRadius:T.xs,transition:"width .4s"}}/>
                     </div>
-                    <div style={{fontSize:"0.68rem",color:T.textSecondary}}>{d.correct}/{d.attempts} correct · {d.qs} question{d.qs!==1?"s":""}</div>
+                    <div style={{fontSize:"0.85rem",color:T.textSecondary}}>{d.correct}/{d.attempts} correct · {d.qs} question{d.qs!==1?"s":""}</div>
                   </div>
                 ))}
               </div>
@@ -913,7 +927,7 @@ export default function Dashboard({ teacher, readOnly }) {
                 const strongest = sorted[sorted.length-1];
                 return (
                   <div style={{padding:"0.6rem 1.25rem",borderTop:`1px solid ${T.border}`,background:T.surface,display:"flex",gap:"1.5rem",flexWrap:"wrap"}}>
-                    <span style={{fontSize:"0.72rem",color:T.textSecondary}}>
+                    <span style={{fontSize:"0.88rem",color:T.textSecondary}}>
                       💡 <strong>Insight:</strong> Students perform best on DOK {strongest.dok} ({strongest.pct}%) and struggle most on DOK {weakest.dok} ({weakest.pct}%).
                       {weakest.dok > 1 ? " Consider more scaffolding for higher-order thinking." : " Focus on foundational recall and fluency."}
                     </span>
@@ -924,7 +938,7 @@ export default function Dashboard({ teacher, readOnly }) {
           )}
 
           <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,overflow:"hidden"}}>
-            <div style={{padding:"0.75rem 1rem",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary}}>
+            <div style={{padding:"0.75rem 1rem",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,fontSize:"0.82rem",fontWeight:700,letterSpacing:"0.08em",color:T.textSecondary}}>
               ITEM ANALYSIS — {itemData.length} questions attempted
             </div>
             {itemData.sort((a,b)=>a.pct-b.pct).map(q=>(()=>{
@@ -943,9 +957,9 @@ export default function Dashboard({ teacher, readOnly }) {
                   <div style={{width:"36px",textAlign:"right",fontSize:"0.9rem",fontWeight:700,color:q.pct>=70?T.success:q.pct>=50?T.warning:T.dangerText,flexShrink:0,paddingTop:"2px"}}>{q.pct}%</div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:"flex",gap:"0.35rem",marginBottom:"2px",flexWrap:"wrap"}}>
-                      <span style={{fontSize:"0.6rem",fontWeight:700,color:T.midnight,background:"rgba(13,148,136,.1)",padding:"1px 5px",borderRadius:"2px"}}>{q.standard}</span>
-                      {q.dok&&<span style={{fontSize:"0.6rem",fontWeight:700,color:T.warning,background:"#fff3cd",padding:"1px 5px",borderRadius:"2px"}}>DOK {q.dok}</span>}
-                      <span style={{fontSize:"0.6rem",color:T.textSecondary}}>{q.short}</span>
+                      <span style={{fontSize:"0.78rem",fontWeight:700,color:T.midnight,background:"rgba(13,148,136,.1)",padding:"2px 6px",borderRadius:"2px"}}>{q.standard}</span>
+                      {q.dok&&<span style={{fontSize:"0.78rem",fontWeight:700,color:T.warning,background:"#fff3cd",padding:"2px 6px",borderRadius:"2px"}}>DOK {q.dok}</span>}
+                      <span style={{fontSize:"0.78rem",color:T.textSecondary}}>{q.short}</span>
                     </div>
                     <div style={{height:"6px",background:"#e8edf2",borderRadius:T.xs,overflow:"hidden",marginBottom: hasDistrib?"6px":"0"}}>
                       <div style={{height:"100%",width:`${q.pct}%`,background:q.pct>=70?T.success:q.pct>=50?"#f59e0b":T.dangerText,borderRadius:T.xs,transition:"width .3s"}}/>
@@ -960,18 +974,18 @@ export default function Dashboard({ teacher, readOnly }) {
                             <div key={ltr} style={{flex:1,minWidth:0}}>
                               <div style={{height:"20px",background:"#f0f4f8",borderRadius:"2px",overflow:"hidden",position:"relative"}}>
                                 <div style={{position:"absolute",bottom:0,left:0,right:0,height:`${pct}%`,background:isCor?T.success:"#e57373",opacity:0.85,transition:"height .3s"}}/>
-                                <div style={{position:"absolute",top:"50%",left:0,right:0,transform:"translateY(-50%)",textAlign:"center",fontSize:"0.52rem",fontWeight:700,color:isCor?T.success:"#b71c1c",zIndex:1}}>{pct>0?`${pct}%`:""}</div>
+                                <div style={{position:"absolute",top:"50%",left:0,right:0,transform:"translateY(-50%)",textAlign:"center",fontSize:"0.72rem",fontWeight:700,color:isCor?T.success:"#b71c1c",zIndex:1}}>{pct>0?`${pct}%`:""}</div>
                               </div>
-                              <div style={{textAlign:"center",fontSize:"0.52rem",fontWeight:700,color:isCor?T.success:T.textMuted,marginTop:"1px"}}>{ltr}{isCor?"✓":""}</div>
+                              <div style={{textAlign:"center",fontSize:"0.72rem",fontWeight:700,color:isCor?T.success:T.textMuted,marginTop:"1px"}}>{ltr}{isCor?"✓":""}</div>
                             </div>
                           );
                         })}
                       </div>
                     )}
                   </div>
-                  <div style={{fontSize:"0.68rem",color:T.textSecondary,flexShrink:0,paddingTop:"2px",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:"2px"}}>
+                  <div style={{fontSize:"0.85rem",color:T.textSecondary,flexShrink:0,paddingTop:"2px",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:"2px"}}>
                     <span>{q.correctCount}/{q.attempted}</span>
-                    {q.missedBy.length>0&&<span style={{fontSize:"0.6rem",color:T.textMuted}}>{isItemOpen?"▲":"▼"}</span>}
+                    {q.missedBy.length>0&&<span style={{fontSize:"0.8rem",color:T.textMuted}}>{isItemOpen?"▲":"▼"}</span>}
                   </div>
                 </div>
                 {isItemOpen && q.missedBy.length>0 && (
@@ -989,23 +1003,23 @@ export default function Dashboard({ teacher, readOnly }) {
                     {q.questionImage && (
                       <img src={q.questionImage} alt="" style={{maxHeight:"160px",maxWidth:"100%",borderRadius:"4px",border:`1px solid ${T.border}`,marginBottom:"0.5rem",display:"block"}}/>
                     )}
-                    <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"0.45rem"}}>
+                    <div style={{fontSize:"0.8rem",fontWeight:700,letterSpacing:"0.08em",color:T.textSecondary,marginBottom:"0.45rem"}}>
                       MISSED BY — {q.missedBy.length} student{q.missedBy.length!==1?"s":""}
                     </div>
                     <div style={{display:"flex",flexWrap:"wrap",gap:"0.35rem"}}>
                       {q.missedBy.map((m,mi)=>(
-                        <div key={mi} style={{display:"flex",alignItems:"center",gap:"4px",background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:T.xs,padding:"3px 8px",fontSize:"0.7rem"}}>
+                        <div key={mi} style={{display:"flex",alignItems:"center",gap:"4px",background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:T.xs,padding:"4px 10px",fontSize:"0.85rem"}}>
                           <span style={{fontWeight:600,color:T.midnight}}>{m.name}</span>
-                          {m.answerLabel&&<span style={{fontWeight:700,color:T.dangerText,background:T.white,border:`1px solid ${T.dangerBd}`,borderRadius:"2px",padding:"0 4px",fontSize:"0.62rem"}}>{m.answerLabel}</span>}
+                          {m.answerLabel&&<span style={{fontWeight:700,color:T.dangerText,background:T.white,border:`1px solid ${T.dangerBd}`,borderRadius:"2px",padding:"0 4px",fontSize:"0.8rem"}}>{m.answerLabel}</span>}
                         </div>
                       ))}
                     </div>
                     {q.choices?.length>0 && (
                       <div style={{marginTop:"0.75rem",paddingTop:"0.65rem",borderTop:`1px solid ${T.surfaceAlt}`}}>
                         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"0.45rem"}}>
-                          <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary}}>ANSWER CHOICES</div>
+                          <div style={{fontSize:"0.8rem",fontWeight:700,letterSpacing:"0.08em",color:T.textSecondary}}>ANSWER CHOICES</div>
                           <button onClick={e=>{e.stopPropagation();setPendingCorrect((q.type==="multiselect"||Array.isArray(q.answer))?(Array.isArray(q.answer)?[...q.answer]:[]):q.correct);setRegradeModalError("");setRegradeModalQ(q);}}
-                            style={{fontSize:"0.68rem",fontWeight:700,background:T.midnight,color:T.white,border:"none",borderRadius:T.xs,padding:"4px 12px",cursor:"pointer"}}>
+                            style={{fontSize:"0.85rem",fontWeight:700,background:T.midnight,color:T.white,border:"none",borderRadius:T.xs,padding:"6px 14px",cursor:"pointer"}}>
                             Correct the Answer
                           </button>
                         </div>
@@ -1020,15 +1034,15 @@ export default function Dashboard({ teacher, readOnly }) {
                                 background:isCorrect?"rgba(16,185,129,.10)":"transparent",
                                 border:isCorrect?`2px solid ${T.success}`:`1px solid ${T.border}`,
                                 borderRadius:T.xs}}>
-                                <div style={{width:"20px",fontWeight:700,fontSize:"0.72rem",color:isCorrect?T.success:T.textSecondary,flexShrink:0}}>{ltr}</div>
+                                <div style={{width:"22px",fontWeight:700,fontSize:"0.88rem",color:isCorrect?T.success:T.textSecondary,flexShrink:0}}>{ltr}</div>
                                 <div style={{flex:1,minWidth:0}}>
-                                  <div style={{fontSize:"0.78rem",color:T.text,marginBottom:"2px"}}><MathText text={ch}/></div>
+                                  <div style={{fontSize:"0.9rem",color:T.text,marginBottom:"2px"}}><MathText text={ch}/></div>
                                   <div style={{height:"6px",background:"#e8edf2",borderRadius:"3px",overflow:"hidden"}}>
                                     <div style={{height:"100%",width:`${pct}%`,background:isCorrect?T.success:pct>30?T.dangerText:"#94a3b8",borderRadius:"3px",transition:"width .3s"}}/>
                                   </div>
                                 </div>
-                                <div style={{fontSize:"0.7rem",fontWeight:700,color:isCorrect?T.success:T.textSecondary,flexShrink:0,minWidth:"42px",textAlign:"right"}}>{count} ({pct}%)</div>
-                                {isCorrect&&<span style={{fontSize:"0.7rem",flexShrink:0}}>✓</span>}
+                                <div style={{fontSize:"0.85rem",fontWeight:700,color:isCorrect?T.success:T.textSecondary,flexShrink:0,minWidth:"48px",textAlign:"right"}}>{count} ({pct}%)</div>
+                                {isCorrect&&<span style={{fontSize:"0.85rem",flexShrink:0}}>✓</span>}
                               </div>
                             );
                           })}
@@ -1056,8 +1070,8 @@ export default function Dashboard({ teacher, readOnly }) {
           </div>
         </div>
       );
-      {/* ── helpers scoped to growth tab ── */}
-      {(() => {
+      // ── helpers scoped to growth tab ──
+      (() => {
         // First session date per code — used for default chronological sort when adding
         const codeFirstDate = {};
         testSessions.forEach(s => {
@@ -1212,7 +1226,7 @@ export default function Dashboard({ teacher, readOnly }) {
                     {growthTestCodes.map((c,i)=>(
                       <div key={c} style={{textAlign:"center",lineHeight:1.2}}>
                         <div style={{color:T.midnight}}>T{i+1}</div>
-                        <div style={{fontWeight:400,opacity:.7,fontSize:"0.52rem",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"60px"}}>{testCodeNames[c]!==c?testCodeNames[c]:c}</div>
+                        <div style={{fontWeight:400,opacity:.7,fontSize:"0.72rem",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"60px"}}>{testCodeNames[c]!==c?testCodeNames[c]:c}</div>
                       </div>
                     ))}
                     <div style={{textAlign:"center"}}>ΔGROWTH</div>
@@ -1303,7 +1317,7 @@ export default function Dashboard({ teacher, readOnly }) {
           )}
         </div>
       );
-      })()}
+      })();
     }
 
     if (tab === "drills") {
@@ -1336,7 +1350,7 @@ export default function Dashboard({ teacher, readOnly }) {
               ["Improving",        improvingCount,            T.midnight],
             ].map(([lbl,val,c])=>(
               <div key={lbl} style={{background:T.white,border:`1px solid ${T.border}`,borderLeft:`3px solid ${c}`,borderRadius:T.xs,padding:"0.9rem 1.25rem",minWidth:"120px",flex:1}}>
-                <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"4px"}}>{lbl.toUpperCase()}</div>
+                <div style={{fontSize:"0.78rem",fontWeight:700,letterSpacing:"0.08em",color:T.textSecondary,marginBottom:"4px"}}>{lbl.toUpperCase()}</div>
                 <div style={{fontSize:"1.6rem",fontWeight:700,color:c}}>{val}</div>
               </div>
             ))}
@@ -1485,7 +1499,7 @@ export default function Dashboard({ teacher, readOnly }) {
               ["Total Sessions", totalSessions, T.success],
             ].map(([lbl,val,c])=>(
               <div key={lbl} style={{background:T.white,border:`1px solid ${T.border}`,borderLeft:`3px solid ${c}`,borderRadius:T.xs,padding:"0.9rem 1.25rem",minWidth:"120px",flex:1}}>
-                <div style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.12em",color:T.textSecondary,marginBottom:"4px"}}>{lbl.toUpperCase()}</div>
+                <div style={{fontSize:"0.78rem",fontWeight:700,letterSpacing:"0.08em",color:T.textSecondary,marginBottom:"4px"}}>{lbl.toUpperCase()}</div>
                 <div style={{fontSize:"1.6rem",fontWeight:700,color:c}}>{val}</div>
               </div>
             ))}
@@ -1739,7 +1753,7 @@ export default function Dashboard({ teacher, readOnly }) {
               <strong>{testSessions.filter(s=>(s.testCode||s.code||"").toUpperCase()===clearTestCode.toUpperCase()).length} session{testSessions.filter(s=>(s.testCode||s.code||"").toUpperCase()===clearTestCode.toUpperCase()).length!==1?"s":""}</strong> will be permanently removed. This cannot be undone.
             </div>
             {clearError && (
-              <div style={{padding:"0 1.5rem",fontSize:"0.8rem",color:"#8b1a1a",background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"4px",margin:"0 1.5rem",padding:"0.5rem 0.75rem"}}>
+              <div style={{fontSize:"0.8rem",color:"#8b1a1a",background:"#fdf2f2",border:"1px solid #f0b8b8",borderRadius:"4px",margin:"0 1.5rem",padding:"0.5rem 0.75rem"}}>
                 ⚠ {clearError}
               </div>
             )}
@@ -1898,21 +1912,21 @@ export default function Dashboard({ teacher, readOnly }) {
       <div style={{background:T.midnight,display:"flex",alignItems:"flex-end",padding:"0 1.5rem",gap:"0.15rem",flexShrink:0}}>
         {TABS.map(([key,lbl])=>(
           <button key={key} onClick={()=>setTab(key)}
-            style={{background:tab===key?T.surface:"transparent",color:tab===key?T.midnight:"rgba(255,255,255,.55)",border:"none",padding:"0.6rem 1.1rem",fontSize:"0.78rem",fontWeight:700,cursor:"pointer",borderRadius:"4px 4px 0 0",transition:"color .15s,background .15s"}}>
+            style={{background:tab===key?T.surface:"transparent",color:tab===key?T.midnight:"rgba(255,255,255,.55)",border:"none",padding:"0.65rem 1.1rem",fontSize:"0.9rem",fontWeight:700,cursor:"pointer",borderRadius:"4px 4px 0 0",transition:"color .15s,background .15s"}}>
             {lbl}
           </button>
         ))}
         <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:"0.5rem",paddingBottom:"4px"}}>
-          <div style={{fontSize:"0.68rem",color:"rgba(13,148,136,.4)",opacity:.7}}>{testSessions.length} tests · {drillSessions.length} drills · live</div>
+          <div style={{fontSize:"0.8rem",color:"rgba(13,148,136,.4)",opacity:.7}}>{testSessions.length} tests · {drillSessions.length} drills · live</div>
           <button
             onClick={()=>generateClassReport(sessions, bankQ, growthClass).catch(e=>alert("Export failed: "+e.message))}
             disabled={sessions.length===0}
-            style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.35)",color:"#fff",borderRadius:"3px",padding:"4px 10px",cursor:sessions.length===0?"not-allowed":"pointer",fontSize:"0.68rem",fontWeight:700,opacity:sessions.length===0?.4:1}}>
+            style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.35)",color:"#fff",borderRadius:"3px",padding:"4px 10px",cursor:sessions.length===0?"not-allowed":"pointer",fontSize:"0.8rem",fontWeight:700,opacity:sessions.length===0?.4:1}}>
             📄 Export PDF
           </button>
           {!readOnly && (
           <button onClick={() => setClearModal(true)} disabled={clearing||sessions.length===0}
-            style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.25)",color:"#fecaca",borderRadius:"3px",padding:"4px 10px",cursor:sessions.length===0?"not-allowed":"pointer",fontSize:"0.68rem",opacity:sessions.length===0?.4:1}}>
+            style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.25)",color:"#fecaca",borderRadius:"3px",padding:"4px 10px",cursor:sessions.length===0?"not-allowed":"pointer",fontSize:"0.8rem",opacity:sessions.length===0?.4:1}}>
             {clearing?"Clearing…":"🗑 Clear"}
           </button>
           )}

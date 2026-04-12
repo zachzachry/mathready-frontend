@@ -62,7 +62,7 @@ export default function StudentDiagnostic({ studentId, studentName, onClose }) {
     clone.style.cssText = "overflow:visible;max-height:none;padding:1.25rem;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;";
     const win = window.open("", "_blank");
     if (!win) { alert("Please allow popups to print."); return; }
-    win.document.write(`<!DOCTYPE html><html><head><title>MathReady — ${studentName}</title>
+    win.document.write(`<!DOCTYPE html><html><head><title>MilestoneReady — ${studentName}</title>
 <style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;color:#111;padding:1rem;}@media print{body{padding:0;}}</style>
 </head><body><h2 style="margin-bottom:1rem;font-size:1rem;">Student Diagnostic — ${studentName}</h2>${clone.outerHTML}</body></html>`);
     win.document.close();

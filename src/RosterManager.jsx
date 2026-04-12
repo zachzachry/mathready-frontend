@@ -3,8 +3,8 @@ import { API, T, teacherHeaders } from "./shared/constants";
 
 const S = {
   inp:   { width:"100%", padding:"0.5rem 0.75rem", border:`1px solid ${T.border}`, borderRadius:T.xs, fontSize:"0.85rem", background:T.surface, boxSizing:"border-box" },
-  lbl:   { display:"block", fontSize:"0.75rem", fontWeight:700, letterSpacing:"0.12em", color:T.textSecondary, marginBottom:"4px" },
-  btn:   { border:`1px solid ${T.border}`, borderRadius:T.xs, padding:"6px 14px", cursor:"pointer", fontSize:"0.78rem", fontWeight:600, background:T.surfaceAlt, color:T.text },
+  lbl:   { display:"block", fontSize:"0.88rem", fontWeight:700, letterSpacing:"0.08em", color:T.textSecondary, marginBottom:"4px" },
+  btn:   { border:`1px solid ${T.border}`, borderRadius:T.xs, padding:"8px 16px", cursor:"pointer", fontSize:"0.88rem", fontWeight:600, background:T.surfaceAlt, color:T.text },
   ta:    { width:"100%", padding:"0.5rem 0.75rem", border:`1px solid ${T.border}`, borderRadius:T.xs, fontSize:"0.82rem", background:T.surface, boxSizing:"border-box", resize:"vertical", fontFamily:T.font, minHeight:"120px" },
 };
 
@@ -43,7 +43,7 @@ function AccomModal({ student, onSave, onClose }) {
               ))}
             </div>
             {extTime !== "none" && (
-              <div style={{marginTop:"6px",fontSize:"0.72rem",color:T.textSecondary,background:T.surfaceAlt,padding:"6px 10px",borderRadius:T.xs}}>
+              <div style={{marginTop:"6px",fontSize:"0.85rem",color:T.textSecondary,background:T.surfaceAlt,padding:"6px 10px",borderRadius:T.xs}}>
                 A 30-min test becomes {extTime==="1.5x"?"45":"60"} minutes for this student.
               </div>
             )}
@@ -61,7 +61,7 @@ function AccomModal({ student, onSave, onClose }) {
               ))}
             </div>
             {reduce && (
-              <div style={{marginTop:"6px",fontSize:"0.72rem",color:T.textSecondary,background:T.surfaceAlt,padding:"6px 10px",borderRadius:T.xs}}>
+              <div style={{marginTop:"6px",fontSize:"0.85rem",color:T.textSecondary,background:T.surfaceAlt,padding:"6px 10px",borderRadius:T.xs}}>
                 One incorrect choice is hidden on all multiple-choice questions.
               </div>
             )}
@@ -212,7 +212,7 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
           <img src="https://www.gstatic.com/images/branding/product/1x/classroom_2020q4_48dp.png"
             alt="" style={{width:"22px",height:"22px"}}/>
           <div style={{flex:1}}>
-            <div style={{fontSize:"0.75rem",opacity:.65,letterSpacing:"0.14em"}}>GOOGLE CLASSROOM</div>
+            <div style={{fontSize:"0.88rem",opacity:.65,letterSpacing:"0.14em"}}>GOOGLE CLASSROOM</div>
             <div style={{fontSize:"0.95rem",fontWeight:700}}>Import Class Roster</div>
           </div>
           <button onClick={onClose} style={{background:"none",border:"none",color:T.white,fontSize:"1.2rem",cursor:"pointer",opacity:.7}}>✕</button>
@@ -240,12 +240,16 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
           )}
 
           {step === "loading" && (
-            <div style={{textAlign:"center",color:T.textSecondary,padding:"2rem"}}>Loading…</div>
+            <div style={{textAlign:"center",color:T.textSecondary,padding:"2rem"}}>
+              <style>{`@keyframes mr-spin{to{transform:rotate(360deg)}}`}</style>
+              <span style={{display:"inline-block",width:"18px",height:"18px",borderRadius:"50%",border:`2px solid ${T.border}`,borderTopColor:T.teal,animation:"mr-spin 0.7s linear infinite",marginBottom:"0.5rem"}}/>
+              <div>Loading…</div>
+            </div>
           )}
 
           {step === "pick" && (
             <>
-              <div style={{fontSize:"0.78rem",fontWeight:700,color:T.textSecondary,letterSpacing:"0.08em"}}>
+              <div style={{fontSize:"0.88rem",fontWeight:700,color:T.textSecondary,letterSpacing:"0.08em"}}>
                 SELECT A CLASS TO IMPORT
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:"0.4rem"}}>
@@ -263,7 +267,7 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
 
           {step === "confirm" && selected && (
             <>
-              <div style={{fontSize:"0.78rem",fontWeight:700,color:T.textSecondary,letterSpacing:"0.08em"}}>
+              <div style={{fontSize:"0.88rem",fontWeight:700,color:T.textSecondary,letterSpacing:"0.08em"}}>
                 PREVIEW — {selected.name} — {students.length} students
               </div>
               <div style={{border:`1px solid ${T.border}`,borderRadius:T.xs,overflow:"hidden",maxHeight:"220px",overflowY:"auto"}}>
@@ -272,10 +276,10 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
                     borderBottom:i<students.length-1?`1px solid ${T.border}`:"none",background:i%2===0?T.white:T.surface}}>
                     <div style={{width:"24px",height:"24px",borderRadius:"50%",background:T.midnight,
                       display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                      <span style={{color:T.white,fontSize:"0.75rem",fontWeight:700}}>{i+1}</span>
+                      <span style={{color:T.white,fontSize:"0.85rem",fontWeight:700}}>{i+1}</span>
                     </div>
                     <div style={{flex:1}}>
-                      <div style={{fontSize:"0.85rem",fontWeight:600}}>{s.name}</div>
+                      <div style={{fontSize:"0.92rem",fontWeight:600}}>{s.name}</div>
                     </div>
                   </div>
                 ))}
@@ -319,7 +323,7 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
                         <div style={{width:"10px",height:"10px",borderRadius:"50%",background:color,flexShrink:0}}/>
                         <div style={{flex:1}}>
                           <span style={{fontWeight:700,fontSize:"0.88rem",color:T.text}}>{g.name}</span>
-                          <span style={{fontSize:"0.75rem",color:T.textSecondary,marginLeft:"8px"}}>
+                          <span style={{fontSize:"0.85rem",color:T.textSecondary,marginLeft:"8px"}}>
                             {count} student{count!==1?"s":""}
                             {g.extendedTime !== "none" && ` · ⏱ ${g.extendedTime === "1.5x" ? "1.5×" : "2×"}`}
                             {g.reduceChoices && " · ✂ 3-choice"}
@@ -327,9 +331,9 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
                         </div>
                         {groups.length > 1 && (
                           <button onClick={e => { e.stopPropagation(); removeGroup(gi); }}
-                            style={{background:"none",border:"none",color:"#bbb",cursor:"pointer",fontSize:"0.78rem",padding:"2px 6px",lineHeight:1}}>✕</button>
+                            style={{background:"none",border:"none",color:"#bbb",cursor:"pointer",fontSize:"0.88rem",padding:"5px 8px",lineHeight:1}}>✕</button>
                         )}
-                        <span style={{fontSize:"0.75rem",color:T.textSecondary}}>{isEditing ? "▲" : "▼"}</span>
+                        <span style={{fontSize:"0.85rem",color:T.textSecondary}}>{isEditing ? "▲" : "▼"}</span>
                       </div>
                       {/* Inline editor */}
                       {isEditing && (
@@ -359,7 +363,7 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
                                 <button key={String(val)} onClick={() => updateGroup(gi, {reduceChoices: val})}
                                   style={{flex:1,padding:"0.4rem",border:`2px solid ${g.reduceChoices===val?color:T.border}`,borderRadius:T.xs,
                                     background:g.reduceChoices===val?color:T.surface,color:g.reduceChoices===val?T.white:T.textSecondary,
-                                    fontWeight:600,fontSize:"0.72rem",cursor:"pointer"}}>
+                                    fontWeight:600,fontSize:"0.85rem",cursor:"pointer"}}>
                                   {lbl}
                                 </button>
                               ))}
@@ -394,8 +398,8 @@ function ClassroomImportModal({ onClose, onImport, onImportGroups }) {
                         {groups.map((g, idx) => (
                           <button key={idx}
                             onClick={() => setAssignments(prev => ({ ...prev, [si]: idx }))}
-                            style={{padding:"2px 8px",border:`2px solid ${assigned === idx ? GRP_COLORS[idx % GRP_COLORS.length] : T.border}`,
-                              borderRadius:"12px",fontSize:"0.75rem",fontWeight:700,cursor:"pointer",
+                            style={{padding:"4px 10px",border:`2px solid ${assigned === idx ? GRP_COLORS[idx % GRP_COLORS.length] : T.border}`,
+                              borderRadius:"12px",fontSize:"0.85rem",fontWeight:700,cursor:"pointer",
                               background:assigned === idx ? GRP_COLORS[idx % GRP_COLORS.length] : T.surface,
                               color:assigned === idx ? T.white : T.textSecondary,whiteSpace:"nowrap"}}>
                             {g.name}
@@ -520,7 +524,10 @@ function ClassroomSyncModal({ cls, onClose, onSync }) {
           )}
 
           {step === "loading" && (
-            <div style={{textAlign:"center",color:T.textSecondary,padding:"1.5rem"}}>Fetching roster…</div>
+            <div style={{textAlign:"center",color:T.textSecondary,padding:"1.5rem"}}>
+              <span style={{display:"inline-block",width:"18px",height:"18px",borderRadius:"50%",border:`2px solid ${T.border}`,borderTopColor:T.teal,animation:"mr-spin 0.7s linear infinite",marginBottom:"0.5rem"}}/>
+              <div>Fetching roster…</div>
+            </div>
           )}
 
           {step === "review" && (
@@ -742,7 +749,7 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
     if (!window.confirm(`Remove ${name} from this class?`)) return;
     try {
       const r = await fetch(`${API}/roster/class/${cid}/student/${sid}`, { method:"DELETE", headers:teacherHeaders() });
-      const d = await r.json();
+      await r.json();
       if (!r.ok) { flash("Failed to remove student."); return; }
       await load();
       flash(`Removed ${name}.`);
@@ -763,7 +770,7 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
       try {
         const r = await fetch(`${API}/roster/class/${cls.id}/student/${s.id}`, { method:"DELETE", headers:teacherHeaders() });
         if (r.ok) removedCount++;
-      } catch {}
+      } catch(e) { console.error("removeStudent failed:", e); }
     }
     await load();
     setSyncModal(null);
@@ -778,7 +785,6 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
     // groups = [{name, extendedTime, reduceChoices, gcCourseId, students:[{name}]}]
     let lastCid = null;
     const newCids = [];
-    const allCurrentIds = classes.map(c => c.id);
     for (const g of groups) {
       if (!g.students.length) continue; // skip empty groups
       const r = await fetch(`${API}/roster/class`, {
@@ -831,9 +837,9 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
       {/* ── Left: class list ── */}
       <div style={{width:"260px",display:"flex",flexDirection:"column",borderRight:`2px solid ${T.borderDark}`,background:T.white,flexShrink:0,overflow:"hidden"}}>
         <div style={{background:T.teal,color:T.white,padding:"0.9rem 1.25rem",flexShrink:0}}>
-          <div style={{fontSize:"0.75rem",opacity:.65,letterSpacing:"0.14em"}}>TEACHER TOOLS</div>
+          <div style={{fontSize:"0.88rem",opacity:.65,letterSpacing:"0.14em"}}>TEACHER TOOLS</div>
           <div style={{fontSize:"1rem",fontWeight:700}}>Class Roster</div>
-          <div style={{fontSize:"0.72rem",opacity:.7,marginTop:"2px"}}>{classes.length} class{classes.length!==1?"es":""} · {totalStudents} students</div>
+          <div style={{fontSize:"0.85rem",opacity:.7,marginTop:"2px"}}>{classes.length} class{classes.length!==1?"es":""} · {totalStudents} students</div>
         </div>
 
         {!readOnly && (
@@ -851,9 +857,9 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
               display:"flex",alignItems:"center",justifyContent:"center",gap:"0.5rem",padding:"0.55rem"}}>
             <img src="https://www.gstatic.com/images/branding/product/1x/classroom_2020q4_48dp.png"
               alt="" style={{width:"16px",height:"16px"}}/>
-            <span style={{fontSize:"0.75rem",fontWeight:700,color:T.midnight}}>Import from Google Classroom</span>
+            <span style={{fontSize:"0.88rem",fontWeight:700,color:T.midnight}}>Import from Google Classroom</span>
           </button>
-          {msg && <div style={{fontSize:"0.72rem",color:T.success,fontWeight:700,marginTop:"5px"}}>✓ {msg}</div>}
+          {msg && <div style={{fontSize:"0.85rem",color:T.success,fontWeight:700,marginTop:"5px"}}>✓ {msg}</div>}
         </div>
         )}
 
@@ -867,20 +873,20 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
                 style={{padding:"0.75rem 0.9rem",borderRadius:"4px",marginBottom:"0.35rem",background:isActive?T.tealLight:T.surface,border:`2px solid ${isActive?T.teal:T.border}`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <div>
                   <div style={{fontSize:"0.88rem",fontWeight:700,color:isActive?T.midnight:T.text}}>{cls.name}</div>
-                  <div style={{fontSize:"0.75rem",color:T.textSecondary,marginTop:"1px"}}>{cls.students.length} student{cls.students.length!==1?"s":""}</div>
+                  <div style={{fontSize:"0.85rem",color:T.textSecondary,marginTop:"1px"}}>{cls.students.length} student{cls.students.length!==1?"s":""}</div>
                 </div>
                 <div style={{display:"flex",gap:"0.35rem",alignItems:"center",flexWrap:"wrap"}}>
                   {cls.gcCourseId && !readOnly && (
                     <button onClick={e=>{e.stopPropagation();setSyncModal(cls);}}
                       title="Sync new students from Google Classroom"
-                      style={{...S.btn,padding:"2px 7px",fontSize:"0.75rem",color:T.midnight,borderColor:T.border,background:T.tealLight}}>
+                      style={{...S.btn,padding:"5px 10px",fontSize:"0.88rem",color:T.midnight,borderColor:T.border,background:T.tealLight}}>
                       ↻ Sync
                     </button>
                   )}
                   {!readOnly && (
                   <button onClick={e=>{e.stopPropagation();deleteClass(cls.id);}}
                     title="Delete entire class"
-                    style={{...S.btn,padding:"2px 7px",color:T.dangerText,borderColor:T.dangerBd,background:T.dangerBg,fontSize:"0.75rem"}}>🗑 Delete</button>
+                    style={{...S.btn,padding:"5px 10px",color:T.dangerText,borderColor:T.dangerBd,background:T.dangerBg,fontSize:"0.88rem"}}>🗑 Delete</button>
                   )}
                 </div>
               </div>
@@ -903,20 +909,20 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
             {/* Class header */}
             <div style={{background:T.white,borderBottom:`1px solid ${T.borderDark}`,padding:"0.75rem 1.25rem",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
               <div>
-                <div style={{fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.12em",color:T.midnight}}>{activeClassData.name.toUpperCase()}</div>
+                <div style={{fontSize:"0.88rem",fontWeight:700,letterSpacing:"0.12em",color:T.midnight}}>{activeClassData.name.toUpperCase()}</div>
                 <div style={{fontSize:"1rem",fontWeight:700,color:T.text,marginTop:"2px"}}>
                   {activeClassData.students.length} student{activeClassData.students.length!==1?"s":""}
                 </div>
                 {activeClassData.joinCode && (
                   <div style={{marginTop:"6px",display:"inline-flex",alignItems:"center",gap:"0.4rem",background:"#e0f2fe",border:"1px solid #7dd3fc",borderRadius:"5px",padding:"2px 10px"}}>
-                    <span style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:"#0369a1"}}>CLASS CODE</span>
+                    <span style={{fontSize:"0.82rem",fontWeight:700,letterSpacing:"0.1em",color:"#0369a1"}}>CLASS CODE</span>
                     <span style={{fontFamily:"monospace",fontSize:"1rem",fontWeight:800,letterSpacing:"0.18em",color:"#0c4a6e"}}>{activeClassData.joinCode}</span>
                   </div>
                 )}
               </div>
               {!readOnly && (
                 <div style={{display:"flex",alignItems:"center",gap:"1.25rem",flexWrap:"wrap"}}>
-                  <label style={{display:"flex",alignItems:"center",gap:"0.5rem",fontSize:"0.78rem",color:T.textSecondary,cursor:"pointer",userSelect:"none"}}>
+                  <label style={{display:"flex",alignItems:"center",gap:"0.5rem",fontSize:"0.88rem",color:T.textSecondary,cursor:"pointer",userSelect:"none"}}>
                     <span>Hide drill timer</span>
                     <div onClick={async () => {
                       const newVal = !(activeClassData.hideTimer ?? true);
@@ -939,7 +945,7 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
                       }}/>
                     </div>
                   </label>
-                  <label style={{display:"flex",alignItems:"center",gap:"0.4rem",fontSize:"0.78rem",color:T.textSecondary}}>
+                  <label style={{display:"flex",alignItems:"center",gap:"0.4rem",fontSize:"0.88rem",color:T.textSecondary}}>
                     <span>Drill time</span>
                     <select value={activeClassData.drillDuration || 180} onChange={async (e) => {
                       const dur = parseInt(e.target.value);
@@ -951,7 +957,7 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
                         load();
                       } catch (e) { console.warn("Failed to update drillDuration:", e); }
                     }} style={{
-                      padding:"2px 6px",fontSize:"0.78rem",borderRadius:4,
+                      padding:"5px 8px",fontSize:"0.88rem",borderRadius:4,
                       border:`1px solid ${T.borderDark}`,background:T.white,cursor:"pointer"
                     }}>
                       <option value={60}>1 min</option>
@@ -999,7 +1005,7 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
               ) : addMode==="csv" ? (
                 <div style={{display:"flex",flexDirection:"column",gap:"0.75rem"}}>
                   {/* Format hint */}
-                  <div style={{background:T.surfaceAlt,borderRadius:"3px",padding:"0.6rem 0.9rem",fontSize:"0.76rem",color:T.textSecondary,lineHeight:1.6}}>
+                  <div style={{background:T.surfaceAlt,borderRadius:"3px",padding:"0.6rem 0.9rem",fontSize:"0.85rem",color:T.textSecondary,lineHeight:1.6}}>
                     <strong>CSV format:</strong> one column — <code>name</code>. Header row optional. Example:<br/>
                     <code style={{display:"block",marginTop:"4px",color:T.midnight}}>
                       Marcus Johnson<br/>
@@ -1013,11 +1019,11 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
                     style={{...S.btn,background:T.teal,color:T.white,border:"none",padding:"0.65rem",fontSize:"0.85rem",fontWeight:700}}>
                     📂 Choose CSV File
                   </button>
-                  {csvErr && <div style={{background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:"3px",padding:"0.55rem 0.85rem",fontSize:"0.76rem",color:T.dangerText}}>⚠ {csvErr}</div>}
+                  {csvErr && <div style={{background:T.dangerBg,border:`1px solid ${T.dangerBd}`,borderRadius:"3px",padding:"0.55rem 0.85rem",fontSize:"0.85rem",color:T.dangerText}}>⚠ {csvErr}</div>}
                   {/* Preview */}
                   {csvPreview && (
                     <div>
-                      <div style={{fontSize:"0.75rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"6px"}}>
+                      <div style={{fontSize:"0.88rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"6px"}}>
                         PREVIEW — {csvPreview.length} student{csvPreview.length!==1?"s":""}
                       </div>
                       <div style={{maxHeight:"160px",overflowY:"auto",border:`1px solid ${T.borderDark}`,borderRadius:"3px",background:T.surface}}>
@@ -1047,18 +1053,18 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
                   {activeClassData.students.map((s,i)=>(
                     <div key={s.id} style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:"3px",padding:"0.6rem 0.9rem",display:"flex",alignItems:"center",gap:"0.75rem",flexWrap:"wrap"}}>
                       <div style={{width:"26px",height:"26px",borderRadius:"50%",background:T.teal,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                        <span style={{color:T.white,fontSize:"0.75rem",fontWeight:700}}>{i+1}</span>
+                        <span style={{color:T.white,fontSize:"0.85rem",fontWeight:700}}>{i+1}</span>
                       </div>
                       <div style={{flex:1,fontSize:"0.88rem",fontWeight:600,color:T.text,minWidth:"120px"}}>
                         {s.name}
                         <span style={{display:"inline-flex",gap:"4px",marginLeft:"8px",verticalAlign:"middle"}}>
                           {s.extendedTime && s.extendedTime !== "none" && (
-                            <span style={{background:T.tealLight,border:`1px solid ${T.border}`,borderRadius:"3px",padding:"1px 6px",fontSize:"0.75rem",fontWeight:700,color:T.midnight}}>
+                            <span style={{background:T.tealLight,border:`1px solid ${T.border}`,borderRadius:"3px",padding:"2px 7px",fontSize:"0.78rem",fontWeight:700,color:T.midnight}}>
                               ⏱ {s.extendedTime === "1.5x" ? "1.5×" : "2×"} TIME
                             </span>
                           )}
                           {s.reduceChoices && (
-                            <span style={{background:"#fff8e1",border:"1px solid #ffc107",borderRadius:"3px",padding:"1px 6px",fontSize:"0.75rem",fontWeight:700,color:"#7a4e00"}}>
+                            <span style={{background:"#fff8e1",border:"1px solid #ffc107",borderRadius:"3px",padding:"2px 7px",fontSize:"0.78rem",fontWeight:700,color:"#7a4e00"}}>
                               ✂ 3-CHOICE
                             </span>
                           )}
@@ -1067,9 +1073,9 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
                       {!readOnly && (<>
                       <button onClick={()=>setAccomModal({cid:activeClassData.id, student:s})}
                         title="Accommodations (extended time, reduced choices)"
-                        style={{...S.btn,padding:"2px 8px",fontSize:"0.75rem",color:T.midnight,borderColor:T.border,background:T.tealLight}}>IEP</button>
+                        style={{...S.btn,padding:"5px 10px",fontSize:"0.88rem",color:T.midnight,borderColor:T.border,background:T.tealLight}}>IEP</button>
                       <button onClick={()=>removeStudent(activeClassData.id, s.id, s.name)}
-                        style={{...S.btn,padding:"2px 8px",color:T.dangerText,borderColor:T.dangerBd,background:T.dangerBg,fontSize:"0.75rem"}}>✕</button>
+                        style={{...S.btn,padding:"5px 10px",color:T.dangerText,borderColor:T.dangerBd,background:T.dangerBg,fontSize:"0.88rem"}}>✕</button>
                       </>)}
                     </div>
                   ))}

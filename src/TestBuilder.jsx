@@ -28,15 +28,13 @@ const DOK_LABELS = { 1:"Recall", 2:"Skill/Concept", 3:"Strategic", 4:"Extended" 
 
 const S = {
   inp:   { width:"100%", padding:"0.5rem 0.75rem", border:`1px solid ${T.border}`, borderRadius:T.xs, fontSize:"0.85rem", background:T.surface, boxSizing:"border-box" },
-  lbl:   { display:"block", fontSize:"0.62rem", fontWeight:700, letterSpacing:"0.12em", color:T.textSecondary, marginBottom:"4px" },
-  smBtn: { border:`1px solid ${T.border}`, borderRadius:T.xs, padding:"4px 10px", cursor:"pointer", fontSize:"0.75rem", fontWeight:600, background:T.surfaceAlt, color:T.text },
+  lbl:   { display:"block", fontSize:"0.82rem", fontWeight:700, letterSpacing:"0.08em", color:T.textSecondary, marginBottom:"4px" },
+  smBtn: { border:`1px solid ${T.border}`, borderRadius:T.xs, padding:"6px 12px", cursor:"pointer", fontSize:"0.88rem", fontWeight:600, background:T.surfaceAlt, color:T.text },
   ta:    { width:"100%", padding:"0.5rem 0.75rem", border:`1px solid ${T.border}`, borderRadius:T.xs, fontSize:"0.85rem", background:T.surface, boxSizing:"border-box", resize:"vertical", minHeight:"80px", fontFamily:T.font },
   code:  { fontFamily:"monospace", fontSize:"1.1rem", letterSpacing:"0.18em", textTransform:"uppercase", fontWeight:700, color:T.midnight },
 };
 
-function genCode() {
-  return Math.random().toString(36).substring(2,8).toUpperCase();
-}
+
 
 // ── Image paste zone ───────────────────────────────────────
 function ImagePasteZone({ image, onImage, onClear }) {
@@ -160,7 +158,7 @@ function EditModal({ question, onSave, onClose, teacher }) {
       };
       await fetch(`${API}/questions`, { method:"POST", headers:teacherHeaders(), body:JSON.stringify(toSave) });
       onSave(toSave);
-    } catch {}
+    } catch(e) { console.error("saveQuestion failed:", e); }
     setSaving(false);
   }
 
@@ -320,8 +318,8 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose, 
   const [oneAttempt,       setOneAttempt]       = useState(editing?.oneAttempt       || false);
   const [shuffleQuestions, setShuffleQuestions] = useState(editing?.shuffleQuestions || false);
   const [shuffleChoices,   setShuffleChoices]   = useState(editing?.shuffleChoices   || false);
-  const [classes,        setClasses]        = useState([]);
-  const [assignedClassIds, setAssignedClassIds] = useState([]);
+  const [,               setClasses]        = useState([]);
+  const [assignedClassIds] = useState([]);
   // Visibility / GMAS fields
   const [visibility,      setVisibility]      = useState(editing?.visibility || "private");
   const [adminScoresOnly, setAdminScoresOnly] = useState(editing?.adminScoresOnly || false);
@@ -339,9 +337,6 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose, 
     }
   }, [visibility]);
 
-  function toggleClass(id) {
-    setAssignedClassIds(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev, id]);
-  }
 
   const duplicate = savedTests.find(t =>
     t.name?.trim().toLowerCase() === name.trim().toLowerCase() && (!editing || t.id !== editing.id)
@@ -388,7 +383,7 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose, 
               </div>
               <div>
                 <div style={{fontSize:"0.82rem",fontWeight:700,color:adaptive?T.success:T.text}}>Adaptive Mode {adaptive?"ON":"OFF"}</div>
-                <div style={{fontSize:"0.7rem",color:T.textSecondary,marginTop:"1px"}}>Questions adjust to each student's weak areas during the test</div>
+                <div style={{fontSize:"0.85rem",color:T.textSecondary,marginTop:"1px"}}>Questions adjust to each student's weak areas during the test</div>
               </div>
             </label>
           </div>
@@ -402,19 +397,19 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose, 
             </div>
             <div>
               <div style={{fontSize:"0.82rem",fontWeight:700,color:untimed?T.warning:T.text}}>Untimed {untimed?"ON":"OFF"}</div>
-              <div style={{fontSize:"0.7rem",color:T.textSecondary,marginTop:"1px"}}>No countdown — students work at their own pace</div>
+              <div style={{fontSize:"0.85rem",color:T.textSecondary,marginTop:"1px"}}>No countdown — students work at their own pace</div>
             </div>
           </label>
           {!untimed && (
             <div style={{display:"flex",gap:"0.75rem"}}>
               <div style={{flex:1}}>
-                <label style={{display:"block",fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"4px"}}>TIME LIMIT (minutes)</label>
+                <label style={{display:"block",fontSize:"0.82rem",fontWeight:700,letterSpacing:"0.08em",color:T.textSecondary,marginBottom:"4px"}}>TIME LIMIT (minutes)</label>
                 <input type="number" min="1" max="180" value={timeMins}
                   onChange={e=>setTimeMins(Math.max(1,Math.min(180,Number(e.target.value))))}
                   style={{...S.inp,fontFamily:"monospace",fontWeight:700,fontSize:"1rem"}}/>
               </div>
               <div style={{flex:1}}>
-                <label style={{display:"block",fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"4px"}}>WARN AT (minutes left)</label>
+                <label style={{display:"block",fontSize:"0.82rem",fontWeight:700,letterSpacing:"0.08em",color:T.textSecondary,marginBottom:"4px"}}>WARN AT (minutes left)</label>
                 <input type="number" min="1" max={timeMins-1} value={warnMins}
                   onChange={e=>setWarnMins(Math.max(1,Math.min(timeMins-1,Number(e.target.value))))}
                   style={{...S.inp,fontFamily:"monospace",fontWeight:700,fontSize:"1rem"}}/>
@@ -435,7 +430,7 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose, 
               <div style={{fontSize:"0.82rem",fontWeight:700,color:oneAttempt?T.dangerText:T.text}}>
                 One Attempt Only {oneAttempt?"ON":"OFF"}
               </div>
-              <div style={{fontSize:"0.7rem",color:T.textSecondary,marginTop:"1px"}}>
+              <div style={{fontSize:"0.85rem",color:T.textSecondary,marginTop:"1px"}}>
                 Students can only submit this test once. They cannot retake it.
               </div>
             </div>
@@ -452,7 +447,7 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose, 
             </div>
             <div>
               <div style={{fontSize:"0.82rem",fontWeight:700,color:shuffleQuestions?T.success:T.text}}>Shuffle Question Order {shuffleQuestions?"ON":"OFF"}</div>
-              <div style={{fontSize:"0.7rem",color:T.textSecondary,marginTop:"1px"}}>Each student sees questions in a different random order</div>
+              <div style={{fontSize:"0.85rem",color:T.textSecondary,marginTop:"1px"}}>Each student sees questions in a different random order</div>
             </div>
           </label>
           <label style={{display:"flex",alignItems:"center",gap:"0.75rem",cursor:"pointer",padding:"0.65rem 0.85rem",
@@ -464,7 +459,7 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose, 
             </div>
             <div>
               <div style={{fontSize:"0.82rem",fontWeight:700,color:shuffleChoices?T.success:T.text}}>Shuffle Answer Choices {shuffleChoices?"ON":"OFF"}</div>
-              <div style={{fontSize:"0.7rem",color:T.textSecondary,marginTop:"1px"}}>A/B/C/D order is randomized per student</div>
+              <div style={{fontSize:"0.85rem",color:T.textSecondary,marginTop:"1px"}}>A/B/C/D order is randomized per student</div>
             </div>
           </label>
         </div>
@@ -474,8 +469,8 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose, 
           <div style={{display:"flex",gap:"0.5rem"}}>
             {[["private","🔒 Private","Only you can see and use this test"],["grade","👥 Grade","Share with specific teachers in your school"],isAdmin&&["global","🌐 Global","Available to all teachers (admin only)"]].filter(Boolean).map(([val,label,desc])=>(
               <button key={val} onClick={()=>setVisibility(val)} style={{flex:1,padding:"0.55rem 0.4rem",border:`2px solid ${visibility===val?"#1565c0":"#c8d3dd"}`,borderRadius:T.xs,background:visibility===val?"#e3f2fd":"#fff",cursor:"pointer",textAlign:"left"}}>
-                <div style={{fontSize:"0.72rem",fontWeight:700,color:visibility===val?"#1565c0":T.text}}>{label}</div>
-                <div style={{fontSize:"0.58rem",color:T.textSecondary,marginTop:"1px"}}>{desc}</div>
+                <div style={{fontSize:"0.85rem",fontWeight:700,color:visibility===val?"#1565c0":T.text}}>{label}</div>
+                <div style={{fontSize:"0.75rem",color:T.textSecondary,marginTop:"1px"}}>{desc}</div>
               </button>
             ))}
           </div>
@@ -624,13 +619,13 @@ function AssignTestModal({ test, onDone, onClose, teacher, existingAssignments }
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
       <div style={{background:T.white,borderRadius:"6px",width:"100%",maxWidth:"460px",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.25)"}}>
         <div style={{background:T.midnight,color:T.white,padding:"0.9rem 1.25rem"}}>
-          <div style={{fontSize:"0.6rem",opacity:.65,letterSpacing:"0.14em"}}>ASSIGN TEST TO STUDENTS</div>
+          <div style={{fontSize:"0.78rem",opacity:.65,letterSpacing:"0.1em"}}>ASSIGN TEST TO STUDENTS</div>
           <div style={{fontSize:"1rem",fontWeight:700}}>{test.name}</div>
         </div>
         <div style={{padding:"1.25rem"}}>
           {!selectedCls ? (
             <>
-              <div style={{fontSize:"0.75rem",color:T.textSecondary,marginBottom:"0.75rem"}}>Select a class:</div>
+              <div style={{fontSize:"0.9rem",color:T.textSecondary,marginBottom:"0.75rem"}}>Select a class:</div>
               {classes.length===0 ? (
                 <div style={{color:T.textMuted,fontSize:"0.82rem",padding:"1rem",textAlign:"center"}}>No classes found.</div>
               ) : (
@@ -643,8 +638,8 @@ function AssignTestModal({ test, onDone, onClose, teacher, existingAssignments }
                           border:`1px solid ${hasAssignment?"#2e7d32":T.border}`,borderRadius:T.xs,
                           background:hasAssignment?"#e8f5e9":T.surface,cursor:"pointer",textAlign:"left",width:"100%"}}>
                         <span style={{fontWeight:600,color:T.midnight,fontSize:"0.85rem",flex:1}}>{cls.name}</span>
-                        <span style={{fontSize:"0.68rem",color:T.textSecondary}}>{cls.students?.length||0} students</span>
-                        {hasAssignment&&<span style={{fontSize:"0.6rem",color:"#2e7d32",fontWeight:700}}>✓ Assigned</span>}
+                        <span style={{fontSize:"0.85rem",color:T.textSecondary}}>{cls.students?.length||0} students</span>
+                        {hasAssignment&&<span style={{fontSize:"0.78rem",color:"#2e7d32",fontWeight:700}}>✓ Assigned</span>}
                       </button>
                     );
                   })}
@@ -657,14 +652,14 @@ function AssignTestModal({ test, onDone, onClose, teacher, existingAssignments }
               <div style={{display:"flex",alignItems:"center",gap:"0.5rem",marginBottom:"0.75rem"}}>
                 <button onClick={()=>setSelectedCls(null)} style={{border:"none",background:"none",cursor:"pointer",fontSize:"0.85rem",color:T.teal,fontWeight:700}}>← Back</button>
                 <span style={{fontWeight:700,color:T.midnight,fontSize:"0.9rem"}}>{selectedCls.name}</span>
-                <span style={{marginLeft:"auto",fontSize:"0.72rem",color:T.textSecondary}}>{checkedCount}/{selectedCls.students?.length||0} selected</span>
+                <span style={{marginLeft:"auto",fontSize:"0.88rem",color:T.textSecondary}}>{checkedCount}/{selectedCls.students?.length||0} selected</span>
               </div>
-              {existing&&<div style={{fontSize:"0.7rem",color:"#2e7d32",background:"#e8f5e9",border:"1px solid #c8e6c9",borderRadius:T.xs,padding:"0.4rem 0.65rem",marginBottom:"0.5rem"}}>
+              {existing&&<div style={{fontSize:"0.85rem",color:"#2e7d32",background:"#e8f5e9",border:"1px solid #c8e6c9",borderRadius:T.xs,padding:"0.4rem 0.65rem",marginBottom:"0.5rem"}}>
                 ✓ Already assigned — {existing.completedCount||0}/{existing.totalStudents||0} completed. Editing student list.
               </div>}
               <div style={{display:"flex",gap:"0.5rem",marginBottom:"0.5rem"}}>
-                <button onClick={selectAll} style={{fontSize:"0.68rem",border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"3px 8px",cursor:"pointer",background:T.surfaceAlt}}>Select All</button>
-                <button onClick={deselectAll} style={{fontSize:"0.68rem",border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"3px 8px",cursor:"pointer",background:T.surfaceAlt}}>Deselect All</button>
+                <button onClick={selectAll} style={{fontSize:"0.85rem",border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"5px 10px",cursor:"pointer",background:T.surfaceAlt}}>Select All</button>
+                <button onClick={deselectAll} style={{fontSize:"0.85rem",border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"5px 10px",cursor:"pointer",background:T.surfaceAlt}}>Deselect All</button>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:"2px",maxHeight:"280px",overflowY:"auto",marginBottom:"0.75rem",border:`1px solid ${T.border}`,borderRadius:T.xs}}>
                 {(selectedCls.students||[]).map(s => {
@@ -678,13 +673,13 @@ function AssignTestModal({ test, onDone, onClose, teacher, existingAssignments }
                         background:on?T.teal:T.white,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                         {on&&<span style={{color:T.white,fontSize:"0.6rem",fontWeight:900}}>✓</span>}
                       </div>
-                      <span style={{flex:1,fontWeight:on?600:400,color:on?T.text:"#999",fontSize:"0.82rem"}}>{s.name}</span>
-                      {completed&&<span style={{fontSize:"0.6rem",color:"#2e7d32",fontWeight:700,background:"#e8f5e9",padding:"1px 6px",borderRadius:"3px"}}>✅ Done</span>}
+                      <span style={{flex:1,fontWeight:on?600:400,color:on?T.text:"#999",fontSize:"0.92rem"}}>{s.name}</span>
+                      {completed&&<span style={{fontSize:"0.78rem",color:"#2e7d32",fontWeight:700,background:"#e8f5e9",padding:"1px 6px",borderRadius:"3px"}}>✅ Done</span>}
                     </label>
                   );
                 })}
               </div>
-              {msg&&<div style={{fontSize:"0.72rem",color:"#e67e00",marginBottom:"0.5rem"}}>⚠ {msg}</div>}
+              {msg&&<div style={{fontSize:"0.88rem",color:"#e67e00",marginBottom:"0.5rem"}}>⚠ {msg}</div>}
               <div style={{display:"flex",gap:"0.65rem"}}>
                 <button onClick={onClose} style={{flex:1,background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"0.65rem",fontSize:"0.85rem",cursor:"pointer",fontWeight:600}}>Cancel</button>
                 <button onClick={handleAssign} disabled={saving||checkedCount===0}
@@ -747,7 +742,7 @@ function TestPreviewModal({ test, bank, onClose }) {
         {/* Header */}
         <div style={{background:"#7c3aed",color:"#fff",padding:"0.85rem 1.25rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
           <div style={{flex:1}}>
-            <div style={{fontSize:"0.55rem",opacity:.7,letterSpacing:"0.14em"}}>TEACHER PREVIEW — NOT RECORDED</div>
+            <div style={{fontSize:"0.78rem",opacity:.7,letterSpacing:"0.14em"}}>TEACHER PREVIEW — NOT RECORDED</div>
             <div style={{fontSize:"1rem",fontWeight:700}}>{test.name || "Untitled"}</div>
           </div>
           {!done && <div style={{fontSize:"0.72rem",opacity:.8}}>{cur+1} / {questions.length}</div>}
@@ -904,7 +899,7 @@ export default function TestBuilder({ teacher, readOnly }) {
 
   const loadBank = useCallback(async () => {
     try { const r=await fetch(`${API}/questions`); setBank(await r.json()); }
-    catch { setBank([]); }
+    catch(e) { console.error("loadBank failed:", e); setBank([]); }
     setLoading(false);
   }, []);
 
@@ -913,7 +908,7 @@ export default function TestBuilder({ teacher, readOnly }) {
       const r=await fetch(`${API}/test/active`); const t=await r.json();
       setSelected((t.questions||[]).map(q=>q.id));
       setTestTitle(t.title||"Grade 5 Math — Practice");
-    } catch {}
+    } catch(e) { console.error("loadActive failed:", e); }
   }, []);
 
   const loadSavedTests = useCallback(async (archived = false) => {
@@ -924,7 +919,7 @@ export default function TestBuilder({ teacher, readOnly }) {
       const r = await fetch(`${API}/tests/saved?${params}`, { headers: teacherHeaders() });
       const data = await r.json();
       setSavedTests(Array.isArray(data) ? data : []);
-    } catch { setSavedTests([]); }
+    } catch(e) { console.error("loadSavedTests failed:", e); setSavedTests([]); }
   }, [teacher]);
 
   const loadAssignments = useCallback(async () => {
@@ -933,7 +928,7 @@ export default function TestBuilder({ teacher, readOnly }) {
       const r=await fetch(`${API}/assignments${classFilter}`, { headers: teacherHeaders() });
       const data = await r.json();
       setTestAssignments(Array.isArray(data) ? data : []);
-    } catch { setTestAssignments([]); }
+    } catch(e) { console.error("loadAssignments failed:", e); setTestAssignments([]); }
   }, [teacher]);
 
   const loadActiveSessions = useCallback(async () => {
@@ -949,11 +944,11 @@ export default function TestBuilder({ teacher, readOnly }) {
           const ar = await fetch(`${API}/active?code=${encodeURIComponent(code)}`);
           const ad = await ar.json();
           counts[code] = (Array.isArray(ad)?ad:[]).filter(s=>s.phase==="waiting").length;
-        } catch {}
+        } catch(e) { console.error("loadActiveSessions inner failed:", e); }
       }));
       setActiveSessions(results);
       setWaitingCounts(counts);
-    } catch {}
+    } catch(e) { console.error("loadActiveSessions failed:", e); }
   }, [testAssignments]);
 
   async function launchSession(testCode, classId) {
@@ -963,7 +958,7 @@ export default function TestBuilder({ teacher, readOnly }) {
         body: JSON.stringify({ code:testCode, classId, action:"launch" }),
       });
       await loadActiveSessions();
-    } catch {}
+    } catch(e) { console.error("launchSession failed:", e); setSavedMsg("Failed to launch session — check your connection."); }
   }
 
   async function beginTesting(testCode) {
@@ -973,7 +968,7 @@ export default function TestBuilder({ teacher, readOnly }) {
         body: JSON.stringify({ code:testCode, action:"begin" }),
       });
       await loadActiveSessions();
-    } catch {}
+    } catch(e) { console.error("beginTesting failed:", e); setSavedMsg("Failed to start testing — check your connection."); }
   }
 
   async function endSession(testCode) {
@@ -985,7 +980,7 @@ export default function TestBuilder({ teacher, readOnly }) {
       });
       setActiveSessions(s=>{ const n={...s}; delete n[testCode]; return n; });
       setWaitingCounts(s=>{ const n={...s}; delete n[testCode]; return n; });
-    } catch {}
+    } catch(e) { console.error("endSession failed:", e); setSavedMsg("Failed to end session — check your connection."); }
   }
 
   async function giveMakeup(assignmentId, studentId) {
@@ -996,7 +991,7 @@ export default function TestBuilder({ teacher, readOnly }) {
         body: JSON.stringify({ studentId }),
       });
       await loadAssignments();
-    } catch {}
+    } catch(e) { console.error("giveMakeup failed:", e); setSavedMsg("Failed to give makeup — check your connection."); }
     setMakeupLoading(null);
   }
 
@@ -1006,6 +1001,7 @@ export default function TestBuilder({ teacher, readOnly }) {
       ? `?classIds=${teacher.classIds.join(",")}`
       : "";
     fetch(`${API}/roster${classFilter}`).then(r=>r.json()).then(d=>setAllClasses(Array.isArray(d)?d:[])).catch(()=>{});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[loadBank,loadActive,loadSavedTests,loadAssignments,showArchived]);
 
   // Poll active sessions every 5s when library tab is open
@@ -1052,24 +1048,12 @@ export default function TestBuilder({ teacher, readOnly }) {
 
   async function deleteQuestion(id) {
     try { await fetch(`${API}/questions/${id}`,{method:"DELETE",headers:teacherHeaders()}); setBank(b=>b.filter(q=>q.id!==id)); setSelected(s=>s.filter(x=>x!==id)); }
-    catch {}
+    catch(e) { console.error("deleteQuestion failed:", e); setSavedMsg("Failed to delete question — check your connection."); }
     setConfirmDelete(null);
   }
 
   function handleSaveEdit(updated) { setBank(b=>b.map(q=>q.id===updated.id?updated:q)); setEditingQ(null); }
 
-  async function assignClasses(testId, classIds) {
-    const t = savedTests.find(x => x.id === testId);
-    if (!t) return;
-    try {
-      await fetch(`${API}/tests/saved/${testId}`, {
-        method:"PUT", headers:teacherHeaders(),
-        body: JSON.stringify({...t, classIds})
-      });
-      await loadSavedTests();
-    } catch {}
-    setAssigningTest(null);
-  }
 
   async function saveTest(name, code, adaptive=false, timerCfg={}) {
     try {
@@ -1167,7 +1151,13 @@ export default function TestBuilder({ teacher, readOnly }) {
     } catch {}
   }
 
-  if (loading) return <div style={{padding:"3rem",textAlign:"center",color:T.textMuted}}>Loading question bank…</div>;
+  if (loading) return (
+    <div style={{padding:"3rem",textAlign:"center",color:T.textMuted,fontFamily:T.font}}>
+      <style>{`@keyframes mr-spin{to{transform:rotate(360deg)}}`}</style>
+      <span style={{display:"inline-block",width:"20px",height:"20px",borderRadius:"50%",border:`2px solid ${T.border}`,borderTopColor:T.teal,animation:"mr-spin 0.7s linear infinite",marginBottom:"0.75rem"}}/>
+      <div>Loading question bank…</div>
+    </div>
+  );
 
   return (
     <div style={{display:"flex",height:"100%",fontFamily:T.font,background:"#e8edf2",overflow:"hidden"}}>
@@ -1176,12 +1166,12 @@ export default function TestBuilder({ teacher, readOnly }) {
       <div style={{width:"55%",display:"flex",flexDirection:"column",borderRight:`2px solid ${T.border}`,overflow:"hidden"}}>
         <div style={{background:T.white,borderBottom:`1px solid ${T.border}`,padding:"0.75rem 1rem",display:"flex",flexDirection:"column",gap:"0.5rem",flexShrink:0}}>
           <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
-            <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.midnight}}>QUESTION BANK</div>
-            <span style={{fontSize:"0.7rem",color:T.textMuted}}>{bank.length} total · {filtered.length} shown</span>
+            <div style={{fontSize:"0.82rem",fontWeight:700,letterSpacing:"0.08em",color:T.midnight}}>QUESTION BANK</div>
+            <span style={{fontSize:"0.85rem",color:T.textMuted}}>{bank.length} total · {filtered.length} shown</span>
             <div style={{marginLeft:"auto",display:"flex",borderRadius:T.xs,overflow:"hidden",border:`1px solid ${T.border}`}}>
               {[["math","Math"],["science","Science"]].map(([key,lbl])=>(
                 <button key={key} onClick={()=>{setSubject(key);setFilterStd("");}}
-                  style={{padding:"3px 12px",fontSize:"0.72rem",fontWeight:600,border:"none",cursor:"pointer",
+                  style={{padding:"5px 14px",fontSize:"0.88rem",fontWeight:600,border:"none",cursor:"pointer",
                     background:subject===key?T.midnight:T.surfaceAlt,color:subject===key?T.white:T.textSecondary}}>
                   {lbl}
                 </button>
@@ -1201,9 +1191,9 @@ export default function TestBuilder({ teacher, readOnly }) {
             <input style={{...S.inp,flex:2,minWidth:"120px"}} value={filterAuthor} onChange={e=>setFilterAuthor(e.target.value)} placeholder="Filter by author…"/>
           </div>
           <div style={{display:"flex",gap:"0.5rem",alignItems:"center",flexWrap:"wrap"}}>
-            <span style={{fontSize:"0.72rem",color:T.textSecondary}}>
+            <span style={{fontSize:"0.88rem",color:T.textSecondary}}>
               Auto-fill <input type="number" min={1} max={50} value={autoCount} onChange={e=>setAutoCount(Number(e.target.value))}
-                style={{width:"42px",padding:"2px 5px",border:`1px solid ${T.border}`,borderRadius:T.xs,fontSize:"0.78rem",textAlign:"center"}}/> questions
+                style={{width:"46px",padding:"3px 5px",border:`1px solid ${T.border}`,borderRadius:T.xs,fontSize:"0.88rem",textAlign:"center"}}/> questions
             </span>
             <button onClick={autoFill} style={{...S.smBtn,background:T.teal,color:T.white,borderColor:T.teal}}>⚡ Auto-fill</button>
             <button onClick={()=>setSelected([])} style={{...S.smBtn,color:T.dangerText,borderColor:T.dangerBd}}>Clear All</button>
@@ -1229,12 +1219,12 @@ export default function TestBuilder({ teacher, readOnly }) {
                   </div>
                   <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>toggleSelect(q)}>
                     <div style={{display:"flex",gap:"0.4rem",marginBottom:"3px",flexWrap:"wrap",alignItems:"center"}}>
-                      {q.id&&<span style={{fontSize:"0.65rem",fontWeight:700,fontFamily:"monospace",color:T.white,background:T.midnight,padding:"1px 7px",borderRadius:T.xs,letterSpacing:"0.05em"}}>{q.id}</span>}
-                      <span style={{fontSize:"0.6rem",fontWeight:700,color:T.midnight,background:T.tealLight,padding:"1px 6px",borderRadius:"2px",border:`1px solid ${T.border}`}}>{q.standard}</span>
-                      {q.dok&&<span style={{fontSize:"0.6rem",fontWeight:700,color:T.warning,background:"#fff3cd",padding:"1px 6px",borderRadius:"2px",border:`1px solid ${T.warningBd}`}}>DOK {q.dok}</span>}
-                      {q.type&&q.type!=="mcq"&&<span style={{fontSize:"0.58rem",fontWeight:700,color:"#6d28d9",background:"#ede9fe",padding:"1px 6px",borderRadius:"2px",border:"1px solid #c4b5fd"}}>{q.type==="dragdrop"?"D&D":q.type==="multiselect"?"Multi":q.type==="keypad"?"Keypad":q.type}</span>}
-                      {q.createdByName&&<span style={{fontSize:"0.58rem",fontWeight:600,color:T.textSecondary,background:T.surfaceAlt,padding:"1px 6px",borderRadius:"2px",border:`1px solid ${T.border}`}}>👤 {q.createdByName}</span>}
-                      <span style={{fontSize:"0.6rem",color:T.textSecondary}}>{q.short}</span>
+                      {q.id&&<span style={{fontSize:"0.75rem",fontWeight:700,fontFamily:"monospace",color:T.white,background:T.midnight,padding:"2px 7px",borderRadius:T.xs,letterSpacing:"0.05em"}}>{q.id}</span>}
+                      <span style={{fontSize:"0.75rem",fontWeight:700,color:T.midnight,background:T.tealLight,padding:"2px 6px",borderRadius:"2px",border:`1px solid ${T.border}`}}>{q.standard}</span>
+                      {q.dok&&<span style={{fontSize:"0.75rem",fontWeight:700,color:T.warning,background:"#fff3cd",padding:"2px 6px",borderRadius:"2px",border:`1px solid ${T.warningBd}`}}>DOK {q.dok}</span>}
+                      {q.type&&q.type!=="mcq"&&<span style={{fontSize:"0.75rem",fontWeight:700,color:"#6d28d9",background:"#ede9fe",padding:"2px 6px",borderRadius:"2px",border:"1px solid #c4b5fd"}}>{q.type==="dragdrop"?"D&D":q.type==="multiselect"?"Multi":q.type==="keypad"?"Keypad":q.type}</span>}
+                      {q.createdByName&&<span style={{fontSize:"0.75rem",fontWeight:600,color:T.textSecondary,background:T.surfaceAlt,padding:"2px 6px",borderRadius:"2px",border:`1px solid ${T.border}`}}>👤 {q.createdByName}</span>}
+                      <span style={{fontSize:"0.78rem",color:T.textSecondary}}>{q.short}</span>
                     </div>
                     <div style={{fontSize:"0.85rem",color:T.text,fontFamily:"Georgia,serif",lineHeight:1.5,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>
                       <MathText text={q.question}/>
@@ -1353,8 +1343,8 @@ export default function TestBuilder({ teacher, readOnly }) {
             <div style={{background:T.white,borderBottom:`1px solid ${T.border}`,padding:"0.75rem 1rem",flexShrink:0}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"0.5rem"}}>
                 <div>
-                  <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.12em",color:T.midnight}}>TEST LIBRARY</div>
-                  <div style={{fontSize:"0.68rem",color:T.textSecondary,marginTop:"1px"}}>{filtered.length} test{filtered.length!==1?"s":""}{q?` · ${filtered.length} match${filtered.length!==1?"es":""}`:""}</div>
+                  <div style={{fontSize:"0.82rem",fontWeight:700,letterSpacing:"0.08em",color:T.midnight}}>TEST LIBRARY</div>
+                  <div style={{fontSize:"0.85rem",color:T.textSecondary,marginTop:"1px"}}>{filtered.length} test{filtered.length!==1?"s":""}{q?` · ${filtered.length} match${filtered.length!==1?"es":""}`:""}</div>
                 </div>
               </div>
               <div style={{display:"flex",gap:"0.4rem",flexWrap:"wrap",marginBottom:"0.4rem"}}>
@@ -1363,16 +1353,16 @@ export default function TestBuilder({ teacher, readOnly }) {
                   {label: showArchived?"📦 Hide Archived":"📦 Archived", active: showArchived, onClick:()=>setShowArchived(v=>!v)},
                 ].map(btn=>(
                   <button key={btn.label} onClick={btn.onClick}
-                    style={{fontSize:"0.68rem",fontWeight:700,padding:"3px 9px",borderRadius:"12px",cursor:"pointer",border:`1px solid ${btn.active?T.teal:T.border}`,background:btn.active?T.tealLight:"transparent",color:btn.active?T.teal:T.textSecondary}}>
+                    style={{fontSize:"0.85rem",fontWeight:700,padding:"5px 11px",borderRadius:"12px",cursor:"pointer",border:`1px solid ${btn.active?T.teal:T.border}`,background:btn.active?T.tealLight:"transparent",color:btn.active?T.teal:T.textSecondary}}>
                     {btn.label}
                   </button>
                 ))}
               </div>
               <div style={{display:"flex",gap:"0.4rem",alignItems:"center"}}>
                 <input value={libSearch} onChange={e=>setLibSearch(e.target.value)} placeholder="Search by name or code..."
-                  style={{...S.inp,flex:1,fontSize:"0.78rem",padding:"5px 8px",margin:0}}/>
+                  style={{...S.inp,flex:1,fontSize:"0.88rem",padding:"6px 8px",margin:0}}/>
                 <select value={libSort} onChange={e=>setLibSort(e.target.value)}
-                  style={{...S.inp,width:"auto",fontSize:"0.72rem",padding:"5px 6px",margin:0,color:T.textSecondary}}>
+                  style={{...S.inp,width:"auto",fontSize:"0.88rem",padding:"6px 8px",margin:0,color:T.textSecondary}}>
                   <option value="newest">Newest</option>
                   <option value="oldest">Oldest</option>
                   <option value="name">A-Z</option>
@@ -1392,7 +1382,6 @@ export default function TestBuilder({ teacher, readOnly }) {
                 sorted.map(t=>{
                   /* Extract unique standards from the full test via the question bank */
                   const testStds = [...new Set((bank||[]).filter(bq=>(t.questionIds||[]).includes(bq.id)||(savedTests.find(x=>x.id===t.id)?.questions||[]).some(sq=>sq.id===bq.id)).map(bq=>bq.standard).filter(Boolean))].sort();
-                  const classNames = (t.classIds||[]).map(id=>allClasses.find(c=>c.id===id)?.name).filter(Boolean);
                   const canEdit = !t.createdBy || t.createdBy === teacher?.teacherId || isAdmin;
                   const canDupe = t.visibility !== "global" || isAdmin;
                   const vis = t.visibility || "private";
@@ -1410,16 +1399,16 @@ export default function TestBuilder({ teacher, readOnly }) {
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:"flex",alignItems:"center",gap:"0.5rem",flexWrap:"wrap"}}>
                           <span style={{fontSize:"0.9rem",fontWeight:700,color:T.text}}>{t.name||"Untitled"}</span>
-                          <span style={{fontSize:"0.58rem",fontWeight:700,background:visBadge.bg,color:visBadge.color,border:`1px solid ${visBadge.bd}`,borderRadius:"3px",padding:"1px 6px"}}>{visBadge.icon} {visBadge.label}</span>
-                          {t.archived&&<span style={{fontSize:"0.58rem",fontWeight:700,background:"#f1f5f9",color:"#64748b",border:"1px solid #cbd5e1",borderRadius:"3px",padding:"1px 6px"}}>📦 ARCHIVED</span>}
-                          {t.createdByName&&<span style={{fontSize:"0.58rem",color:T.textSecondary}}>by {t.createdByName}</span>}
+                          <span style={{fontSize:"0.75rem",fontWeight:700,background:visBadge.bg,color:visBadge.color,border:`1px solid ${visBadge.bd}`,borderRadius:"3px",padding:"2px 7px"}}>{visBadge.icon} {visBadge.label}</span>
+                          {t.archived&&<span style={{fontSize:"0.75rem",fontWeight:700,background:"#f1f5f9",color:"#64748b",border:"1px solid #cbd5e1",borderRadius:"3px",padding:"2px 7px"}}>📦 ARCHIVED</span>}
+                          {t.createdByName&&<span style={{fontSize:"0.75rem",color:T.textSecondary}}>by {t.createdByName}</span>}
                         </div>
-                        <div style={{fontSize:"0.7rem",color:T.textSecondary,marginTop:"2px"}}>
+                        <div style={{fontSize:"0.85rem",color:T.textSecondary,marginTop:"2px"}}>
                           {t.count} Q{t.count!==1?"s":""} · {t.saved_at}
-                          {t.oneAttempt&&<span style={{marginLeft:"6px",background:"#fff3e0",color:"#e65100",borderRadius:"3px",padding:"0px 5px",fontSize:"0.6rem",fontWeight:600}}>1 attempt</span>}
-                          {t.untimed&&<span style={{marginLeft:"4px",background:"#e8f5e9",color:"#2e7d32",borderRadius:"3px",padding:"0px 5px",fontSize:"0.6rem",fontWeight:600}}>untimed</span>}
-                          {t.adaptive&&<span style={{marginLeft:"4px",background:"#e3f2fd",color:"#1565c0",borderRadius:"3px",padding:"0px 5px",fontSize:"0.6rem",fontWeight:600}}>adaptive</span>}
-                          {t.closeDate&&<span style={{marginLeft:"4px",background:"#fce4ec",color:"#c62828",borderRadius:"3px",padding:"0px 5px",fontSize:"0.6rem",fontWeight:600}}>closes {t.closeDate}</span>}
+                          {t.oneAttempt&&<span style={{marginLeft:"6px",background:"#fff3e0",color:"#e65100",borderRadius:"3px",padding:"1px 6px",fontSize:"0.78rem",fontWeight:600}}>1 attempt</span>}
+                          {t.untimed&&<span style={{marginLeft:"4px",background:"#e8f5e9",color:"#2e7d32",borderRadius:"3px",padding:"1px 6px",fontSize:"0.78rem",fontWeight:600}}>untimed</span>}
+                          {t.adaptive&&<span style={{marginLeft:"4px",background:"#e3f2fd",color:"#1565c0",borderRadius:"3px",padding:"1px 6px",fontSize:"0.78rem",fontWeight:600}}>adaptive</span>}
+                          {t.closeDate&&<span style={{marginLeft:"4px",background:"#fce4ec",color:"#c62828",borderRadius:"3px",padding:"1px 6px",fontSize:"0.78rem",fontWeight:600}}>closes {t.closeDate}</span>}
                         </div>
                       </div>
                       <div style={{display:"flex",gap:"0.35rem",flexShrink:0}}>
@@ -1441,17 +1430,17 @@ export default function TestBuilder({ teacher, readOnly }) {
                     {/* Direct link (backup access) */}
                     {t.code&&(
                       <div style={{marginTop:"0.5rem",display:"flex",alignItems:"center",gap:"0.5rem",background:T.surface,borderRadius:"4px",padding:"0.4rem 0.65rem"}}>
-                        <span style={{fontSize:"0.58rem",color:T.textSecondary,fontWeight:700,letterSpacing:"0.1em"}}>DIRECT LINK</span>
-                        <span style={{fontSize:"0.65rem",color:T.textSecondary,fontFamily:"monospace",opacity:0.6}}>{t.code}</span>
+                        <span style={{fontSize:"0.78rem",color:T.textSecondary,fontWeight:700,letterSpacing:"0.08em"}}>DIRECT LINK</span>
+                        <span style={{fontSize:"0.82rem",color:T.textSecondary,fontFamily:"monospace",opacity:0.6}}>{t.code}</span>
                         <button onClick={()=>navigator.clipboard.writeText(`${window.location.origin}/?code=${t.code}`)}
-                          style={{...S.smBtn,marginLeft:"auto",padding:"2px 8px",fontSize:"0.65rem"}}>📋 Copy</button>
+                          style={{...S.smBtn,marginLeft:"auto",padding:"4px 10px"}}>📋 Copy</button>
                       </div>
                     )}
                     {/* Standards tags */}
                     {testStds.length>0&&(
                       <div style={{marginTop:"0.45rem",display:"flex",flexWrap:"wrap",gap:"3px"}}>
                         {testStds.map(std=>(
-                          <span key={std} style={{fontSize:"0.58rem",fontWeight:600,background:"#eef2ff",color:"#4338ca",borderRadius:"3px",padding:"1px 6px",border:"1px solid #c7d2fe"}}>{std}</span>
+                          <span key={std} style={{fontSize:"0.75rem",fontWeight:600,background:"#eef2ff",color:"#4338ca",borderRadius:"3px",padding:"2px 7px",border:"1px solid #c7d2fe"}}>{std}</span>
                         ))}
                       </div>
                     )}
@@ -1459,7 +1448,7 @@ export default function TestBuilder({ teacher, readOnly }) {
                     {(()=>{
                       const assigns = (testAssignments||[]).filter(a=>a.testId===t.id);
                       if (assigns.length === 0) return (
-                        <div style={{marginTop:"0.4rem",fontSize:"0.68rem",color:"#e67e00"}}>
+                        <div style={{marginTop:"0.4rem",fontSize:"0.85rem",color:"#e67e00"}}>
                           <span onClick={()=>setAssigningTest(t)} style={{cursor:"pointer"}}>⚠ Not assigned — click Assign to push to students</span>
                         </div>
                       );
@@ -1472,7 +1461,7 @@ export default function TestBuilder({ teacher, readOnly }) {
                           .filter(s=>!(a.completedIds||[]).includes(s.id) && (a.studentIds||[]).includes(s.id));
                         const isExpanded = expandedAssign === a.id;
                         return (
-                          <div key={a.id} style={{marginTop:"0.35rem",fontSize:"0.68rem",background:"#e8f5e9",borderRadius:"3px",padding:"0.3rem 0.5rem"}}>
+                          <div key={a.id} style={{marginTop:"0.35rem",fontSize:"0.85rem",background:"#e8f5e9",borderRadius:"3px",padding:"0.35rem 0.6rem"}}>
                             {/* Main row */}
                             <div style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
                               <span style={{fontWeight:600,color:"#2e7d32"}}>📋 {a.className}</span>
@@ -1483,33 +1472,33 @@ export default function TestBuilder({ teacher, readOnly }) {
                               {/* Session control button */}
                               {!sess ? (
                                 <button onClick={()=>launchSession(t.code, a.classId)}
-                                  style={{border:"1px solid #a5d6a7",background:"#e8f5e9",cursor:"pointer",fontSize:"0.62rem",fontWeight:700,color:"#2e7d32",padding:"2px 8px",borderRadius:"3px",whiteSpace:"nowrap"}}>
+                                  style={{border:"1px solid #a5d6a7",background:"#e8f5e9",cursor:"pointer",fontSize:"0.88rem",fontWeight:700,color:"#2e7d32",padding:"5px 12px",borderRadius:"3px",whiteSpace:"nowrap"}}>
                                   🟢 Launch
                                 </button>
                               ) : isWaiting ? (
                                 <button onClick={()=>beginTesting(t.code)}
-                                  style={{border:"1px solid #90caf9",background:"#e3f2fd",cursor:"pointer",fontSize:"0.62rem",fontWeight:700,color:"#1565c0",padding:"2px 8px",borderRadius:"3px",whiteSpace:"nowrap"}}>
+                                  style={{border:"1px solid #90caf9",background:"#e3f2fd",cursor:"pointer",fontSize:"0.88rem",fontWeight:700,color:"#1565c0",padding:"5px 12px",borderRadius:"3px",whiteSpace:"nowrap"}}>
                                   ▶ Begin{waitCount>0?` (${waitCount} waiting)`:""}
                                 </button>
                               ) : isTesting ? (
                                 <button onClick={()=>endSession(t.code)}
-                                  style={{border:"1px solid #f0b8b8",background:"#fdf2f2",cursor:"pointer",fontSize:"0.62rem",fontWeight:600,color:"#8b1a1a",padding:"2px 8px",borderRadius:"3px",whiteSpace:"nowrap"}}>
+                                  style={{border:"1px solid #f0b8b8",background:"#fdf2f2",cursor:"pointer",fontSize:"0.88rem",fontWeight:600,color:"#8b1a1a",padding:"5px 12px",borderRadius:"3px",whiteSpace:"nowrap"}}>
                                   End Session
                                 </button>
                               ) : null}
                               {/* Makeup expander */}
                               {notCompleted.length > 0 && (
                                 <button onClick={()=>setExpandedAssign(isExpanded ? null : a.id)}
-                                  style={{border:"1px solid #ffcc02",background:"#fff8e1",cursor:"pointer",fontSize:"0.62rem",fontWeight:600,color:"#e65100",padding:"2px 8px",borderRadius:"3px",whiteSpace:"nowrap"}}>
+                                  style={{border:"1px solid #ffcc02",background:"#fff8e1",cursor:"pointer",fontSize:"0.88rem",fontWeight:600,color:"#e65100",padding:"5px 12px",borderRadius:"3px",whiteSpace:"nowrap"}}>
                                   ＋ Makeup ({notCompleted.length})
                                 </button>
                               )}
                               <button onClick={()=>{if(window.confirm(`Unassign from ${a.className}?`))deleteAssignment(a.id);}} title="Remove assignment"
-                                style={{border:"1px solid #f0b8b8",background:"#fdf2f2",cursor:"pointer",fontSize:"0.62rem",fontWeight:600,color:"#8b1a1a",padding:"2px 8px",borderRadius:"3px"}}>Unassign</button>
+                                style={{border:"1px solid #f0b8b8",background:"#fdf2f2",cursor:"pointer",fontSize:"0.88rem",fontWeight:600,color:"#8b1a1a",padding:"5px 12px",borderRadius:"3px"}}>Unassign</button>
                             </div>
                             {/* Session code display when live */}
                             {sess && (
-                              <div style={{marginTop:"0.3rem",fontSize:"0.62rem",color:"#1565c0",fontWeight:600}}>
+                              <div style={{marginTop:"0.3rem",fontSize:"0.85rem",color:"#1565c0",fontWeight:600}}>
                                 Session code: <span style={{fontFamily:"monospace",letterSpacing:"0.05em"}}>{t.code}</span>
                                 {isWaiting && " · Waiting room open"}
                                 {isTesting && " · Testing in progress"}
@@ -1518,7 +1507,7 @@ export default function TestBuilder({ teacher, readOnly }) {
                             {/* Not-completed student list for makeup */}
                             {isExpanded && notCompleted.length > 0 && (
                               <div style={{marginTop:"0.5rem",borderTop:"1px solid #c8e6c9",paddingTop:"0.4rem"}}>
-                                <div style={{fontSize:"0.6rem",fontWeight:700,color:"#888",marginBottom:"0.3rem",textTransform:"uppercase",letterSpacing:"0.08em"}}>
+                                <div style={{fontSize:"0.78rem",fontWeight:700,color:"#888",marginBottom:"0.3rem",textTransform:"uppercase",letterSpacing:"0.06em"}}>
                                   Not completed — click Give Makeup to add &amp; extend window to end of today
                                 </div>
                                 <div style={{display:"flex",flexDirection:"column",gap:"3px"}}>
@@ -1528,13 +1517,13 @@ export default function TestBuilder({ teacher, readOnly }) {
                                       <button
                                         disabled={makeupLoading===s.id}
                                         onClick={()=>giveMakeup(a.id, s.id)}
-                                        style={{border:"1px solid #ffcc02",background:"#fff8e1",cursor:"pointer",fontSize:"0.6rem",fontWeight:700,color:"#e65100",padding:"2px 7px",borderRadius:"3px",opacity:makeupLoading===s.id?0.6:1}}>
+                                        style={{border:"1px solid #ffcc02",background:"#fff8e1",cursor:"pointer",fontSize:"0.85rem",fontWeight:700,color:"#e65100",padding:"5px 10px",borderRadius:"3px",opacity:makeupLoading===s.id?0.6:1}}>
                                         {makeupLoading===s.id ? "…" : "Give Makeup →"}
                                       </button>
                                     </div>
                                   ))}
                                 </div>
-                                <div style={{marginTop:"0.35rem",fontSize:"0.6rem",color:"#888"}}>
+                                <div style={{marginTop:"0.35rem",fontSize:"0.82rem",color:"#888"}}>
                                   Test code: <strong style={{fontFamily:"monospace"}}>{t.code}</strong> · Share with student after clicking Give Makeup
                                 </div>
                               </div>

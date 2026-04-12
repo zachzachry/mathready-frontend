@@ -44,6 +44,16 @@ function ClassAdmin() {
     catch (e) { console.warn("Failed to delete class:", e); }
   }
 
+  async function togglePractice(cls) {
+    try {
+      await fetch(`${API}/roster/class/${cls.id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ practiceOpen: cls.practiceOpen === false }),
+      });
+      await load();
+    } catch (e) { console.warn("Failed to toggle practice:", e); }
+  }
+
   if (loading) return <div style={{ padding: "2rem", color: "#aaa" }}>Loading…</div>;
 
   return (
@@ -93,6 +103,13 @@ function ClassAdmin() {
                   {cls.students?.length || 0} student{cls.students?.length !== 1 ? "s" : ""}
                 </div>
               </div>
+              <button onClick={() => togglePractice(cls)}
+                title={cls.practiceOpen === false ? "Open 5.NR.2 Practice" : "Close 5.NR.2 Practice"}
+                style={{ background: cls.practiceOpen === false ? '#f59e0b' : '#059669',
+                  color: '#fff', border: 'none', borderRadius: T.xs, padding: '0.35rem 0.75rem',
+                  cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                {cls.practiceOpen === false ? '✖÷ Open' : '✖÷ Close'}
+              </button>
               <button onClick={() => deleteClass(cls)}
                 style={S.btnDanger}>✕ Delete</button>
             </div>
