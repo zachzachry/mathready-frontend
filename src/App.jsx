@@ -44,8 +44,9 @@ function UnifiedGoogleSignIn({ onTeacher, onStudent }) {
     if (window.google) { init(); return; }
 
     // Poll every 100ms until the GSI script loads (avoids needing a page refresh)
-    const poll = setInterval(() => { if (window.google) { clearInterval(poll); clearTimeout(giveUp); init(); } }, 100);
-    const giveUp = setTimeout(() => {
+    let poll, giveUp;
+    poll   = setInterval(() => { if (window.google) { clearInterval(poll); clearTimeout(giveUp); init(); } }, 100);
+    giveUp = setTimeout(() => {
       clearInterval(poll);
       if (!window.google) setGoogleFallback("Google Sign-In could not load. Please check your connection and refresh.");
     }, 10000);
