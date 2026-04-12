@@ -240,7 +240,7 @@ const GENERATORS = {
     ];
 
     const q = shuffle(stems)[0];
-    const isMoney = q.startsWith('Each') && q.includes('$') || q.startsWith('Tickets');
+    const isMoney = (q.startsWith('Each') && q.includes('$')) || q.startsWith('Tickets');
     const correctStr = isMoney ? `$${ans}` : String(ans);
     const wrongStrs  = isMoney ? ws.map(n => `$${n}`) : ws.map(String);
     const choices    = shuffle([correctStr, ...wrongStrs.slice(0,3)]);

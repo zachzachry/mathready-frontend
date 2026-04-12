@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import MathTest from "./MathTest";
 import TeacherShell from "./TeacherShell";
 import PrivacyPolicy from "./PrivacyPolicy";
-import { API, T, S, setToken, clearToken } from "./shared/constants";
+import { API, T, setToken, clearToken } from "./shared/constants";
 
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
 const SESSION_KEY = "mathready_session";
