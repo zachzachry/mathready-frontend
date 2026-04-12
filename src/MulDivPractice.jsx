@@ -15,10 +15,10 @@ const CAT = {
 };
 
 const GRADE_BANDS = [
-  { min: 90, label: 'Distinguished', color: '#059669' },
-  { min: 75, label: 'Proficient',    color: T.teal    },
-  { min: 60, label: 'Approaching',   color: '#d97706' },
-  { min:  0, label: 'Developing',    color: '#dc2626' },
+  { min: 95, label: 'Distinguished Learner', color: '#059669' },
+  { min: 85, label: 'Proficient Learner',    color: T.teal    },
+  { min: 75, label: 'Developing Learner',    color: '#d97706' },
+  { min: 65, label: 'Beginning Learner',     color: '#dc2626' },
 ];
 function gradeBand(pct) {
   return GRADE_BANDS.find(b => pct >= b.min) || GRADE_BANDS[GRADE_BANDS.length - 1];
