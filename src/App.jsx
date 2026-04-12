@@ -27,24 +27,29 @@ function UnifiedGoogleSignIn({ onTeacher, onStudent }) {
 
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;
-    if (!window.google) {
-      setGoogleFallback("Google Sign-In is loading...");
-      const timer = setTimeout(() => {
-        if (!window.google) {
-          setGoogleFallback("Google Sign-In could not load. Please check your internet connection and refresh.");
-        }
-      }, 5000);
-      return () => clearTimeout(timer);
+
+    function init() {
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback:  handleCredential,
+        ux_mode:   "popup",
+        auto_select: false,
+      });
+      window.google.accounts.id.renderButton(btnRef.current, {
+        theme: "outline", size: "large", text: "signin_with", shape: "rectangular", width: 300,
+      });
+      setGoogleFallback("");
     }
-    window.google.accounts.id.initialize({
-      client_id: GOOGLE_CLIENT_ID,
-      callback:  handleCredential,
-      ux_mode:   "popup",
-      auto_select: false,
-    });
-    window.google.accounts.id.renderButton(btnRef.current, {
-      theme: "outline", size: "large", text: "signin_with", shape: "rectangular", width: 300,
-    });
+
+    if (window.google) { init(); return; }
+
+    // Poll every 100ms until the GSI script loads (avoids needing a page refresh)
+    const poll = setInterval(() => { if (window.google) { clearInterval(poll); clearTimeout(giveUp); init(); } }, 100);
+    const giveUp = setTimeout(() => {
+      clearInterval(poll);
+      if (!window.google) setGoogleFallback("Google Sign-In could not load. Please check your connection and refresh.");
+    }, 10000);
+    return () => { clearInterval(poll); clearTimeout(giveUp); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [GOOGLE_CLIENT_ID]);
 
