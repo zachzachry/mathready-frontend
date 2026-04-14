@@ -43,12 +43,13 @@ function fmtDateTime(iso) {
 export default function PracticeParentReport({ session, classAvgScore, todayInClass, title, onClose }) {
   if (!session) return null;
   const answers = session.answers || {};
-  const qKeys   = Object.keys(answers).sort((a, b) => {
+  const qKeys   = Object.keys(answers).filter(k => /^Q\d+$/.test(k)).sort((a, b) => {
     const ai = parseInt(a.replace('Q', '')) || 0;
     const bi = parseInt(b.replace('Q', '')) || 0;
     return ai - bi;
   });
-  const totalQs  = qKeys.length || 20;
+  const didNotParticipate = qKeys.length === 0 && session.total === 0;
+  const totalQs  = qKeys.length || (didNotParticipate ? 0 : 20);
   const correct  = qKeys.filter(k => answers[k]?.isCorrect).length;
   const smartScore = smartScoreFromAnswers(answers);
   const b        = band(smartScore);
@@ -144,7 +145,17 @@ export default function PracticeParentReport({ session, classAvgScore, todayInCl
               </div>
             </div>
 
+            {/* Did-not-participate notice */}
+            {didNotParticipate && (
+              <div style={{ background: '#fef9c3', border: '1px solid #fde68a', borderRadius: 6,
+                padding: '0.85rem 1rem', marginBottom: '1rem', fontSize: '0.88rem', color: '#92400e' }}>
+                <strong>⚑ No participation recorded.</strong> This student did not start the practice session.
+                This record was submitted by the teacher.
+              </div>
+            )}
+
             {/* Score summary */}
+            {!didNotParticipate && (
             <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 140, background: '#f8fafc', border: '1px solid #e2e8f0',
                 borderRadius: 6, padding: '0.75rem 1rem', textAlign: 'center' }}>
@@ -173,6 +184,7 @@ export default function PracticeParentReport({ session, classAvgScore, todayInCl
                 )}
               </div>
             </div>
+            )}
 
             {/* Per-standard breakdown */}
             {Object.keys(stdMap).length > 0 && (
@@ -202,6 +214,7 @@ export default function PracticeParentReport({ session, classAvgScore, todayInCl
             )}
 
             {/* Question-by-question transcript */}
+            {!didNotParticipate && (<>
             <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.82rem',
               marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               {studentName.split(' ')[0]}'s Work — {correct} of {totalQs} correct
@@ -252,6 +265,7 @@ export default function PracticeParentReport({ session, classAvgScore, todayInCl
                 })}
               </tbody>
             </table>
+            </>)}
 
             {/* Footer */}
             <div style={{ marginTop: '1.25rem', paddingTop: '0.75rem',

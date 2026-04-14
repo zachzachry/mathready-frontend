@@ -1504,9 +1504,40 @@ export default function Dashboard({ teacher, readOnly }) {
             // All students across all classes in the roster
             const allRosterStudents = roster.flatMap(c => (c.students||[]).map(s=>({...s, className:c.name, classId:c.id})));
             const rosterNames = new Set(allRosterStudents.map(s => s.name));
+            // Map name → full student object (for force-submit)
+            const rosterByName = Object.fromEntries(allRosterStudents.map(s => [s.name, s]));
 
             // Today's midnight for "submitted today" check
             const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
+
+            // Force-submit a zero-score session for a student who never started
+            async function forceSubmitStudent(studentInfo, code, title) {
+              if (!window.confirm(`Record "${studentInfo.name}" as absent/did not participate for ${title}?\n\nThis will submit a 0-score session on their behalf.`)) return;
+              try {
+                await fetch(`${API}/submit`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    studentId:   studentInfo.id   || "",
+                    studentName: studentInfo.name || "",
+                    classId:     studentInfo.classId  || "",
+                    className:   studentInfo.className || "",
+                    testCode:    code,
+                    testTitle:   title,
+                    score:       0,
+                    total:       0,
+                    pct:         0,
+                    mode:        "practice",
+                    inClass:     true,
+                    submitted:   new Date().toISOString(),
+                    timeUsed:    "",
+                    answers:     { note: { question: "No participation recorded by teacher", standard: "N/A", tier: "easy", chosen: "—", correct: "—", isCorrect: false, timeMs: 0 } },
+                    questionTimes: [],
+                  }),
+                });
+                await refreshSessions();
+              } catch(e) { alert("Could not record session: " + e.message); }
+            }
 
             function PracticeTable({ code, title, icon, headerColor, sessions: sess }) {
               // Latest session per student
@@ -1530,7 +1561,7 @@ export default function Dashboard({ teacher, readOnly }) {
               // Not-submitted students (in roster but no session today for this code)
               const submittedNames = new Set(submitted.map(s => s.studentName || s.name));
               const notSubmitted = rosterNames.size > 0
-                ? [...rosterNames].filter(n => !submittedNames.has(n)).sort()
+                ? [...rosterNames].filter(n => !submittedNames.has(n)).sort().map(n => rosterByName[n] || { name: n })
                 : [];
 
               const BANDS = [
@@ -1597,12 +1628,21 @@ export default function Dashboard({ teacher, readOnly }) {
                   })}
 
                   {/* Not-submitted students */}
-                  {notSubmitted.map((name,i)=>(
+                  {notSubmitted.map((student,i)=>(
                     <div key={i} style={{padding:"0.55rem 1rem",borderBottom:`1px solid ${T.surfaceAlt}`,
                       display:"flex",alignItems:"center",gap:"0.6rem",background:"#fafafa"}}>
                       <span style={{color:"#d1d5db",fontWeight:700,fontSize:"0.85rem",minWidth:16}}>✗</span>
-                      <div style={{flex:1,fontSize:"0.88rem",color:T.textMuted}}>{name}</div>
-                      <div style={{fontSize:"0.78rem",color:T.textMuted,fontStyle:"italic"}}>Not submitted</div>
+                      <div style={{flex:1,fontSize:"0.88rem",color:T.textMuted}}>{student.name}</div>
+                      <div style={{fontSize:"0.78rem",color:T.textMuted,fontStyle:"italic"}}>Did not start</div>
+                      <button
+                        onClick={()=>forceSubmitStudent(student, code, title)}
+                        title="Record as absent / did not participate"
+                        style={{background:"transparent",border:`1px solid #e5e7eb`,borderRadius:4,
+                          padding:"2px 8px",fontSize:"0.72rem",cursor:"pointer",color:"#9ca3af",
+                          fontFamily:"inherit",flexShrink:0,whiteSpace:"nowrap"}}
+                      >
+                        ⚑ Record absent
+                      </button>
                     </div>
                   ))}
                 </div>
