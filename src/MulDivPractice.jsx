@@ -228,7 +228,7 @@ export default function MulDivPractice({ student, cls, onBack }) {
   const remainderRef = useRef(null);
   const nextRef      = useRef(null);
 
-  const [tabWarnCount,   setTabWarnCount]   = useState(0);
+  const [, setTabWarnCount]   = useState(0);
   const [showTabWarning, setShowTabWarning] = useState(false);
   const tabWarnRef      = useRef(0); // ref copy so event handlers read latest value
   const periodTimerRef  = useRef(null);
@@ -454,7 +454,6 @@ export default function MulDivPractice({ student, cls, onBack }) {
   // ── Question ──────────────────────────────────────────────
   if (phase === 'question' && curQ) {
     const pct      = Math.round((history.length / LIMIT) * 100);
-    const cat      = CAT[curQ.standard] || CAT['MUL.TRAD'];
     const tierLabel = { easy:'Easy · 1 pt', medium:'Medium · 2 pts', hard:'Hard · 3 pts' }[curQ.tier] || '';
     const isDiv    = hasSeparateRemainder(curQ);
     const correct  = isAnswerCorrect(curQ, inputAnswer, inputRemainder);
