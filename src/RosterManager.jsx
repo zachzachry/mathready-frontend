@@ -966,6 +966,22 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
                       <option value={300}>5 min</option>
                     </select>
                   </label>
+                  <label style={{display:"flex",alignItems:"center",gap:"0.5rem",fontSize:"0.82rem",color:T.textSecondary}}>
+                    Period ends:
+                    <input type="time" value={activeClassData.periodEndTime || ''} onChange={async (e) => {
+                      const t = e.target.value || null;
+                      try {
+                        await fetch(`${API}/roster/class/${activeClassData.id}`, {
+                          method:"PUT", headers:teacherHeaders(),
+                          body: JSON.stringify({ periodEndTime: t })
+                        });
+                        load();
+                      } catch (err) { console.warn("Failed to update periodEndTime:", err); }
+                    }} style={{
+                      padding:"5px 8px",fontSize:"0.88rem",borderRadius:4,
+                      border:`1px solid ${T.borderDark}`,background:T.white,cursor:"pointer"
+                    }}/>
+                  </label>
                 </div>
               )}
             </div>

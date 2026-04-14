@@ -156,9 +156,17 @@ function EditModal({ question, onSave, onClose, teacher }) {
         createdBy:     q.createdBy     || teacher?.teacherId   || "",
         createdByName: q.createdByName || teacher?.teacherName || "",
       };
-      await fetch(`${API}/questions`, { method:"POST", headers:teacherHeaders(), body:JSON.stringify(toSave) });
-      onSave(toSave);
-    } catch(e) { console.error("saveQuestion failed:", e); }
+      const resp = await fetch(`${API}/questions`, { method:"POST", headers:teacherHeaders(), body:JSON.stringify(toSave) });
+      if (!resp.ok) {
+        const detail = await resp.text().catch(() => String(resp.status));
+        alert(`Question could not be saved (server error ${resp.status}).\n\n${detail}\n\nPlease try again or contact support.`);
+      } else {
+        onSave(toSave);
+      }
+    } catch(e) {
+      console.error("saveQuestion failed:", e);
+      alert("Network error — question could not be saved. Check your connection and try again.");
+    }
     setSaving(false);
   }
 
@@ -357,7 +365,7 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose, 
       visibility,
       sharedWith: visibility === "grade" ? sharedWith : [],
       adminScoresOnly: visibility === "global" ? adminScoresOnly : false,
-      closeDate: (visibility === "global" && adminScoresOnly && closeDate) ? closeDate : null,
+      closeDate: closeDate || null,
     };
     const err = await onSave(name.trim(), editing?.code || "", adaptive, timerCfg);
     if (err) { setCodeErr(err); setSaving(false); setOverwriteWarning(false); }
@@ -509,6 +517,12 @@ function SaveTestModal({ count, currentTitle, savedTests = [], onSave, onClose, 
               )}
             </div>
           )}
+          {/* Close date available for all test types */}
+          <div style={{marginTop:"0.6rem"}}>
+            <label style={S.lbl}>CLOSE DATE (optional — students blocked after this date)</label>
+            <input type="date" value={closeDate} onChange={e=>setCloseDate(e.target.value)}
+              style={{...S.inp,fontFamily:"monospace"}}/>
+          </div>
         </div>
         </div>
         {overwriteWarning && (
@@ -1116,6 +1130,18 @@ export default function TestBuilder({ teacher, readOnly }) {
     } catch {}
   }
 
+  async function togglePsEntered(t) {
+    const newVal = !t.psEntered;
+    try {
+      await fetch(`${API}/tests/saved/${t.id}/ps-entered`, {
+        method: "PATCH",
+        headers: {"Content-Type":"application/json", ...teacherHeaders()},
+        body: JSON.stringify({ psEntered: newVal }),
+      });
+      setSavedTests(s => s.map(x => x.id === t.id ? {...x, psEntered: newVal} : x));
+    } catch {}
+  }
+
   async function archiveTest(t) {
     const newVal = !t.archived;
     try {
@@ -1423,7 +1449,7 @@ export default function TestBuilder({ teacher, readOnly }) {
                           style={{...S.smBtn,padding:"5px 8px",background:T.surfaceAlt,borderColor:T.border,color:T.text}}>📄</button>}
                         {canEdit&&canHardDelete&&<button onClick={()=>setConfirmDeleteTest(t)} title="Delete test"
                           style={{...S.smBtn,color:"#8b1a1a",borderColor:"#f0b8b8",background:"#fdf2f2",padding:"5px 8px"}}>🗑</button>}
-                        {canEdit&&!canHardDelete&&<button onClick={()=>archiveTest(t)} title={t.archived?"Restore test":"Archive test"}
+                        {canEdit&&!canHardDelete&&!hasAssignment&&<button onClick={()=>archiveTest(t)} title={t.archived?"Restore test":"Archive test"}
                           style={{...S.smBtn,color:t.archived?T.teal:"#64748b",borderColor:t.archived?"#99e6da":"#cbd5e1",background:t.archived?T.tealLight:"#f8fafc",padding:"5px 8px"}}>{t.archived?"↩":"📦"}</button>}
                       </div>
                     </div>
@@ -1532,6 +1558,18 @@ export default function TestBuilder({ teacher, readOnly }) {
                         );
                       });
                     })()}
+                    {/* PowerSchool entered marker */}
+                    {canEdit && (
+                      <div style={{marginTop:"0.45rem",display:"flex",alignItems:"center",gap:"0.5rem"}}>
+                        <label style={{display:"flex",alignItems:"center",gap:"0.4rem",cursor:"pointer",userSelect:"none"}}>
+                          <input type="checkbox" checked={!!t.psEntered} onChange={()=>togglePsEntered(t)}
+                            style={{width:"14px",height:"14px",accentColor:"#2e7d32",cursor:"pointer"}}/>
+                          <span style={{fontSize:"0.8rem",fontWeight:700,color:t.psEntered?"#2e7d32":"#64748b"}}>
+                            {t.psEntered ? "✅ Entered in PowerSchool" : "Enter in PowerSchool"}
+                          </span>
+                        </label>
+                      </div>
+                    )}
                   </div>
                   );
                 })

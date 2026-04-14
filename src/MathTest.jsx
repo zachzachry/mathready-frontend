@@ -837,15 +837,7 @@ function StudentLogin({ onStartTest, onStartDrill, onStartMulDiv, onBack, prefil
               </div>
             </button>
             )}
-            {studentAssignments.length > 0 ? (
-              <div style={{flex:1,minWidth:"140px",background:"rgba(13,148,136,.08)",border:"1px solid rgba(13,148,136,.25)",borderRadius:"10px",padding:"1rem 1.25rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
-                <span style={{fontSize:"1.5rem"}}>✖÷</span>
-                <div style={{textAlign:"left"}}>
-                  <div style={{fontSize:"0.95rem",fontWeight:800,color:"rgba(255,255,255,.35)"}}>5.NR.2 Practice</div>
-                  <div style={{fontSize:"0.7rem",color:"rgba(13,148,136,.6)"}}>Complete your test first</div>
-                </div>
-              </div>
-            ) : cls?.practiceOpen === false ? (
+            {cls?.practiceOpen === false ? (
               <div style={{flex:1,minWidth:"140px",background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.1)",borderRadius:"10px",padding:"1rem 1.25rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
                 <span style={{fontSize:"1.5rem",opacity:0.3}}>✖÷</span>
                 <div style={{textAlign:"left"}}>
@@ -884,7 +876,7 @@ function StudentLogin({ onStartTest, onStartDrill, onStartMulDiv, onBack, prefil
                   onClick={async () => {
                     setChecking(true); setErr("");
                     try {
-                      setTestInfo({ found:true, questions:a.questions, title:a.testTitle, adaptive:a.adaptive, untimed:a.untimed, timeLimitSecs:a.timeLimitSecs, warnSecs:a.warnSecs, oneAttempt:a.oneAttempt });
+                      setTestInfo({ found:true, questions:a.questions, title:a.testTitle, subject:a.subject||"math", adaptive:a.adaptive, untimed:a.untimed, timeLimitSecs:a.timeLimitSecs, warnSecs:a.warnSecs, oneAttempt:a.oneAttempt });
                       setCode(a.testCode); setStep("confirm");
                     } catch { setErr("Failed to load test."); }
                     setChecking(false);
@@ -1049,7 +1041,7 @@ function StudentLogin({ onStartTest, onStartDrill, onStartMulDiv, onBack, prefil
             ] : [
               ["STUDENT NAME", student?.name],
               ["CLASS",        cls?.name],
-              ["TEST",         testInfo.title || "Grade 5 Mathematics"],
+              ["TEST",         testInfo.title || (testInfo.subject === "science" ? "Grade 5 Science" : "Grade 5 Mathematics")],
               ["TEST CODE",    code.toUpperCase()],
               ["QUESTIONS",    String(testInfo.questions.length)],
               ["TIME LIMIT",   testInfo.untimed ? "No Time Limit" : (() => {
@@ -1550,7 +1542,7 @@ function normalizeQuestion(q) {
   return { ...q, type, answer };
 }
 
-function StudentTest({ studentName, studentId, testCode, questions: initialQuestions, adaptive, onFinish, untimed=false, timeLimitSecs=1800, warnSecs=300, onReturnToTeacher=null, initialDraft=null, gated=false }) {
+function StudentTest({ studentName, studentId, testCode, questions: initialQuestions, adaptive, onFinish, untimed=false, timeLimitSecs=1800, warnSecs=300, onReturnToTeacher=null, initialDraft=null, gated=false, testSubject="math" }) {
   // ── Session persistence key ──
   const sessionKey = testCode && studentId ? `mathready_test_${testCode}_${studentId}` : null;
 
@@ -2145,7 +2137,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
         </div>
       )}
 
-      <TopBar title="Grade 5 Math" right={
+      <TopBar title={testSubject === "science" ? "Grade 5 Science" : "Grade 5 Math"} right={
         <div style={{display:"flex",gap:"1rem",alignItems:"center"}}>
           {devToolsOpen && (
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:"1.5rem"}}>
@@ -3306,11 +3298,11 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
 }
 
 // ── Student Results ────────────────────────────────────────
-function StudentResults({ session, questions, onReset }) {
+function StudentResults({ session, questions, subject, onReset }) {
   const p = session.pct;
   return (
     <div style={{minHeight:"100vh",background:"#e8edf2",fontFamily:T.font,display:"flex",flexDirection:"column"}}>
-      <TopBar title="Grade 5 Mathematics — Results"/>
+      <TopBar title={`Grade 5 ${subject === "science" ? "Science" : "Mathematics"} — Results`}/>
       <div style={{flex:1,display:"flex",justifyContent:"center",padding:"2rem 1rem"}}>
         <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:"4px",width:"100%",maxWidth:"640px",boxShadow:"0 2px 12px rgba(0,0,0,.07)",overflow:"hidden"}}>
           <div style={{background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,padding:"1.25rem 1.5rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -3503,6 +3495,7 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
   const [cls,             setCls]             = useState(null);
   const [testCode,        setTestCode]        = useState("");
   const [testTitle,       setTestTitle]       = useState("");
+  const [testSubject,     setTestSubject]     = useState("math");
   const [finalSession,    setFinalSession]    = useState(null);
   const [practiceHistory, setPracticeHistory] = useState([]);
   const [drillKey,        setDrillKey]        = useState(0);   // increment to remount (Play Again)
@@ -3557,6 +3550,7 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
 
   async function handleStartTest(studentObj, classObj, code, testInfo) {
     setStudent(studentObj); setCls(classObj); setTestCode(code); setTestTitle(testInfo?.title || "");
+    setTestSubject(testInfo?.subject || "math");
     const drill = testInfo?.type === "drill";
     setIsDrill(drill);
     setIsAdaptive(!!testInfo?.adaptive && !drill);
@@ -3720,8 +3714,8 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
               }}/>;
 
   if (screen === "test")
-    return <StudentTest studentName={student?.name || ""} studentId={student?.id || ""} testCode={testCode} questions={questions} adaptive={isAdaptive} onFinish={handleFinishTest} untimed={untimed} timeLimitSecs={timeLimitSecs} warnSecs={warnSecs} onReturnToTeacher={impersonateStudent ? onBack : null} initialDraft={initialDraft} gated={testGated}/>;
+    return <StudentTest studentName={student?.name || ""} studentId={student?.id || ""} testCode={testCode} questions={questions} adaptive={isAdaptive} onFinish={handleFinishTest} untimed={untimed} timeLimitSecs={timeLimitSecs} warnSecs={warnSecs} onReturnToTeacher={impersonateStudent ? onBack : null} initialDraft={initialDraft} gated={testGated} testSubject={testSubject}/>;
 
   if (screen === "results")
-    return <StudentResults session={finalSession} questions={questions} onReset={()=>{ reset(); onBack(); }}/>;
+    return <StudentResults session={finalSession} questions={questions} subject={testSubject} onReset={()=>{ reset(); onBack(); }}/>;
 }

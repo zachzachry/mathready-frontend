@@ -374,7 +374,7 @@ export function updateSessionWeights(weights, sessionHistory, allStandards) {
   Object.entries(counts).forEach(([std, d]) => {
     const acc = d.correct / d.total;
     if (acc < 0.5 && d.total >= 2)  updated[std] = Math.min(1.0, (updated[std] || 0.5) + 0.2);
-    if (acc >= 0.8 && d.total >= 3) updated[std] = Math.max(0.05, (updated[std] || 0.5) - 0.3);
+    if (acc >= 0.7 && d.total >= 2) updated[std] = Math.max(0.05, (updated[std] || 0.5) - 0.3);
   });
 
   return updated;

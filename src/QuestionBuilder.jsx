@@ -873,8 +873,12 @@ export default function QuestionBuilder() {
       } catch {}
     }
     setSaving(false);
-    setSavedCount(count);
-    setTimeout(() => setSavedCount(0), 3000);
+    if (count === 0 && complete_qs.length > 0) {
+      alert("Save failed — no questions were saved to the bank. Check your connection and try again, or contact support if the problem persists.");
+    } else {
+      setSavedCount(count);
+      setTimeout(() => setSavedCount(0), 3000);
+    }
   }
 
   async function seedBank() {

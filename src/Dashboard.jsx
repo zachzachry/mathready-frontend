@@ -367,6 +367,7 @@ export default function Dashboard({ teacher, readOnly }) {
   const [sessions, setSessions] = useState([]);
   const [selected, setSelected] = useState(null);
   const [overviewTest, setOverviewTest] = useState("all"); // filter overview by test code
+  const [gradeSort,    setGradeSort]    = useState("score"); // "score" | "name"
   const [loading,  setLoading]  = useState(true);
   const [clearing, setClearing] = useState(false);
   const [clearError, setClearError] = useState(""); // error message from failed delete
@@ -544,8 +545,11 @@ export default function Dashboard({ teacher, readOnly }) {
   }
 
   // ── Split sessions by mode ──
-  const testSessions  = sessions.filter(s => s.mode !== "drill");
-  const drillSessions = sessions.filter(s => s.mode === "drill" || s.mode === "practice");
+  const testSessions     = sessions.filter(s => s.mode !== "drill" && s.mode !== "practice");
+  const drillSessions    = sessions.filter(s => s.mode === "drill" || s.mode === "practice");
+  const practiceSessions    = sessions.filter(s => s.mode === "practice");
+  const inClassPractice     = practiceSessions.filter(s => s.inClass);
+  const outOfClassPractice  = practiceSessions.filter(s => !s.inClass);
 
   // ── Overview stats (tests only) ──
   // Build code→name map: primary source = saved test library, fallback = session's testTitle
@@ -585,7 +589,14 @@ export default function Dashboard({ teacher, readOnly }) {
     }).length;
     return Math.round(correct / qIds.length * 100);
   }
-  const sorted  = [...latestByStudent].sort((a,b)=>effPct(b)-effPct(a));
+  const sorted  = [...latestByStudent].sort((a,b)=>{
+    if (gradeSort === "name") {
+      const aName = (a.studentName||a.name||"").split(" ").reverse().join(" ");
+      const bName = (b.studentName||b.name||"").split(" ").reverse().join(" ");
+      return aName.localeCompare(bName);
+    }
+    return effPct(b)-effPct(a);
+  });
 
   const avgP    = latestByStudent.length ? Math.round(latestByStudent.reduce((a,s)=>a+effPct(s),0)/latestByStudent.length) : 0;
   const profC   = latestByStudent.filter(s=>effPct(s)>=80).length;
@@ -765,9 +776,13 @@ export default function Dashboard({ teacher, readOnly }) {
             </div>
           )}
           <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,overflow:"hidden"}}>
-            <div style={{padding:"0.75rem 1rem",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,fontSize:"0.82rem",fontWeight:700,letterSpacing:"0.08em",color:T.textSecondary}}>
-              TEST SCORES — {sorted.length} student{sorted.length!==1?"s":""}
-              {overviewTest !== "all" && <span style={{marginLeft:"0.5rem",background:T.midnight,color:T.white,padding:"1px 6px",borderRadius:"3px",fontSize:"0.78rem"}}>{testCodeNames[overviewTest]!==overviewTest?`${testCodeNames[overviewTest]} · `:""}<span style={{fontFamily:"monospace"}}>{overviewTest}</span></span>}
+            <div style={{padding:"0.75rem 1rem",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,fontSize:"0.82rem",fontWeight:700,letterSpacing:"0.08em",color:T.textSecondary,display:"flex",alignItems:"center",gap:"0.5rem",flexWrap:"wrap"}}>
+              <span>TEST SCORES — {sorted.length} student{sorted.length!==1?"s":""}</span>
+              {overviewTest !== "all" && <span style={{background:T.midnight,color:T.white,padding:"1px 6px",borderRadius:"3px",fontSize:"0.78rem"}}>{testCodeNames[overviewTest]!==overviewTest?`${testCodeNames[overviewTest]} · `:""}<span style={{fontFamily:"monospace"}}>{overviewTest}</span></span>}
+              <div style={{marginLeft:"auto",display:"flex",gap:"4px"}}>
+                <button onClick={()=>setGradeSort("score")} style={{fontSize:"0.75rem",fontWeight:700,padding:"2px 9px",borderRadius:"3px",border:`1px solid ${gradeSort==="score"?T.teal:T.border}`,background:gradeSort==="score"?T.tealLight:T.white,color:gradeSort==="score"?T.teal:T.textSecondary,cursor:"pointer"}}>By Score</button>
+                <button onClick={()=>setGradeSort("name")} style={{fontSize:"0.75rem",fontWeight:700,padding:"2px 9px",borderRadius:"3px",border:`1px solid ${gradeSort==="name"?T.teal:T.border}`,background:gradeSort==="name"?T.tealLight:T.white,color:gradeSort==="name"?T.teal:T.textSecondary,cursor:"pointer"}}>By Last Name</button>
+              </div>
             </div>
             {sorted.map((s,i)=>{
               const name = s.studentName||s.name;
@@ -1481,6 +1496,40 @@ export default function Dashboard({ teacher, readOnly }) {
             </div>
             </div>
           ))}
+
+          {/* ── Mul/Div Practice Sessions ── */}
+          {practiceSessions.length > 0 && (()=>{
+            // Latest session per student
+            const latestPractice = {};
+            practiceSessions.forEach(s => {
+              const name = s.studentName || s.name || "Unknown";
+              if (!latestPractice[name] || s.submitted_at > latestPractice[name].submitted_at)
+                latestPractice[name] = s;
+            });
+            const rows = Object.values(latestPractice).sort((a,b) => (b.pct||0)-(a.pct||0));
+            return (
+              <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,overflow:"hidden"}}>
+                <div style={{padding:"0.75rem 1rem",background:"#f0f9ff",borderBottom:`1px solid ${T.border}`,fontSize:"0.82rem",fontWeight:700,letterSpacing:"0.08em",color:"#0369a1",display:"flex",alignItems:"center",gap:"0.5rem",flexWrap:"wrap"}}>
+                  <span>✏️ MUL/DIV PRACTICE — {rows.length} student{rows.length!==1?"s":""}</span>
+                  <span style={{fontWeight:400,color:T.textSecondary,fontSize:"0.75rem"}}>latest session per student</span>
+                  <span style={{marginLeft:"auto",fontSize:"0.75rem",fontWeight:600,color:"#059669"}}>🏫 {inClassPractice.length} in-class</span>
+                  <span style={{fontSize:"0.75rem",fontWeight:600,color:T.textSecondary}}>🏠 {outOfClassPractice.length} home</span>
+                </div>
+                {rows.map((s,i)=>{
+                  const p = s.pct ?? Math.round((s.score/s.total)*100);
+                  const name = s.studentName || s.name;
+                  return (
+                    <div key={i} style={{padding:"0.6rem 1rem",borderBottom:`1px solid ${T.surfaceAlt}`,display:"flex",alignItems:"center",gap:"0.75rem"}}>
+                      <div style={{flex:1,fontSize:"0.88rem",fontWeight:600,color:T.text}}>{name}</div>
+                      <div style={{fontSize:"0.75rem",color:s.inClass?"#059669":T.textMuted}}>{s.inClass?"🏫":"🏠"}</div>
+                      <div style={{fontSize:"0.82rem",color:T.textSecondary}}>{s.score}/{s.total} pts</div>
+                      <div style={{fontSize:"0.88rem",fontWeight:700,color:p>=85?T.success:p>=75?T.teal:p>=65?T.warning:T.dangerText,minWidth:"42px",textAlign:"right"}}>{p}%</div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       );
     }
