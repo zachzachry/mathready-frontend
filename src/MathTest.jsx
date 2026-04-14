@@ -7,6 +7,7 @@ import TopBar from "./shared/TopBar";
 import { QUESTIONS as FALLBACK_QUESTIONS, LETTERS, S, T, pct, lvl, lvlC, lvlBg, lvlBd, fmtTime, now, sendHeartbeat, API, TEACHER_POLL_MS, HEARTBEAT_MS, DRAFT_SAVE_DEBOUNCE_MS, FS_GRACE_MS, DEVTOOLS_THRESHOLD_PX } from "./shared/constants";
 import { buildWeightMap, updateSessionWeights, pickAdaptiveQuestion, ALL_STANDARDS } from "./adaptive";
 import MulDivPractice from "./MulDivPractice";
+import FractionPractice from "./FractionPractice";
 import PlotGrid from "./shared/PlotGrid";
 
 /* ── Drag-and-Drop Answer Component ─────────────────────── */
@@ -475,7 +476,7 @@ const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
 
 // ── Student Login ──────────────────────────────────────────
 // Flow: google → choice (drill | test code) → [code → confirm] or [drill start]
-function StudentLogin({ onStartTest, onStartDrill, onStartMulDiv, onBack, prefillCode, prefillCredential, impersonateStudent }) {
+function StudentLogin({ onStartTest, onStartDrill, onStartMulDiv, onStartFractions, onBack, prefillCode, prefillCredential, impersonateStudent }) {
   const [credential, setCredential] = useState(prefillCredential || null);
   const [code,       setCode]       = useState(prefillCode || "");
   const [err,        setErr]        = useState("");
@@ -852,6 +853,24 @@ function StudentLogin({ onStartTest, onStartDrill, onStartMulDiv, onBack, prefil
                 <div style={{textAlign:"left"}}>
                   <div style={{fontSize:"0.95rem",fontWeight:800,color:T.white}}>5.NR.2 Practice</div>
                   <div style={{fontSize:"0.7rem",color:"rgba(255,255,255,.8)"}}>Multiply &amp; divide</div>
+                </div>
+              </button>
+            )}
+            {cls?.practiceOpen === false ? (
+              <div style={{flex:1,minWidth:"140px",background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.1)",borderRadius:"10px",padding:"1rem 1.25rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
+                <span style={{fontSize:"1.5rem",opacity:0.3}}>½</span>
+                <div style={{textAlign:"left"}}>
+                  <div style={{fontSize:"0.95rem",fontWeight:800,color:"rgba(255,255,255,.3)"}}>5.NR.3 Practice</div>
+                  <div style={{fontSize:"0.7rem",color:"rgba(255,255,255,.25)"}}>Not available</div>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => { if (onStartFractions) onStartFractions(student, cls); }}
+                style={{flex:1,minWidth:"140px",background:"linear-gradient(135deg,#7c3aed,#6d28d9)",border:"none",borderRadius:"10px",padding:"1rem 1.25rem",cursor:"pointer",display:"flex",alignItems:"center",gap:"0.75rem",boxShadow:"0 4px 12px rgba(124,58,237,.3)"}}>
+                <span style={{fontSize:"1.5rem"}}>½</span>
+                <div style={{textAlign:"left"}}>
+                  <div style={{fontSize:"0.95rem",fontWeight:800,color:T.white}}>5.NR.3 Practice</div>
+                  <div style={{fontSize:"0.7rem",color:"rgba(255,255,255,.8)"}}>Fractions</div>
                 </div>
               </button>
             )}
@@ -3676,6 +3695,9 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
       onStartMulDiv={(studentObj, classObj) => {
         setStudent(studentObj); setCls(classObj); setScreen("muldiv");
       }}
+      onStartFractions={(studentObj, classObj) => {
+        setStudent(studentObj); setCls(classObj); setScreen("fractions");
+      }}
       onBack={onBack}
       prefillCode={prefillCode}
       prefillCredential={prefillCredential}
@@ -3694,6 +3716,13 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
 
   if (screen === "muldiv")
     return <MulDivPractice
+      student={student}
+      cls={cls}
+      onBack={() => setScreen("login")}
+    />;
+
+  if (screen === "fractions")
+    return <FractionPractice
       student={student}
       cls={cls}
       onBack={() => setScreen("login")}

@@ -170,10 +170,19 @@ function saveSeenTexts(key, set) {
   } catch {}
 }
 
-async function submitPracticeSession(student, cls, weightedEarned, actualMax, inClass) {
+async function submitPracticeSession(student, cls, history, inClass) {
   if (!student) return;
-  const maxPts = actualMax || MAX_PTS;
-  const pct = Math.round((weightedEarned / maxPts) * 100);
+  const weightedEarned = history.reduce((s, h) => h.correct ? s + (TIER_PTS[h.q.tier] || 1) : s, 0);
+  const actualMax      = history.reduce((s, h) => s + (TIER_PTS[h.q.tier] || 1), 0) || 1;
+  const pct            = Math.round((weightedEarned / actualMax) * 100);
+  const answers        = Object.fromEntries(
+    history.map((h, i) => [`Q${i + 1}`, {
+      question: h.q.question, standard: h.q.standard, tier: h.q.tier,
+      chosen: h.chosen, correct: h.q.correct, isCorrect: h.correct,
+      timeMs: h.timeMs || 0,
+    }])
+  );
+  const questionTimes  = history.map(h => h.timeMs || 0);
   try {
     await fetch(`${API}/submit`, {
       method: "POST",
@@ -186,11 +195,14 @@ async function submitPracticeSession(student, cls, weightedEarned, actualMax, in
         testCode:    "NR2PRAC",
         testTitle:   "5.NR.2 Multiply & Divide Practice",
         score:       weightedEarned,
-        total:       maxPts,
+        total:       actualMax,
         pct,
         mode:        "practice",
         inClass:     !!inClass,
         submitted:   new Date().toISOString(),
+        timeUsed:    "",
+        answers,
+        questionTimes,
       }),
     });
   } catch { /* fire-and-forget */ }
@@ -227,6 +239,7 @@ export default function MulDivPractice({ student, cls, onBack }) {
   const answerRef   = useRef(null);
   const remainderRef = useRef(null);
   const nextRef      = useRef(null);
+  const qStartRef    = useRef(null); // timestamp when current question was shown
 
   const [, setTabWarnCount]   = useState(0);
   const [showTabWarning, setShowTabWarning] = useState(false);
@@ -288,6 +301,7 @@ export default function MulDivPractice({ student, cls, onBack }) {
     setShowTabWarning(false);
     setInClass(cls?.practiceOpen !== false);
     startPeriodTimer();
+    qStartRef.current = Date.now();
     setPhase('question');
   }
 
@@ -299,15 +313,14 @@ export default function MulDivPractice({ student, cls, onBack }) {
   }
 
   function handleNext() {
+    const timeMs     = qStartRef.current ? Date.now() - qStartRef.current : 0;
     const isCorrect  = isAnswerCorrect(curQ, inputAnswer, inputRemainder);
-    const newHistory = [...history, { q: curQ, chosen: inputAnswer, correct: isCorrect }];
+    const newHistory = [...history, { q: curQ, chosen: inputAnswer, correct: isCorrect, timeMs }];
     setHistory(newHistory);
 
     if (newHistory.length >= LIMIT) {
-      const earned    = newHistory.reduce((sum, h) => h.correct ? sum + (TIER_PTS[h.q.tier] || 1) : sum, 0);
-      const actualMax = newHistory.reduce((sum, h) => sum + (TIER_PTS[h.q.tier] || 1), 0);
       clearDraft(student?.id);
-      submitPracticeSession(student, cls, earned, actualMax, inClass);
+      submitPracticeSession(student, cls, newHistory, inClass);
       setPhase('results');
       return;
     }
@@ -322,7 +335,7 @@ export default function MulDivPractice({ student, cls, onBack }) {
     setInputRemainder('');
     setRevealed(false);
     setQNum(n => n + 1);
-    // Save draft after each question so student can resume if kicked out
+    qStartRef.current = Date.now();
     saveDraft(student?.id, { history: newHistory, weights: newWeights, curQ: next, qNum: newHistory.length + 1 });
   }
 
@@ -333,14 +346,11 @@ export default function MulDivPractice({ student, cls, onBack }) {
     periodTimerRef.current = setTimeout(() => {
       // Auto-submit with whatever has been answered so far
       setHistory(prev => {
-        const h = prev;
-        if (h.length === 0) { setPhase('landing'); return h; }
-        const earned    = h.reduce((s, x) => x.correct ? s + (TIER_PTS[x.q.tier] || 1) : s, 0);
-        const actualMax = h.reduce((s, x) => s + (TIER_PTS[x.q.tier] || 1), 0);
+        if (prev.length === 0) { setPhase('landing'); return prev; }
         clearDraft(student?.id);
-        submitPracticeSession(student, cls, earned, actualMax, true); // auto-submit = always in-class
+        submitPracticeSession(student, cls, prev, true); // auto-submit = always in-class
         setPhase('results');
-        return h;
+        return prev;
       });
     }, ms);
   }
@@ -359,6 +369,7 @@ export default function MulDivPractice({ student, cls, onBack }) {
     setShowTabWarning(false);
     setInClass(cls?.practiceOpen !== false);
     startPeriodTimer();
+    qStartRef.current = Date.now();
     setPhase('question');
   }
 

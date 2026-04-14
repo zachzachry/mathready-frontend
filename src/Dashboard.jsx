@@ -6,6 +6,7 @@ import ParentReport from "./ParentReport";
 import TestParentReport from "./TestParentReport";
 import StudentDiagnostic from "./StudentDiagnostic";
 import StudentQuestionReport from "./StudentQuestionReport";
+import PracticeParentReport from "./PracticeParentReport";
 
 const ALL_TABS = [
   ["overview",  "📊 Overview",       false, false],
@@ -373,7 +374,8 @@ export default function Dashboard({ teacher, readOnly }) {
   const [clearError, setClearError] = useState(""); // error message from failed delete
   const [clearModal, setClearModal] = useState(false);
   const [clearTestCode, setClearTestCode] = useState(""); // for per-test clear
-  const [,         setRoster]   = useState([]);
+  const [roster,   setRoster]   = useState([]);
+  const [practiceReport, setPracticeReport] = useState(null); // session to show in parent report modal
   const [fluencyReport, setFluencyReport] = useState([]);
   const [leaderboard,   setLeaderboard]   = useState([]);
   const [parentReportId,   setParentReportId]   = useState(null); // student ID for fluency parent report
@@ -1497,37 +1499,136 @@ export default function Dashboard({ teacher, readOnly }) {
             </div>
           ))}
 
-          {/* ── Mul/Div Practice Sessions ── */}
-          {practiceSessions.length > 0 && (()=>{
-            // Latest session per student
-            const latestPractice = {};
-            practiceSessions.forEach(s => {
-              const name = s.studentName || s.name || "Unknown";
-              if (!latestPractice[name] || s.submitted_at > latestPractice[name].submitted_at)
-                latestPractice[name] = s;
-            });
-            const rows = Object.values(latestPractice).sort((a,b) => (b.pct||0)-(a.pct||0));
-            return (
-              <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,overflow:"hidden"}}>
-                <div style={{padding:"0.75rem 1rem",background:"#f0f9ff",borderBottom:`1px solid ${T.border}`,fontSize:"0.82rem",fontWeight:700,letterSpacing:"0.08em",color:"#0369a1",display:"flex",alignItems:"center",gap:"0.5rem",flexWrap:"wrap"}}>
-                  <span>✏️ MUL/DIV PRACTICE — {rows.length} student{rows.length!==1?"s":""}</span>
-                  <span style={{fontWeight:400,color:T.textSecondary,fontSize:"0.75rem"}}>latest session per student</span>
-                  <span style={{marginLeft:"auto",fontSize:"0.75rem",fontWeight:600,color:"#059669"}}>🏫 {inClassPractice.length} in-class</span>
-                  <span style={{fontSize:"0.75rem",fontWeight:600,color:T.textSecondary}}>🏠 {outOfClassPractice.length} home</span>
-                </div>
-                {rows.map((s,i)=>{
-                  const p = s.pct ?? Math.round((s.score/s.total)*100);
-                  const name = s.studentName || s.name;
-                  return (
-                    <div key={i} style={{padding:"0.6rem 1rem",borderBottom:`1px solid ${T.surfaceAlt}`,display:"flex",alignItems:"center",gap:"0.75rem"}}>
-                      <div style={{flex:1,fontSize:"0.88rem",fontWeight:600,color:T.text}}>{name}</div>
-                      <div style={{fontSize:"0.75rem",color:s.inClass?"#059669":T.textMuted}}>{s.inClass?"🏫":"🏠"}</div>
-                      <div style={{fontSize:"0.82rem",color:T.textSecondary}}>{s.score}/{s.total} pts</div>
-                      <div style={{fontSize:"0.88rem",fontWeight:700,color:p>=85?T.success:p>=75?T.teal:p>=65?T.warning:T.dangerText,minWidth:"42px",textAlign:"right"}}>{p}%</div>
+          {/* ── Practice Sessions (Mul/Div + Fractions) ── */}
+          {(()=>{
+            // All students across all classes in the roster
+            const allRosterStudents = roster.flatMap(c => (c.students||[]).map(s=>({...s, className:c.name, classId:c.id})));
+            const rosterNames = new Set(allRosterStudents.map(s => s.name));
+
+            // Today's midnight for "submitted today" check
+            const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
+
+            function PracticeTable({ code, title, icon, headerColor, sessions: sess }) {
+              // Latest session per student
+              const latest = {};
+              sess.forEach(s => {
+                const name = s.studentName || s.name || "Unknown";
+                if (!latest[name] || (s.submittedAt||s.submitted||"") > (latest[name].submittedAt||latest[name].submitted||""))
+                  latest[name] = s;
+              });
+              const submitted = Object.values(latest);
+
+              // Class avg for in-class sessions submitted today
+              const todayInClass = submitted.filter(s => {
+                const sub = new Date(s.submittedAt || s.submitted || 0);
+                return s.inClass && sub >= todayMidnight;
+              });
+              const classAvgScore = todayInClass.length > 0
+                ? Math.round(todayInClass.reduce((a, s) => a + (s.pct || 0), 0) / todayInClass.length)
+                : null;
+
+              // Not-submitted students (in roster but no session today for this code)
+              const submittedNames = new Set(submitted.map(s => s.studentName || s.name));
+              const notSubmitted = rosterNames.size > 0
+                ? [...rosterNames].filter(n => !submittedNames.has(n)).sort()
+                : [];
+
+              const BANDS = [
+                { min: 90, label: 'Distinguished', color: '#059669' },
+                { min: 75, label: 'Proficient',    color: '#0d9488' },
+                { min: 60, label: 'Approaching',   color: '#d97706' },
+                { min: 0,  label: 'Beginning',     color: '#dc2626' },
+              ];
+              const band = p => BANDS.find(b => p >= b.min) || BANDS[BANDS.length - 1];
+
+              if (submitted.length === 0 && notSubmitted.length === 0) return null;
+
+              return (
+                <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,overflow:"hidden"}}>
+                  <div style={{padding:"0.75rem 1rem",background:headerColor,borderBottom:`1px solid ${T.border}`,
+                    fontSize:"0.82rem",fontWeight:700,letterSpacing:"0.08em",color:"#0369a1",
+                    display:"flex",alignItems:"center",gap:"0.5rem",flexWrap:"wrap"}}>
+                    <span>{icon} {title} — {submitted.length} submitted</span>
+                    {notSubmitted.length > 0 && (
+                      <span style={{fontWeight:600,color:"#b45309",fontSize:"0.75rem"}}>
+                        · {notSubmitted.length} not yet submitted
+                      </span>
+                    )}
+                    {classAvgScore !== null && (
+                      <span style={{marginLeft:"auto",fontSize:"0.75rem",fontWeight:600,color:"#0369a1"}}>
+                        Class avg: {classAvgScore}%
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Submitted students */}
+                  {submitted.sort((a,b)=>(b.pct||0)-(a.pct||0)).map((s,i)=>{
+                    const p = s.pct ?? Math.round(((s.score||0)/(s.total||1))*100);
+                    const name = s.studentName || s.name;
+                    const b = band(p);
+                    const subDate = new Date(s.submittedAt || s.submitted || 0);
+                    const timeStr = subDate.getTime() > 0
+                      ? subDate.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})
+                      : "";
+                    return (
+                      <div key={i} style={{padding:"0.55rem 1rem",borderBottom:`1px solid ${T.surfaceAlt}`,
+                        display:"flex",alignItems:"center",gap:"0.6rem"}}>
+                        <span style={{color:"#059669",fontWeight:700,fontSize:"0.85rem",minWidth:16}}>✓</span>
+                        <div style={{flex:1,fontSize:"0.88rem",fontWeight:600,color:T.text}}>{name}</div>
+                        <div style={{fontSize:"0.72rem",color:s.inClass?"#059669":T.textMuted}}>
+                          {s.inClass?"🏫":"🏠"}
+                        </div>
+                        {timeStr && <div style={{fontSize:"0.72rem",color:T.textMuted}}>{timeStr}</div>}
+                        <div style={{fontSize:"0.82rem",color:T.textSecondary,minWidth:50,textAlign:"right"}}>
+                          {s.score}/{s.total} pts
+                        </div>
+                        <div style={{fontSize:"0.82rem",fontWeight:700,color:b.color,minWidth:80,textAlign:"right"}}>
+                          {b.label}
+                        </div>
+                        <button onClick={()=>setPracticeReport({session:s,classAvgScore,todayInClass,title})}
+                          style={{background:"transparent",border:`1px solid ${T.border}`,
+                            borderRadius:4,padding:"2px 7px",fontSize:"0.72rem",cursor:"pointer",
+                            color:T.textSecondary,fontFamily:"inherit",flexShrink:0}}
+                          title="Parent report">
+                          📄
+                        </button>
+                      </div>
+                    );
+                  })}
+
+                  {/* Not-submitted students */}
+                  {notSubmitted.map((name,i)=>(
+                    <div key={i} style={{padding:"0.55rem 1rem",borderBottom:`1px solid ${T.surfaceAlt}`,
+                      display:"flex",alignItems:"center",gap:"0.6rem",background:"#fafafa"}}>
+                      <span style={{color:"#d1d5db",fontWeight:700,fontSize:"0.85rem",minWidth:16}}>✗</span>
+                      <div style={{flex:1,fontSize:"0.88rem",color:T.textMuted}}>{name}</div>
+                      <div style={{fontSize:"0.78rem",color:T.textMuted,fontStyle:"italic"}}>Not submitted</div>
                     </div>
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              );
+            }
+
+            const mulDivSessions = practiceSessions.filter(s => (s.testCode||"").toUpperCase() === "NR2PRAC");
+            const fracSessions   = practiceSessions.filter(s => (s.testCode||"").toUpperCase() === "NR3PRAC");
+
+            return (
+              <>
+                <PracticeTable
+                  code="NR2PRAC"
+                  title="MUL/DIV PRACTICE"
+                  icon="✖÷"
+                  headerColor="#f0f9ff"
+                  sessions={mulDivSessions}
+                />
+                <PracticeTable
+                  code="NR3PRAC"
+                  title="FRACTIONS PRACTICE"
+                  icon="½"
+                  headerColor="#f5f3ff"
+                  sessions={fracSessions}
+                />
+              </>
             );
           })()}
         </div>
@@ -1985,6 +2086,17 @@ export default function Dashboard({ teacher, readOnly }) {
       <div style={{flex:1,padding:"1.25rem 1.5rem",overflowY:"auto"}}>
         {renderTab()}
       </div>
+
+      {/* Practice parent report modal (Drills tab) */}
+      {practiceReport && (
+        <PracticeParentReport
+          session={practiceReport.session}
+          classAvgScore={practiceReport.classAvgScore}
+          todayInClass={practiceReport.todayInClass}
+          title={practiceReport.title}
+          onClose={() => setPracticeReport(null)}
+        />
+      )}
 
       {/* Fluency parent report modal (Drills tab) */}
       {parentReportId && (

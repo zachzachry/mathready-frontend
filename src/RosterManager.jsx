@@ -967,7 +967,7 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
                     </select>
                   </label>
                   <label style={{display:"flex",alignItems:"center",gap:"0.5rem",fontSize:"0.82rem",color:T.textSecondary}}>
-                    Period ends:
+                    ⏰ Period ends:
                     <input type="time" value={activeClassData.periodEndTime || ''} onChange={async (e) => {
                       const t = e.target.value || null;
                       try {
@@ -982,6 +982,46 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
                       border:`1px solid ${T.borderDark}`,background:T.white,cursor:"pointer"
                     }}/>
                   </label>
+                  {activeClassData.periodEndTime && (
+                    <div style={{fontSize:"0.75rem",color:"#059669",fontWeight:600,marginTop:2}}>
+                      ✓ Practice auto-submits at {activeClassData.periodEndTime}
+                    </div>
+                  )}
+                </div>
+
+                {/* Fraction Practice Standards */}
+                <div style={{marginTop:"0.75rem",paddingTop:"0.75rem",borderTop:`1px solid ${T.border}`}}>
+                  <div style={{fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"0.5rem"}}>
+                    5.NR.3 FRACTION PRACTICE STANDARDS
+                  </div>
+                  {[
+                    ['FRA.DIV',      '5.NR.3.1 — Fraction as Division'],
+                    ['FRA.MUL',      '5.NR.3.4 — Multiply Fractions'],
+                    ['FRA.SCALE',    '5.NR.3.5 — Fraction Scaling'],
+                    ['FRA.DIV_UNIT', '5.NR.3.6 — Divide Unit Fractions'],
+                  ].map(([code, label]) => {
+                    const current = activeClassData.practiceStandards || ['FRA.DIV','FRA.MUL','FRA.SCALE','FRA.DIV_UNIT'];
+                    const checked = current.includes(code);
+                    return (
+                      <label key={code} style={{display:"flex",alignItems:"center",gap:"0.5rem",
+                        fontSize:"0.82rem",color:T.text,marginBottom:"0.25rem",cursor:"pointer"}}>
+                        <input type="checkbox" checked={checked} onChange={async () => {
+                          const next = checked
+                            ? current.filter(s => s !== code)
+                            : [...current, code];
+                          if (next.length === 0) return; // always keep at least one
+                          try {
+                            await fetch(`${API}/roster/class/${activeClassData.id}`, {
+                              method:"PUT", headers:teacherHeaders(),
+                              body: JSON.stringify({ practiceStandards: next })
+                            });
+                            load();
+                          } catch (err) { console.warn("Failed to update practiceStandards:", err); }
+                        }}/>
+                        {label}
+                      </label>
+                    );
+                  })}
                 </div>
               )}
             </div>

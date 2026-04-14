@@ -298,6 +298,187 @@ const GENERATORS = {
     return { id:uid(), standard:'DIV.WORD', dok:2, parametric:true,
              question:q, correct:correctStr, choices };
   },
+
+  // ── Fraction Practice Standards ──────────────────────────────
+
+  // FRA.DIV — 5.NR.3.1: Fraction as division (a ÷ b = a/b)
+  // easy: "What fraction equals a ÷ b?" (proper fraction, no reduction needed)
+  // medium: word problem (sharing, result is proper fraction)
+  // hard: "What fraction in simplest form equals a ÷ b?" (requires GCD reduction)
+  'FRA.DIV': (opts = {}) => {
+    const tier = opts.tier || 'easy';
+
+    if (tier === 'easy') {
+      const a = rnd(1, 6), b = rnd(a + 1, 9);
+      const correctStr = frac(a, b);
+      const wf = wrongFracs(a, b, 3);
+      const choices = shuffle([correctStr, ...wf.map(({ n, d }) => d === 1 ? String(n) : frac(n, d))]);
+      return { id: uid(), standard: 'FRA.DIV', dok: 1, parametric: true,
+               question: `What fraction is equal to ${a} ÷ ${b}?`, correct: correctStr, choices };
+    }
+
+    if (tier === 'medium') {
+      // Sharing word problems: k items shared among n people → k/n (k < n)
+      const n = rnd(4, 10), k = rnd(1, n - 1);
+      const correctStr = frac(k, n);
+      const wf = wrongFracs(k, n, 3);
+      const choices = shuffle([correctStr, ...wf.map(({ n: wn, d: wd }) => wd === 1 ? String(wn) : frac(wn, wd))]);
+      const stems = [
+        `${n} students share ${k} pizza${k > 1 ? 's' : ''} equally. What fraction of a pizza does each student get?`,
+        `${k} gallon${k > 1 ? 's' : ''} of lemonade ${k > 1 ? 'are' : 'is'} shared equally among ${n} people. What fraction of a gallon does each person get?`,
+        `A teacher divides ${k} pound${k > 1 ? 's' : ''} of clay equally among ${n} students. What fraction of a pound does each student receive?`,
+        `${n} friends split ${k} yard${k > 1 ? 's' : ''} of ribbon equally. What fraction of a yard does each friend get?`,
+        `${k} sandwich${k > 1 ? 'es' : ''} ${k > 1 ? 'are' : 'is'} divided equally among ${n} campers. What fraction of a sandwich does each camper get?`,
+      ];
+      return { id: uid(), standard: 'FRA.DIV', dok: 2, parametric: true,
+               question: shuffle(stems)[0], correct: correctStr, choices };
+    }
+
+    // hard: requires GCD reduction
+    let p, q, k;
+    do { p = rnd(1, 5); q = rnd(p + 1, 8); k = rnd(2, 4); } while (gcd(p, q) !== 1);
+    const a = k * p, b = k * q;
+    const correctStr = frac(p, q);
+    const wf = wrongFracs(p, q, 3);
+    const choices = shuffle([correctStr, ...wf.map(({ n, d }) => d === 1 ? String(n) : frac(n, d))]);
+    return { id: uid(), standard: 'FRA.DIV', dok: 2, parametric: true,
+             question: `What fraction in simplest form is equal to ${a} ÷ ${b}?`,
+             correct: correctStr, choices };
+  },
+
+  // FRA.MUL — 5.NR.3.4: Multiply a fraction by a whole number
+  // easy: 1/d × (d × k) = k  (whole number result, straightforward)
+  // medium: p/q × (q × k) = p × k  (larger numbers, still whole result)
+  // hard: word problem version
+  'FRA.MUL': (opts = {}) => {
+    const tier = opts.tier || 'easy';
+    const d = rnd(2, 6), k = rnd(2, 8);
+
+    if (tier === 'easy') {
+      const whole = d * k, ans = k;
+      const ws = nearInts(ans, 3, Math.max(2, Math.floor(ans * 0.4)));
+      const choices = shuffle([String(ans), ...ws.slice(0, 3).map(String)]);
+      return { id: uid(), standard: 'FRA.MUL', dok: 1, parametric: true,
+               question: `What is ${frac(1, d)} × ${whole}?`, correct: String(ans), choices };
+    }
+
+    if (tier === 'medium') {
+      const p = rnd(2, d - 1 > 1 ? d - 1 : 2), whole = d * k, ans = p * k;
+      const ws = nearInts(ans, 3, Math.max(3, Math.floor(ans * 0.2)));
+      const choices = shuffle([String(ans), ...ws.slice(0, 3).map(String)]);
+      return { id: uid(), standard: 'FRA.MUL', dok: 2, parametric: true,
+               question: `What is ${frac(p, d)} × ${whole}?`, correct: String(ans), choices };
+    }
+
+    // hard: word problem
+    const p = rnd(2, d - 1 > 1 ? d - 1 : 2), whole = d * k, ans = p * k;
+    const ws = nearInts(ans, 3, Math.max(3, Math.floor(ans * 0.2)));
+    const choices = shuffle([String(ans), ...ws.slice(0, 3).map(String)]);
+    const stems = [
+      `A garden has ${whole} flowers. ${frac(p, d)} of the flowers are roses. How many flowers are roses?`,
+      `A school ordered ${whole} books. ${frac(p, d)} of the books are math books. How many math books were ordered?`,
+      `There are ${whole} students at field day. ${frac(p, d)} of the students are on the red team. How many students are on the red team?`,
+      `A baker made ${whole} muffins. ${frac(p, d)} of the muffins are blueberry. How many blueberry muffins are there?`,
+      `A parking lot has ${whole} spaces. ${frac(p, d)} of the spaces are reserved. How many spaces are reserved?`,
+    ];
+    return { id: uid(), standard: 'FRA.MUL', dok: 2, parametric: true,
+             question: shuffle(stems)[0], correct: String(ans), choices };
+  },
+
+  // FRA.SCALE — 5.NR.3.5: Fraction scaling (explain why multiplying by fraction > 1 or < 1)
+  // easy: compare product to original whole number (greater/less/equal)
+  // medium: "Which expression gives a product greater than [n]?"
+  // hard: general reasoning about multiplying by a fraction
+  'FRA.SCALE': (opts = {}) => {
+    const tier = opts.tier || 'easy';
+    const whole = rnd(8, 24);
+
+    if (tier === 'easy') {
+      const type = rnd(0, 2); // 0=less, 1=greater, 2=equal
+      let p, q;
+      if (type === 0) { q = rnd(3, 8); p = rnd(1, q - 1); }
+      else if (type === 1) { q = rnd(2, 5); p = q + rnd(1, 3); }
+      else { q = rnd(2, 8); p = q; }
+      const correct = type === 0 ? `Less than ${whole}`
+                    : type === 1 ? `Greater than ${whole}`
+                    : `Equal to ${whole}`;
+      const choices = shuffle([`Greater than ${whole}`, `Less than ${whole}`,
+                                `Equal to ${whole}`, 'Cannot be determined']);
+      return { id: uid(), standard: 'FRA.SCALE', dok: 2, parametric: true,
+               question: `What is ${whole} × ${frac(p, q)} compared to ${whole}?`,
+               correct, choices };
+    }
+
+    if (tier === 'medium') {
+      // Which expression gives a product GREATER THAN whole?
+      const q = rnd(3, 6);
+      const correctP = q + rnd(1, 3);                             // fraction > 1
+      const wrongPs = [rnd(1, q - 1), rnd(1, q - 1), rnd(1, q - 1)]; // fractions < 1
+      const correctExpr = `${whole} × ${frac(correctP, q)}`;
+      const wrongExprs  = wrongPs.map(p2 => `${whole} × ${frac(p2, q)}`);
+      const choices = shuffle([correctExpr, ...wrongExprs.slice(0, 3)]);
+      return { id: uid(), standard: 'FRA.SCALE', dok: 2, parametric: true,
+               question: `Which expression gives a product greater than ${whole}?`,
+               correct: correctExpr, choices };
+    }
+
+    // hard: general reasoning
+    const type = rnd(0, 1);
+    let p, q;
+    if (type === 0) { q = rnd(3, 8); p = rnd(1, q - 1); }
+    else             { q = rnd(2, 5); p = q + rnd(1, 3); }
+    const correct = type === 0
+      ? 'The product is less than the whole number'
+      : 'The product is greater than the whole number';
+    const choices = shuffle([
+      'The product is less than the whole number',
+      'The product is greater than the whole number',
+      'The product equals the whole number',
+      'The product could be any value',
+    ]);
+    return { id: uid(), standard: 'FRA.SCALE', dok: 3, parametric: true,
+             question: `A whole number is multiplied by ${frac(p, q)}. What must be true about the product?`,
+             correct, choices };
+  },
+
+  // FRA.DIV_UNIT — 5.NR.3.6: Divide unit fractions by whole numbers and whole numbers by unit fractions
+  // easy:   1/n ÷ k  = 1/(n×k)
+  // medium: k ÷ 1/n  = k×n
+  // hard:   word problem (k ÷ 1/n)
+  'FRA.DIV_UNIT': (opts = {}) => {
+    const tier = opts.tier || 'easy';
+
+    if (tier === 'easy') {
+      const n = rnd(2, 6), k = rnd(2, 6);
+      const correctStr = frac(1, n * k);
+      const wf = wrongFracs(1, n * k, 3);
+      const choices = shuffle([correctStr, ...wf.map(({ n: wn, d: wd }) => wd === 1 ? String(wn) : frac(wn, wd))]);
+      return { id: uid(), standard: 'FRA.DIV_UNIT', dok: 1, parametric: true,
+               question: `What is ${frac(1, n)} ÷ ${k}?`, correct: correctStr, choices };
+    }
+
+    if (tier === 'medium') {
+      const k = rnd(2, 8), n = rnd(2, 8), ans = k * n;
+      const ws = nearInts(ans, 3, Math.max(3, Math.floor(ans * 0.15)));
+      const choices = shuffle([String(ans), ...ws.slice(0, 3).map(String)]);
+      return { id: uid(), standard: 'FRA.DIV_UNIT', dok: 2, parametric: true,
+               question: `What is ${k} ÷ ${frac(1, n)}?`, correct: String(ans), choices };
+    }
+
+    // hard: word problem (whole ÷ unit fraction)
+    const k = rnd(2, 8), n = rnd(2, 8), ans = k * n;
+    const ws = nearInts(ans, 3, Math.max(3, Math.floor(ans * 0.15)));
+    const choices = shuffle([String(ans), ...ws.slice(0, 3).map(String)]);
+    const stems = [
+      `A baker has ${k} pound${k > 1 ? 's' : ''} of flour. Each loaf of bread uses ${frac(1, n)} pound of flour. How many loaves can the baker make?`,
+      `A rope is ${k} foot${k > 1 ? ' long' : ''}. It is cut into pieces that are each ${frac(1, n)} foot long. How many pieces are there?`,
+      `A pitcher holds ${k} cup${k > 1 ? 's' : ''} of juice. Each serving is ${frac(1, n)} cup. How many servings are in the pitcher?`,
+      `A shelf is ${k} foot${k > 1 ? ' long' : ''}. Each book is ${frac(1, n)} foot wide. How many books fit on the shelf?`,
+      `A garden has ${k} pound${k > 1 ? 's' : ''} of seeds. Each row needs ${frac(1, n)} pound of seeds. How many rows can be planted?`,
+    ];
+    return { id: uid(), standard: 'FRA.DIV_UNIT', dok: 2, parametric: true,
+             question: shuffle(stems)[0], correct: String(ans), choices };
+  },
 };
 
 // GCD helper
@@ -424,6 +605,9 @@ export function pickAdaptiveQuestion(bankQ, weights, seenIds, allStandards) {
 
 // Standards for the Multiplication & Division practice mode
 export const MUL_DIV_STANDARDS = ['MUL.TRAD', 'MUL.WORD', 'DIV.TRAD', 'DIV.WORD'];
+
+// Standards for the Fractions practice mode (5.NR.3)
+export const FRAC_STANDARDS = ['FRA.DIV', 'FRA.MUL', 'FRA.SCALE', 'FRA.DIV_UNIT'];
 
 // All GSE 5th grade standards (for seeding weights)
 export const ALL_STANDARDS = [
