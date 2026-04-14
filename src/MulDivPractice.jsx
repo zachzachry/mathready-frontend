@@ -448,14 +448,17 @@ export default function MulDivPractice({ student, cls, onBack }) {
             </div>
           )}
 
-          <button onClick={handleStart} style={{ ...S.btnPri, width:'100%',
-            textAlign:'center', padding:'0.85rem', fontSize:'1rem' }}>
-            {draft ? 'Start Over' : 'Start Practice →'}
-          </button>
+          {/* In-class with a draft in progress: only allow Resume, no Start Over */}
+          {!(draft && cls?.practiceOpen !== false) && (
+            <button onClick={handleStart} style={{ ...S.btnPri, width:'100%',
+              textAlign:'center', padding:'0.85rem', fontSize:'1rem' }}>
+              {draft ? 'Start Over' : 'Start Practice →'}
+            </button>
+          )}
 
           <button onClick={onBack} style={{ ...S.btnSec, width:'100%',
             textAlign:'center', padding:'0.7rem' }}>
-            ← Back
+            🏠 Home
           </button>
         </div>
       </div>
@@ -530,7 +533,7 @@ export default function MulDivPractice({ student, cls, onBack }) {
             {history.filter(h=>h.correct).length} correct · Q {qNum} of {LIMIT}
           </div>
           <button onClick={onBack} style={{ background:'transparent', border:'1px solid rgba(255,255,255,.3)', color:'rgba(255,255,255,.75)', borderRadius:'4px', padding:'4px 10px', fontSize:'0.78rem', cursor:'pointer', fontFamily:'inherit' }}>
-            ✕ Exit
+            🏠 Home
           </button>
         </div>
 
@@ -780,13 +783,16 @@ export default function MulDivPractice({ student, cls, onBack }) {
           })}
 
           <div style={{ display:'flex', flexDirection:'column', gap:'0.6rem', marginTop:'0.5rem' }}>
-            <button onClick={handleReset} style={{ ...S.btnPri, width:'100%',
-              textAlign:'center', padding:'0.85rem', fontSize:'0.95rem' }}>
-              Practice Again
-            </button>
+            {/* Hide "Practice Again" for in-class sessions — prevents gaming by restarting */}
+            {!inClass && (
+              <button onClick={handleReset} style={{ ...S.btnPri, width:'100%',
+                textAlign:'center', padding:'0.85rem', fontSize:'0.95rem' }}>
+                Practice Again
+              </button>
+            )}
             <button onClick={onBack} style={{ ...S.btnSec, width:'100%',
               textAlign:'center', padding:'0.7rem' }}>
-              Done
+              🏠 Done — Go Home
             </button>
           </div>
         </div>
