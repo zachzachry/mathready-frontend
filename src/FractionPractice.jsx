@@ -85,13 +85,6 @@ function initWeights(stds) {
   return Object.fromEntries(stds.map(s => [s, 0.5]));
 }
 
-// ── Time formatting ──────────────────────────────────────────
-function fmtTime(ms) {
-  if (!ms || ms < 0) return '—';
-  const secs = Math.round(ms / 1000);
-  if (secs < 60) return `${secs}s`;
-  return `${Math.floor(secs / 60)}m ${secs % 60}s`;
-}
 
 // Determine if current time falls within the class period window.
 function checkInClass(cls) {

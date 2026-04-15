@@ -5,7 +5,6 @@ import { T, S, API } from "./shared/constants";
 
 const LIMIT    = 20;
 const TIER_PTS = { easy: 1, medium: 2, hard: 3 };
-const MAX_PTS  = LIMIT * 3; // 60 — max possible weighted score
 
 const CAT = {
   'MUL.TRAD': { label: 'Multiplication — Computation', color: T.teal,     bg: T.tealLight   },

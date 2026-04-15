@@ -550,8 +550,6 @@ export default function Dashboard({ teacher, readOnly }) {
   const testSessions     = sessions.filter(s => s.mode !== "drill" && s.mode !== "practice");
   const drillSessions    = sessions.filter(s => s.mode === "drill" || s.mode === "practice");
   const practiceSessions    = sessions.filter(s => s.mode === "practice");
-  const inClassPractice     = practiceSessions.filter(s => s.inClass);
-  const outOfClassPractice  = practiceSessions.filter(s => !s.inClass);
 
   // ── Overview stats (tests only) ──
   // Build code→name map: primary source = saved test library, fallback = session's testTitle
