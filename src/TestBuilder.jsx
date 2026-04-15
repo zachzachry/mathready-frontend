@@ -1000,11 +1000,16 @@ export default function TestBuilder({ teacher, readOnly }) {
   async function giveMakeup(assignmentId, studentId) {
     setMakeupLoading(studentId);
     try {
-      await fetch(`${API}/assignments/${assignmentId}/makeup`, {
+      const resp = await fetch(`${API}/assignments/${assignmentId}/makeup`, {
         method:"PATCH", headers:teacherHeaders(),
         body: JSON.stringify({ studentId }),
       });
-      await loadAssignments();
+      if (!resp.ok) {
+        const body = await resp.text().catch(() => String(resp.status));
+        setSavedMsg(`Failed to give makeup: ${resp.status} — ${body}`);
+      } else {
+        await loadAssignments();
+      }
     } catch(e) { console.error("giveMakeup failed:", e); setSavedMsg("Failed to give makeup — check your connection."); }
     setMakeupLoading(null);
   }
@@ -1484,7 +1489,7 @@ export default function TestBuilder({ teacher, readOnly }) {
                         const isTesting = sess?.testing && !sess?.gate;
                         const waitCount = waitingCounts[t.code] || 0;
                         const notCompleted = (allClasses.find(c=>c.id===a.classId)?.students||[])
-                          .filter(s=>!(a.completedIds||[]).includes(s.id) && (a.studentIds||[]).includes(s.id));
+                          .filter(s=>!(a.completedIds||[]).includes(s.id));
                         const isExpanded = expandedAssign === a.id;
                         return (
                           <div key={a.id} style={{marginTop:"0.35rem",fontSize:"0.85rem",background:"#e8f5e9",borderRadius:"3px",padding:"0.35rem 0.6rem"}}>

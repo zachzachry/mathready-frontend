@@ -1337,7 +1337,8 @@ export default function Dashboard({ teacher, readOnly }) {
 
     if (tab === "drills") {
       const hasFluency = fluencyReport.some(c => c.students.some(s => s.sessionCount > 0 || s.personalBests?.bestAccuracy > 0));
-      if (drillSessions.length === 0 && !hasFluency) return (
+      const hasRosterStudents = roster.some(c => (c.students || []).length > 0);
+      if (drillSessions.length === 0 && !hasFluency && !hasRosterStudents) return (
         <div style={{background:"#fff",border:"1px solid #c8d3dd",borderRadius:"3px",padding:"3rem",textAlign:"center",color:"#aaa",maxWidth:"600px"}}>
           <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>🎯</div>
           <div style={{fontSize:"1rem",fontWeight:600,color:"#555",marginBottom:"4px"}}>No drill data yet</div>

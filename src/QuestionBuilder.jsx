@@ -854,6 +854,7 @@ export default function QuestionBuilder() {
     if (complete_qs.length === 0) return;
     setSaving(true);
     let count = 0;
+    const errors = [];
     for (const q of complete_qs) {
       try {
         // Ensure type is correct before saving
@@ -868,13 +869,19 @@ export default function QuestionBuilder() {
           headers: teacherHeaders(),
           body: JSON.stringify(toSave),
         });
-        if (!resp.ok) { console.error("Save failed:", resp.status); }
-        else count++;
-      } catch {}
+        if (!resp.ok) {
+          const body = await resp.text().catch(() => String(resp.status));
+          errors.push(`"${(q.question||"").slice(0,40)}": HTTP ${resp.status} — ${body}`);
+        } else {
+          count++;
+        }
+      } catch (err) {
+        errors.push(`"${(q.question||"").slice(0,40)}": ${err.message || err}`);
+      }
     }
     setSaving(false);
-    if (count === 0 && complete_qs.length > 0) {
-      alert("Save failed — no questions were saved to the bank. Check your connection and try again, or contact support if the problem persists.");
+    if (errors.length > 0) {
+      alert(`${count} of ${complete_qs.length} question(s) saved.\n\nErrors:\n${errors.join("\n")}`);
     } else {
       setSavedCount(count);
       setTimeout(() => setSavedCount(0), 3000);
