@@ -1000,8 +1000,7 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
                   </label>
                   {(activeClassData.periodStartTime || activeClassData.periodEndTime) && (
                     <div style={{fontSize:"0.75rem",color:"#059669",fontWeight:600,marginTop:2}}>
-                      ✓ In-class window: {activeClassData.periodStartTime || '—'} → {activeClassData.periodEndTime || '—'}
-                      {activeClassData.periodEndTime && ' · auto-submits at end'}
+                      {`In-class window: ${activeClassData.periodStartTime || '--'} to ${activeClassData.periodEndTime || '--'}${activeClassData.periodEndTime ? ' · auto-submits at end' : ''}`}
                     </div>
                   )}
                 </div>
