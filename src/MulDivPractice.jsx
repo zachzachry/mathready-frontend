@@ -199,7 +199,7 @@ async function submitPracticeSession(student, cls, history, inClass) {
   );
   const questionTimes  = history.map(h => h.timeMs || 0);
   try {
-    await fetch(`${API}/submit`, {
+    const resp = await fetch(`${API}/submit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -220,7 +220,15 @@ async function submitPracticeSession(student, cls, history, inClass) {
         questionTimes,
       }),
     });
-  } catch { /* fire-and-forget */ }
+    if (!resp.ok) {
+      const detail = await resp.text().catch(() => String(resp.status));
+      console.error("[MulDivPractice] submit failed:", resp.status, detail);
+      alert("Your practice session could not be saved (" + resp.status + "). Please let your teacher know.");
+    }
+  } catch (e) {
+    console.error("[MulDivPractice] submit error:", e);
+    alert("Your practice session could not be saved. Please let your teacher know.");
+  }
 }
 
 // True for problems that have a separate remainder field
