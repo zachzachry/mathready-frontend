@@ -89,6 +89,22 @@ function msUntilPeriodEnd(periodEndTime) {
   return end - now;
 }
 
+// Determine if current time falls within the class period window.
+// If start+end times are configured, use the time window.
+// Otherwise fall back to the manual muldivOpen flag.
+function checkInClass(cls) {
+  const start = cls?.periodStartTime;
+  const end   = cls?.periodEndTime;
+  if (start || end) {
+    const now = new Date();
+    const hhmm = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    const afterStart = !start || hhmm >= start;
+    const beforeEnd  = !end   || hhmm <  end;
+    return afterStart && beforeEnd;
+  }
+  return cls?.muldivOpen !== false && cls?.practiceOpen !== false;
+}
+
 function sessionDraftKey(studentId) {
   return studentId ? `nr2prac_draft_${studentId}` : null;
 }
@@ -299,7 +315,7 @@ export default function MulDivPractice({ student, cls, onBack }) {
     setTabWarnCount(0);
     tabWarnRef.current = 0;
     setShowTabWarning(false);
-    setInClass(cls?.practiceOpen !== false);
+    setInClass(checkInClass(cls));
     startPeriodTimer();
     qStartRef.current = Date.now();
     setPhase('question');
@@ -367,7 +383,7 @@ export default function MulDivPractice({ student, cls, onBack }) {
     setTabWarnCount(0);
     tabWarnRef.current = 0;
     setShowTabWarning(false);
-    setInClass(cls?.practiceOpen !== false);
+    setInClass(checkInClass(cls));
     startPeriodTimer();
     qStartRef.current = Date.now();
     setPhase('question');
@@ -442,14 +458,14 @@ export default function MulDivPractice({ student, cls, onBack }) {
             </div>
           )}
 
-          {cls?.practiceOpen === false && (
+          {!checkInClass(cls) && (
             <div style={{ background:'rgba(13,148,136,.08)', border:'1px solid rgba(13,148,136,.2)', borderRadius:T.xs, padding:'0.6rem 0.85rem', fontSize:'0.8rem', color:T.teal, textAlign:'center' }}>
               🏠 You're practicing on your own — this won't count toward your grade, but every session makes you stronger!
             </div>
           )}
 
           {/* In-class with a draft in progress: only allow Resume, no Start Over */}
-          {!(draft && cls?.practiceOpen !== false) && (
+          {!(draft && checkInClass(cls)) && (
             <button onClick={handleStart} style={{ ...S.btnPri, width:'100%',
               textAlign:'center', padding:'0.85rem', fontSize:'1rem' }}>
               {draft ? 'Start Over' : 'Start Practice →'}

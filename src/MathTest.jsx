@@ -838,7 +838,7 @@ function StudentLogin({ onStartTest, onStartDrill, onStartMulDiv, onStartFractio
               </div>
             </button>
             )}
-            {cls?.practiceOpen === false ? (
+            {cls?.muldivOpen === false ? (
               <div style={{flex:1,minWidth:"140px",background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.1)",borderRadius:"10px",padding:"1rem 1.25rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
                 <span style={{fontSize:"1.5rem",opacity:0.3}}>✖÷</span>
                 <div style={{textAlign:"left"}}>
@@ -856,7 +856,7 @@ function StudentLogin({ onStartTest, onStartDrill, onStartMulDiv, onStartFractio
                 </div>
               </button>
             )}
-            {cls?.practiceOpen === false ? (
+            {cls?.fractionsOpen === false ? (
               <div style={{flex:1,minWidth:"140px",background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.1)",borderRadius:"10px",padding:"1rem 1.25rem",display:"flex",alignItems:"center",gap:"0.75rem"}}>
                 <span style={{fontSize:"1.5rem",opacity:0.3}}>½</span>
                 <div style={{textAlign:"left"}}>

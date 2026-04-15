@@ -967,6 +967,22 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
                     </select>
                   </label>
                   <label style={{display:"flex",alignItems:"center",gap:"0.5rem",fontSize:"0.82rem",color:T.textSecondary}}>
+                    ⏰ Period starts:
+                    <input type="time" value={activeClassData.periodStartTime || ''} onChange={async (e) => {
+                      const t = e.target.value || null;
+                      try {
+                        await fetch(`${API}/roster/class/${activeClassData.id}`, {
+                          method:"PUT", headers:teacherHeaders(),
+                          body: JSON.stringify({ periodStartTime: t })
+                        });
+                        load();
+                      } catch (err) { console.warn("Failed to update periodStartTime:", err); }
+                    }} style={{
+                      padding:"5px 8px",fontSize:"0.88rem",borderRadius:4,
+                      border:`1px solid ${T.borderDark}`,background:T.white,cursor:"pointer"
+                    }}/>
+                  </label>
+                  <label style={{display:"flex",alignItems:"center",gap:"0.5rem",fontSize:"0.82rem",color:T.textSecondary}}>
                     ⏰ Period ends:
                     <input type="time" value={activeClassData.periodEndTime || ''} onChange={async (e) => {
                       const t = e.target.value || null;
@@ -982,9 +998,10 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
                       border:`1px solid ${T.borderDark}`,background:T.white,cursor:"pointer"
                     }}/>
                   </label>
-                  {activeClassData.periodEndTime && (
+                  {(activeClassData.periodStartTime || activeClassData.periodEndTime) && (
                     <div style={{fontSize:"0.75rem",color:"#059669",fontWeight:600,marginTop:2}}>
-                      ✓ Practice auto-submits at {activeClassData.periodEndTime}
+                      ✓ In-class window: {activeClassData.periodStartTime || '—'} → {activeClassData.periodEndTime || '—'}
+                      {activeClassData.periodEndTime && ' · auto-submits at end'}
                     </div>
                   )}
                 </div>
