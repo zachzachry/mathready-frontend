@@ -165,6 +165,7 @@ function saveSeenTexts(key, set) {
 
 // ── SmartScore (0-100) ────────────────────────────────────────
 function computeSmartScore(history) {
+  if (history.length > 0 && history.every(h => h.correct)) return 100;
   let score = 0;
   for (const h of history) {
     const pts = TIER_PTS[h.q.tier] || 1;
@@ -184,7 +185,7 @@ async function submitFractionSession(student, cls, history, inClass) {
   if (!student) return;
   const earned    = history.reduce((s, h) => h.correct ? s + (TIER_PTS[h.q.tier] || 1) : s, 0);
   const actualMax = history.reduce((s, h) => s + (TIER_PTS[h.q.tier] || 1), 0) || 1;
-  const pct       = Math.round((earned / actualMax) * 100);
+  const pct       = computeSmartScore(history);
   const answers   = Object.fromEntries(
     history.map((h, i) => [`Q${i + 1}`, {
       question: h.q.question, standard: h.q.standard, tier: h.q.tier,
