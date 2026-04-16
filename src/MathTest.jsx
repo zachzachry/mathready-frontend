@@ -5,11 +5,12 @@ import { AreaChart, Area, LineChart, Line, XAxis, YAxis, ResponsiveContainer, To
 import MathText from "./shared/MathText";
 import TopBar from "./shared/TopBar";
 import { QUESTIONS as FALLBACK_QUESTIONS, LETTERS, S, T as LIGHT_THEME, DARK_THEME, pct, lvl, lvlC, lvlBg, lvlBd, fmtTime, now, sendHeartbeat, API, TEACHER_POLL_MS, HEARTBEAT_MS, DRAFT_SAVE_DEBOUNCE_MS, FS_GRACE_MS, DEVTOOLS_THRESHOLD_PX } from "./shared/constants";
-const T = LIGHT_THEME; // file-level fallback; StudentLogin/StudentTest/StudentResults shadow this
 import { buildWeightMap, updateSessionWeights, pickAdaptiveQuestion, ALL_STANDARDS } from "./adaptive";
 import MulDivPractice from "./MulDivPractice";
 import FractionPractice from "./FractionPractice";
 import PlotGrid from "./shared/PlotGrid";
+
+const T = LIGHT_THEME; // file-level fallback; StudentLogin/StudentTest/StudentResults shadow this
 
 /* ── Drag-and-Drop Answer Component ─────────────────────── */
 function DragDropAnswer({ zones=[], items=[], value, onChange, revealed, correctMap, ddLayout="categories" }) {

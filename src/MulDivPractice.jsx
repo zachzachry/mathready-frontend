@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import MathText from "./shared/MathText";
 import { generateParametric, updateSessionWeights, MUL_DIV_STANDARDS } from "./adaptive";
-import { LIGHT_THEME, DARK_THEME, S, API } from "./shared/constants";
+import { T, LIGHT_THEME, DARK_THEME, S, API } from "./shared/constants";
 
 const DEFAULT_LIMIT = 20;
+const LIMIT = DEFAULT_LIMIT; // module-level fallback for helpers outside the component
 const TIER_PTS = { easy: 1, medium: 2, hard: 3 };
 
 const CAT = {
