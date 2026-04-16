@@ -617,7 +617,7 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
       const r = await fetch(url);
       setClasses(await r.json());
     }
-    catch { setClasses([]); flash("Could not load classes. Please refresh."); }
+    catch (e) { console.error("load classes failed:", e); setClasses([]); flash("Could not load classes. Please refresh."); }
     setLoading(false);
   }, [teacher]);
 
@@ -735,10 +735,11 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
       s.id === sid ? { ...s, extendedTime, reduceChoices } : s
     );
     try {
-      await fetch(`${API}/roster/class/${cid}`, {
+      const r = await fetch(`${API}/roster/class/${cid}`, {
         method:"PUT", headers:teacherHeaders(),
         body: JSON.stringify({ name: cls.name, students: updated }),
       });
+      if (!r.ok) { console.error("saveAccommodations failed:", r.status); return; }
       await load();
       setAccomModal(null);
     } catch(e) { console.error("saveAccommodations failed", e); }

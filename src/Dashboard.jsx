@@ -130,8 +130,8 @@ function TestControls() {
 
         if (code) {
           const [c, a] = await Promise.all([
-            fetch(`${API}/test/control?code=${encodeURIComponent(code)}`).then(r=>r.json()),
-            fetch(`${API}/active?code=${encodeURIComponent(code)}`).then(r=>r.json()).catch(()=>[]),
+            fetch(`${API}/test/control?code=${encodeURIComponent(code)}`).then(r=>{ if(!r.ok) console.error("GET /test/control failed:", r.status); return r.json(); }),
+            fetch(`${API}/active?code=${encodeURIComponent(code)}`).then(r=>{ if(!r.ok) console.error("GET /active failed:", r.status); return r.json(); }).catch(()=>[]),
           ]);
           setCtrl(c);
           setActive(Array.isArray(a) ? a : []);
@@ -169,14 +169,17 @@ function TestControls() {
   async function grantExtension(studentName, extraSecs) {
     if (!selectedCode) return;
     try {
-      await fetch(`${API}/test/control/extend`, {
+      const extResp = await fetch(`${API}/test/control/extend`, {
         method:"POST", headers: teacherHeaders(),
         body: JSON.stringify({ code: selectedCode, studentName, extraSecs }),
       });
+      if (!extResp.ok) console.error("POST /test/control/extend failed:", extResp.status);
       const mins = extraSecs / 60;
       setExtMsgs(prev => ({ ...prev, [studentName]: `+${mins} min granted` }));
       setTimeout(() => setExtMsgs(prev => { const n={...prev}; delete n[studentName]; return n; }), 3000);
-      const d = await fetch(`${API}/test/control?code=${encodeURIComponent(selectedCode)}`).then(r=>r.json());
+      const ctrlResp = await fetch(`${API}/test/control?code=${encodeURIComponent(selectedCode)}`);
+      if (!ctrlResp.ok) console.error("GET /test/control failed:", ctrlResp.status);
+      const d = await ctrlResp.json();
       setCtrl(d);
     } catch(e) { console.error("grantExtension failed:", e); setMsg("Failed to grant extension — check your connection."); }
   }
@@ -533,12 +536,14 @@ export default function Dashboard({ teacher, readOnly }) {
     setClearing(true); setClearModal(false);
     try {
       if (mode === "fluency") {
-        await fetch(`${API}/fluency/all`, { method: "DELETE", headers: teacherHeaders() });
+        const r = await fetch(`${API}/fluency/all`, { method: "DELETE", headers: teacherHeaders() });
+        if (!r.ok) console.error("DELETE /fluency/all failed:", r.status);
         setFluencyReport([]); setLeaderboard([]);
       } else {
         const url = mode === "all" ? `${API}/sessions` : `${API}/sessions?mode=${mode}`;
-        await fetch(url, { method: "DELETE", headers: teacherHeaders() });
-        if (mode === "all") { setSessions([]); await fetch(`${API}/fluency/all`, { method: "DELETE", headers: teacherHeaders() }); setFluencyReport([]); setLeaderboard([]); }
+        const r = await fetch(url, { method: "DELETE", headers: teacherHeaders() });
+        if (!r.ok) console.error(`DELETE ${url} failed:`, r.status);
+        if (mode === "all") { setSessions([]); const r2 = await fetch(`${API}/fluency/all`, { method: "DELETE", headers: teacherHeaders() }); if (!r2.ok) console.error("DELETE /fluency/all failed:", r2.status); setFluencyReport([]); setLeaderboard([]); }
         else if (mode === "tests") setSessions(prev => prev.filter(s => s.mode === "drill" || s.mode === "practice"));
         else if (mode === "drills") setSessions(prev => prev.filter(s => s.mode !== "drill" && s.mode !== "practice"));
       }
@@ -1479,7 +1484,7 @@ export default function Dashboard({ teacher, readOnly }) {
                     </div>
                     <div style={{padding:"0.3rem 0.15rem",textAlign:"center",borderBottom:`1px solid ${T.surfaceAlt}`}}>
                       <button
-                        onClick={async () => { if (!window.confirm(`Reset fluency data for ${s.student.name}?`)) return; await fetch(`${API}/fluency/student/${s.student.id}`, {method:"DELETE"}); refresh(); }}
+                        onClick={async () => { if (!window.confirm(`Reset fluency data for ${s.student.name}?`)) return; const r = await fetch(`${API}/fluency/student/${s.student.id}`, {method:"DELETE"}); if (!r.ok) console.error(`DELETE /fluency/student/${s.student.id} failed:`, r.status); refresh(); }}
                         title="Reset fluency data"
                         style={{
                           background: T.dangerBg, border: `1px solid ${T.dangerBd}`,
@@ -1718,7 +1723,8 @@ export default function Dashboard({ teacher, readOnly }) {
                       <button onClick={async()=>{
                         if(!window.confirm(`Clear test scores for "${c.name}"? Drill data is kept. This cannot be undone.`)) return;
                         try {
-                          await fetch(`${API}/sessions/class/${c.id}`,{method:"DELETE",headers:teacherHeaders()});
+                          const r = await fetch(`${API}/sessions/class/${c.id}`,{method:"DELETE",headers:teacherHeaders()});
+                          if (!r.ok) console.error(`DELETE /sessions/class/${c.id} failed:`, r.status);
                           refresh();
                         } catch {}
                       }} title="Clear test data for this class"

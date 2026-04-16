@@ -912,14 +912,20 @@ export default function TestBuilder({ teacher, readOnly }) {
 
 
   const loadBank = useCallback(async () => {
-    try { const r=await fetch(`${API}/questions`); setBank(await r.json()); }
+    try {
+      const r = await fetch(`${API}/questions`);
+      if (!r.ok) { console.error("loadBank failed:", r.status); setBank([]); setLoading(false); return; }
+      setBank(await r.json());
+    }
     catch(e) { console.error("loadBank failed:", e); setBank([]); }
     setLoading(false);
   }, []);
 
   const loadActive = useCallback(async () => {
     try {
-      const r=await fetch(`${API}/test/active`); const t=await r.json();
+      const r = await fetch(`${API}/test/active`);
+      if (!r.ok) { console.error("loadActive failed:", r.status); return; }
+      const t = await r.json();
       setSelected((t.questions||[]).map(q=>q.id));
       setTestTitle(t.title||"Grade 5 Math — Practice");
     } catch(e) { console.error("loadActive failed:", e); }
@@ -931,6 +937,7 @@ export default function TestBuilder({ teacher, readOnly }) {
       if (teacher?.teacherId) { params.set("teacherId", teacher.teacherId); }
       if (archived) params.set("showArchived", "true");
       const r = await fetch(`${API}/tests/saved?${params}`, { headers: teacherHeaders() });
+      if (!r.ok) { console.error("loadSavedTests failed:", r.status); setSavedTests([]); return; }
       const data = await r.json();
       setSavedTests(Array.isArray(data) ? data : []);
     } catch(e) { console.error("loadSavedTests failed:", e); setSavedTests([]); }
@@ -939,7 +946,8 @@ export default function TestBuilder({ teacher, readOnly }) {
   const loadAssignments = useCallback(async () => {
     try {
       const classFilter = teacher?.classIds?.length ? `?classIds=${teacher.classIds.join(",")}` : "";
-      const r=await fetch(`${API}/assignments${classFilter}`, { headers: teacherHeaders() });
+      const r = await fetch(`${API}/assignments${classFilter}`, { headers: teacherHeaders() });
+      if (!r.ok) { console.error("loadAssignments failed:", r.status); setTestAssignments([]); return; }
       const data = await r.json();
       setTestAssignments(Array.isArray(data) ? data : []);
     } catch(e) { console.error("loadAssignments failed:", e); setTestAssignments([]); }
@@ -967,20 +975,22 @@ export default function TestBuilder({ teacher, readOnly }) {
 
   async function launchSession(testCode, classId) {
     try {
-      await fetch(`${API}/test/control`, {
+      const r = await fetch(`${API}/test/control`, {
         method:"POST", headers:teacherHeaders(),
         body: JSON.stringify({ code:testCode, classId, action:"launch" }),
       });
+      if (!r.ok) { console.error("launchSession failed:", r.status); setSavedMsg("Failed to launch session — check your connection."); return; }
       await loadActiveSessions();
     } catch(e) { console.error("launchSession failed:", e); setSavedMsg("Failed to launch session — check your connection."); }
   }
 
   async function beginTesting(testCode) {
     try {
-      await fetch(`${API}/test/control`, {
+      const r = await fetch(`${API}/test/control`, {
         method:"POST", headers:teacherHeaders(),
         body: JSON.stringify({ code:testCode, action:"begin" }),
       });
+      if (!r.ok) { console.error("beginTesting failed:", r.status); setSavedMsg("Failed to start testing — check your connection."); return; }
       await loadActiveSessions();
     } catch(e) { console.error("beginTesting failed:", e); setSavedMsg("Failed to start testing — check your connection."); }
   }
@@ -988,10 +998,11 @@ export default function TestBuilder({ teacher, readOnly }) {
   async function endSession(testCode) {
     if (!window.confirm(`End the live session for code ${testCode}?`)) return;
     try {
-      await fetch(`${API}/test/control`, {
+      const r = await fetch(`${API}/test/control`, {
         method:"POST", headers:teacherHeaders(),
         body: JSON.stringify({ code:testCode, action:"end" }),
       });
+      if (!r.ok) { console.error("endSession failed:", r.status); setSavedMsg("Failed to end session — check your connection."); return; }
       setActiveSessions(s=>{ const n={...s}; delete n[testCode]; return n; });
       setWaitingCounts(s=>{ const n={...s}; delete n[testCode]; return n; });
     } catch(e) { console.error("endSession failed:", e); setSavedMsg("Failed to end session — check your connection."); }
@@ -1066,7 +1077,12 @@ export default function TestBuilder({ teacher, readOnly }) {
   }
 
   async function deleteQuestion(id) {
-    try { await fetch(`${API}/questions/${id}`,{method:"DELETE",headers:teacherHeaders()}); setBank(b=>b.filter(q=>q.id!==id)); setSelected(s=>s.filter(x=>x!==id)); }
+    try {
+      const r = await fetch(`${API}/questions/${id}`, { method:"DELETE", headers:teacherHeaders() });
+      if (!r.ok) { console.error("deleteQuestion failed:", r.status); setSavedMsg("Failed to delete question — check your connection."); setConfirmDelete(null); return; }
+      setBank(b=>b.filter(q=>q.id!==id));
+      setSelected(s=>s.filter(x=>x!==id));
+    }
     catch(e) { console.error("deleteQuestion failed:", e); setSavedMsg("Failed to delete question — check your connection."); }
     setConfirmDelete(null);
   }
@@ -1118,8 +1134,12 @@ export default function TestBuilder({ teacher, readOnly }) {
   }
 
   async function deleteAssignment(aid) {
-    try { await fetch(`${API}/assignments/${aid}`,{method:"DELETE",headers:teacherHeaders()}); await loadAssignments(); }
-    catch {}
+    try {
+      const r = await fetch(`${API}/assignments/${aid}`, { method:"DELETE", headers:teacherHeaders() });
+      if (!r.ok) { console.error("deleteAssignment failed:", r.status); return; }
+      await loadAssignments();
+    }
+    catch(e) { console.error("deleteAssignment failed:", e); }
   }
 
   async function deleteSavedTest(id) {
@@ -1132,42 +1152,44 @@ export default function TestBuilder({ teacher, readOnly }) {
         return;
       }
       setSavedTests(s=>s.filter(t=>t.id!==id));
-    } catch {}
+    } catch(e) { console.error("deleteSavedTest failed:", e); }
   }
 
   async function togglePsEntered(t) {
     const newVal = !t.psEntered;
     try {
-      await fetch(`${API}/tests/saved/${t.id}/ps-entered`, {
+      const r = await fetch(`${API}/tests/saved/${t.id}/ps-entered`, {
         method: "PATCH",
         headers: {"Content-Type":"application/json", ...teacherHeaders()},
         body: JSON.stringify({ psEntered: newVal }),
       });
+      if (!r.ok) { console.error("togglePsEntered failed:", r.status); return; }
       setSavedTests(s => s.map(x => x.id === t.id ? {...x, psEntered: newVal} : x));
-    } catch {}
+    } catch(e) { console.error("togglePsEntered failed:", e); }
   }
 
   async function archiveTest(t) {
     const newVal = !t.archived;
     try {
-      await fetch(`${API}/tests/saved/${t.id}/archive`, {
+      const r = await fetch(`${API}/tests/saved/${t.id}/archive`, {
         method: "PATCH",
         headers: {"Content-Type":"application/json", ...teacherHeaders()},
         body: JSON.stringify({ archived: newVal }),
       });
+      if (!r.ok) { console.error("archiveTest failed:", r.status); return; }
       if (newVal && !showArchived) {
         setSavedTests(s => s.filter(x => x.id !== t.id));
       } else {
         setSavedTests(s => s.map(x => x.id === t.id ? {...x, archived: newVal} : x));
       }
-    } catch {}
+    } catch(e) { console.error("archiveTest failed:", e); }
   }
 
   async function duplicateSavedTest(id) {
     try {
       const p = teacher?.teacherId ? `?teacherId=${teacher.teacherId}` : "";
-      const r = await fetch(`${API}/tests/saved/${id}${p}`, { headers: teacherHeaders() });
-      const t = await r.json();
+      const orig = await fetch(`${API}/tests/saved/${id}${p}`, { headers: teacherHeaders() });
+      const t = await orig.json();
       const body = {
         name: `${t.name} (copy)`, questions: t.questions||[], title: t.title||"",
         adaptive: t.adaptive||false, untimed: t.untimed||false, timeLimitSecs: t.timeLimitSecs||1800,
@@ -1177,9 +1199,10 @@ export default function TestBuilder({ teacher, readOnly }) {
         visibility: "private", sharedWith: [], adminScoresOnly: false, closeDate: null,
       };
       const cp = teacher?.teacherId ? `?teacherId=${teacher.teacherId}&role=${teacher.teacherRole||"teacher"}` : "";
-      await fetch(`${API}/tests/saved${cp}`, { method:"POST", headers:teacherHeaders(), body: JSON.stringify(body) });
+      const r = await fetch(`${API}/tests/saved${cp}`, { method:"POST", headers:teacherHeaders(), body: JSON.stringify(body) });
+      if (!r.ok) { console.error("duplicateSavedTest failed:", r.status); return; }
       await loadSavedTests();
-    } catch {}
+    } catch(e) { console.error("duplicateSavedTest failed:", e); }
   }
 
   if (loading) return (

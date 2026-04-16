@@ -575,9 +575,9 @@ function StudentLogin({ onStartTest, onStartDrill, onStartMulDiv, onStartFractio
             if (ar?.ok) { const ad = await ar.json(); setStudentAssignments(ad.assignments || []); }
             if (hr?.ok) { setStudentHistory(await hr.json()); }
             if (fr?.ok) { setStudentFluency(await fr.json()); }
-          } catch {}
+          } catch(e) { console.warn("init data load failed:", e); }
         }
-      } catch {}
+      } catch(e) { console.warn("init data load failed:", e); }
     })();
   }, [step, credential, impersonateStudent]);
 
@@ -588,6 +588,7 @@ function StudentLogin({ onStartTest, onStartDrill, onStartMulDiv, onStartFractio
     setChecking(true); setErr("");
     try {
       const r = await fetch(`${API}/test/code/${encodeURIComponent(c)}`);
+      if (!r.ok) { setErr("Could not load test. Check your code and try again."); setChecking(false); return; }
       const data = await r.json();
       if (!data.found || (!data.questions?.length && data.type !== "drill")) {
         setErr("Invalid test code. Check with your teacher.");
@@ -614,6 +615,7 @@ function StudentLogin({ onStartTest, onStartDrill, onStartMulDiv, onStartFractio
       if (data.oneAttempt) {
         try {
           const ar = await fetch(`${API}/test/attempt-check?code=${encodeURIComponent(c)}&studentId=${encodeURIComponent(vd.student.id)}`);
+          if (!ar.ok) { setErr("Something went wrong checking attempt status. Please try again."); setChecking(false); return; }
           const ad = await ar.json();
           if (ad.attempted) { setErr("You have already submitted this test. Only one attempt is allowed."); setChecking(false); return; }
         } catch { setErr("Something went wrong checking attempt status. Please try again."); setChecking(false); return; }
@@ -1681,9 +1683,11 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
     if (!adaptive) return;
     async function seedWeights() {
       try {
-        const hRes = studentId
-          ? await fetch(`${API}/student/history/${encodeURIComponent(studentId)}`).then(r=>r.json()).catch(()=>[])
-          : [];
+        let hRes = [];
+        if (studentId) {
+          const hR = await fetch(`${API}/student/history/${encodeURIComponent(studentId)}`).catch(() => null);
+          if (hR?.ok) hRes = await hR.json().catch(() => []);
+        }
         const initW = buildWeightMap(Array.isArray(hRes) ? hRes : []);
         ALL_STANDARDS.forEach(std => { if (!initW[std]) initW[std] = 0.5; });
         setWeights(initW);
@@ -1762,6 +1766,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
           ? `${API}/test/control?code=${encodeURIComponent(testCode)}`
           : `${API}/test/control`;
         const r = await fetch(url);
+        if (!r.ok) return;
         const d = await r.json();
 
         // Gate: teacher launched session but hasn't clicked Begin Testing yet
