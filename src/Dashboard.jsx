@@ -1543,15 +1543,21 @@ export default function Dashboard({ teacher, readOnly }) {
               } catch(e) { alert("Could not record session: " + e.message); }
             }
 
-            function PracticeTable({ code, title, icon, headerColor, sessions: sess }) {
-              // Latest session per student
-              const latest = {};
+            function PracticeTable({ code, title, icon, headerColor, sessions: sess, masteryGoal }) {
+              // Last 3 sessions per student, sorted newest-first
+              const byStudent = {};
               sess.forEach(s => {
                 const name = s.studentName || s.name || "Unknown";
-                if (!latest[name] || (s.submittedAt||s.submitted||"") > (latest[name].submittedAt||latest[name].submitted||""))
-                  latest[name] = s;
+                if (!byStudent[name]) byStudent[name] = [];
+                byStudent[name].push(s);
               });
-              const submitted = Object.values(latest);
+              Object.keys(byStudent).forEach(name => {
+                byStudent[name].sort((a, b) =>
+                  new Date(b.submittedAt || b.submitted || 0) - new Date(a.submittedAt || a.submitted || 0)
+                );
+                byStudent[name] = byStudent[name].slice(0, 3);
+              });
+              const submitted = Object.values(byStudent).map(arr => arr[0]);
 
               // Class avg for in-class sessions submitted today
               const todayInClass = submitted.filter(s => {
@@ -1563,7 +1569,7 @@ export default function Dashboard({ teacher, readOnly }) {
                 : null;
 
               // Not-submitted students (in roster but no session today for this code)
-              const submittedNames = new Set(submitted.map(s => s.studentName || s.name));
+              const submittedNames = new Set(Object.keys(byStudent));
               const notSubmitted = rosterNames.size > 0
                 ? [...rosterNames].filter(n => !submittedNames.has(n)).sort().map(n => rosterByName[n] || { name: n })
                 : [];
@@ -1592,42 +1598,69 @@ export default function Dashboard({ teacher, readOnly }) {
                     {classAvgScore !== null && (
                       <span style={{marginLeft:"auto",fontSize:"0.75rem",fontWeight:600,color:"#0369a1"}}>
                         Class avg: {classAvgScore}%
+                        {masteryGoal != null && (
+                          <span style={{color: classAvgScore >= masteryGoal ? '#059669' : '#d97706', marginLeft:"0.4rem"}}>
+                            · Goal: {masteryGoal}% {classAvgScore >= masteryGoal ? '✓' : ''}
+                          </span>
+                        )}
                       </span>
                     )}
                   </div>
 
-                  {/* Submitted students */}
-                  {submitted.sort((a,b)=>(b.pct||0)-(a.pct||0)).map((s,i)=>{
+                  {/* Submitted students — latest + up to 2 prior attempts */}
+                  {Object.entries(byStudent).sort(([,a],[,b])=>(b[0].pct||0)-(a[0].pct||0)).map(([name,attempts],i)=>{
+                    const s = attempts[0];
                     const p = s.pct ?? Math.round(((s.score||0)/(s.total||1))*100);
-                    const name = s.studentName || s.name;
                     const b = band(p);
                     const subDate = new Date(s.submittedAt || s.submitted || 0);
                     const timeStr = subDate.getTime() > 0
                       ? subDate.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})
                       : "";
+                    const trend = attempts.length >= 2
+                      ? (p > (attempts[1].pct||0) ? "↑" : p < (attempts[1].pct||0) ? "↓" : "—")
+                      : "";
+                    const trendColor = trend === "↑" ? "#059669" : trend === "↓" ? "#dc2626" : T.textMuted;
                     return (
-                      <div key={i} style={{padding:"0.55rem 1rem",borderBottom:`1px solid ${T.surfaceAlt}`,
-                        display:"flex",alignItems:"center",gap:"0.6rem"}}>
-                        <span style={{color:"#059669",fontWeight:700,fontSize:"0.85rem",minWidth:16}}>✓</span>
-                        <div style={{flex:1,fontSize:"0.88rem",fontWeight:600,color:T.text}}>{name}</div>
-                        <div style={{fontSize:"0.72rem",color:s.inClass?"#059669":T.textMuted}}>
-                          {s.inClass?"🏫":"🏠"}
+                      <React.Fragment key={i}>
+                        <div style={{padding:"0.55rem 1rem",borderBottom:`1px solid ${T.surfaceAlt}`,
+                          display:"flex",alignItems:"center",gap:"0.6rem"}}>
+                          <span style={{color:"#059669",fontWeight:700,fontSize:"0.85rem",minWidth:16}}>✓</span>
+                          {trend && <span style={{color:trendColor,fontWeight:700,fontSize:"0.85rem",minWidth:14}}>{trend}</span>}
+                          <div style={{flex:1,fontSize:"0.88rem",fontWeight:600,color:T.text}}>{name}</div>
+                          <div style={{fontSize:"0.72rem",color:s.inClass?"#059669":T.textMuted}}>
+                            {s.inClass?"🏫":"🏠"}
+                          </div>
+                          {timeStr && <div style={{fontSize:"0.72rem",color:T.textMuted}}>{timeStr}</div>}
+                          <div style={{fontSize:"0.82rem",color:T.textSecondary,minWidth:50,textAlign:"right"}}>
+                            {s.score}/{s.total} pts
+                          </div>
+                          <div style={{fontSize:"0.82rem",fontWeight:700,color:b.color,minWidth:80,textAlign:"right"}}>
+                            {b.label}
+                          </div>
+                          <button onClick={()=>setPracticeReport({session:s,classAvgScore,todayInClass,title})}
+                            style={{background:"transparent",border:`1px solid ${T.border}`,
+                              borderRadius:4,padding:"2px 7px",fontSize:"0.72rem",cursor:"pointer",
+                              color:T.textSecondary,fontFamily:"inherit",flexShrink:0}}
+                            title="Parent report">
+                            📄
+                          </button>
                         </div>
-                        {timeStr && <div style={{fontSize:"0.72rem",color:T.textMuted}}>{timeStr}</div>}
-                        <div style={{fontSize:"0.82rem",color:T.textSecondary,minWidth:50,textAlign:"right"}}>
-                          {s.score}/{s.total} pts
-                        </div>
-                        <div style={{fontSize:"0.82rem",fontWeight:700,color:b.color,minWidth:80,textAlign:"right"}}>
-                          {b.label}
-                        </div>
-                        <button onClick={()=>setPracticeReport({session:s,classAvgScore,todayInClass,title})}
-                          style={{background:"transparent",border:`1px solid ${T.border}`,
-                            borderRadius:4,padding:"2px 7px",fontSize:"0.72rem",cursor:"pointer",
-                            color:T.textSecondary,fontFamily:"inherit",flexShrink:0}}
-                          title="Parent report">
-                          📄
-                        </button>
-                      </div>
+                        {attempts.slice(1).map((prev, j) => {
+                          const pp = prev.pct ?? Math.round(((prev.score||0)/(prev.total||1))*100);
+                          const pb = band(pp);
+                          const pd = new Date(prev.submittedAt || prev.submitted || 0);
+                          return (
+                            <div key={j} style={{padding:"0.3rem 1rem 0.3rem 2.5rem",borderBottom:`1px solid ${T.surfaceAlt}`,
+                              display:"flex",alignItems:"center",gap:"0.6rem",background:"#fafafa"}}>
+                              <div style={{flex:1,fontSize:"0.72rem",color:T.textMuted}}>
+                                {pd.getTime() > 0 ? pd.toLocaleDateString([],{month:"short",day:"numeric"}) : "prior"}
+                              </div>
+                              <div style={{fontSize:"0.72rem",color:T.textSecondary}}>{prev.score}/{prev.total} pts</div>
+                              <div style={{fontSize:"0.72rem",fontWeight:600,color:pb.color,minWidth:80,textAlign:"right"}}>{pb.label}</div>
+                            </div>
+                          );
+                        })}
+                      </React.Fragment>
                     );
                   })}
 
@@ -1655,6 +1688,14 @@ export default function Dashboard({ teacher, readOnly }) {
 
             const mulDivSessions = practiceSessions.filter(s => (s.testCode||"").toUpperCase() === "NR2PRAC");
             const fracSessions   = practiceSessions.filter(s => (s.testCode||"").toUpperCase() === "NR3PRAC");
+            const mulDivGoal = (() => {
+              const cid = mulDivSessions[0]?.classId;
+              return roster.find(c => c.id === cid)?.practiceMasteryGoal ?? null;
+            })();
+            const fracGoal = (() => {
+              const cid = fracSessions[0]?.classId;
+              return roster.find(c => c.id === cid)?.practiceMasteryGoal ?? null;
+            })();
 
             return (
               <>
@@ -1664,6 +1705,7 @@ export default function Dashboard({ teacher, readOnly }) {
                   icon="✖÷"
                   headerColor="#f0f9ff"
                   sessions={mulDivSessions}
+                  masteryGoal={mulDivGoal}
                 />
                 <PracticeTable
                   code="NR3PRAC"
@@ -1671,6 +1713,7 @@ export default function Dashboard({ teacher, readOnly }) {
                   icon="½"
                   headerColor="#f5f3ff"
                   sessions={fracSessions}
+                  masteryGoal={fracGoal}
                 />
               </>
             );

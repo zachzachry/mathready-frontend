@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import MathText from "./shared/MathText";
 import { generateParametric, updateSessionWeights, FRAC_STANDARDS } from "./adaptive";
-import { T, S, API } from "./shared/constants";
+import { LIGHT_THEME, DARK_THEME, S, API } from "./shared/constants";
 
-const LIMIT    = 20;
+const DEFAULT_LIMIT = 20;
 const TIER_PTS = { easy: 1, medium: 2, hard: 3 };
 
 const CAT = {
@@ -229,11 +229,16 @@ async function submitFractionSession(student, cls, history, inClass) {
 
 // ── Component ────────────────────────────────────────────────
 export default function FractionPractice({ student, cls, onBack }) {
+  const [isDark, setIsDark] = useState(() => localStorage.getItem("mr_theme") === "dark");
+  const T = isDark ? DARK_THEME : LIGHT_THEME;
+  const toggleTheme = () => setIsDark(d => { localStorage.setItem("mr_theme", !d ? "dark" : "light"); return !d; });
+
   // Determine which standards are active for this class
   const activeStds = (cls?.practiceStandards?.length > 0)
     ? cls.practiceStandards.filter(s => FRAC_STANDARDS.includes(s))
     : FRAC_STANDARDS;
   const effectiveStds = activeStds.length > 0 ? activeStds : FRAC_STANDARDS;
+  const LIMIT = cls?.practiceQuestionCount || DEFAULT_LIMIT;
 
   const SEEN_KEY = seenKey(student?.id);
   const [seenTexts, setSeenTexts] = useState(() => loadSeenTexts(SEEN_KEY));
@@ -390,7 +395,14 @@ export default function FractionPractice({ student, cls, onBack }) {
     return (
       <div style={{ minHeight: '100vh', background: T.midnight, display: 'flex',
         flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        fontFamily: T.font, padding: '2rem 1rem', gap: '2rem' }}>
+        fontFamily: T.font, padding: '2rem 1rem', gap: '2rem', position: 'relative' }}>
+
+        <button onClick={toggleTheme} title={isDark ? "Light mode" : "Dark mode"}
+          style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'rgba(255,255,255,0.1)',
+            border: '1px solid rgba(255,255,255,0.2)', borderRadius: T.full,
+            padding: '0.35rem 0.65rem', cursor: 'pointer', fontSize: '1rem', lineHeight: 1 }}>
+          {isDark ? '☀️' : '🌙'}
+        </button>
 
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.2em',
@@ -401,7 +413,7 @@ export default function FractionPractice({ student, cls, onBack }) {
             Fractions Practice
           </div>
           <div style={{ fontSize: '0.88rem', color: T.textMuted }}>
-            20 adaptive questions · difficulty scales as you go
+            {LIMIT} adaptive questions · difficulty scales as you go
           </div>
         </div>
 
@@ -714,6 +726,29 @@ export default function FractionPractice({ student, cls, onBack }) {
               </div>
             );
           })}
+
+          {cls?.practiceMasteryGoal != null && (() => {
+            const goal = cls.practiceMasteryGoal;
+            const met  = smartScore >= goal;
+            return (
+              <div style={{ padding: '0.75rem 1rem', borderRadius: T.xs,
+                background: met ? '#d1fae5' : '#fff7ed',
+                border: `1px solid ${met ? '#6ee7b7' : '#fed7aa'}` }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700,
+                  color: met ? '#065f46' : '#92400e', marginBottom: '0.4rem' }}>
+                  {met
+                    ? `Class goal: ${goal} — You scored: ${smartScore} ✓`
+                    : `Class goal: ${goal} — You scored: ${smartScore} · Keep practicing!`}
+                </div>
+                <div style={{ height: 6, background: met ? 'rgba(5,150,105,.15)' : '#ffedd5',
+                  borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', borderRadius: 3,
+                    width: `${Math.min(100, Math.round((smartScore / goal) * 100))}%`,
+                    background: met ? '#059669' : '#f97316', transition: 'width .5s' }} />
+                </div>
+              </div>
+            );
+          })()}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.5rem' }}>
             {/* Hide "Practice Again" for in-class sessions — prevents gaming by restarting */}

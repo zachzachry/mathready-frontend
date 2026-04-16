@@ -4,7 +4,8 @@ import { gradeAnswer } from "./grading";
 import { AreaChart, Area, LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import MathText from "./shared/MathText";
 import TopBar from "./shared/TopBar";
-import { QUESTIONS as FALLBACK_QUESTIONS, LETTERS, S, T, pct, lvl, lvlC, lvlBg, lvlBd, fmtTime, now, sendHeartbeat, API, TEACHER_POLL_MS, HEARTBEAT_MS, DRAFT_SAVE_DEBOUNCE_MS, FS_GRACE_MS, DEVTOOLS_THRESHOLD_PX } from "./shared/constants";
+import { QUESTIONS as FALLBACK_QUESTIONS, LETTERS, S, T as LIGHT_THEME, DARK_THEME, pct, lvl, lvlC, lvlBg, lvlBd, fmtTime, now, sendHeartbeat, API, TEACHER_POLL_MS, HEARTBEAT_MS, DRAFT_SAVE_DEBOUNCE_MS, FS_GRACE_MS, DEVTOOLS_THRESHOLD_PX } from "./shared/constants";
+const T = LIGHT_THEME; // file-level fallback; StudentLogin/StudentTest/StudentResults shadow this
 import { buildWeightMap, updateSessionWeights, pickAdaptiveQuestion, ALL_STANDARDS } from "./adaptive";
 import MulDivPractice from "./MulDivPractice";
 import FractionPractice from "./FractionPractice";
@@ -477,6 +478,10 @@ const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
 // ── Student Login ──────────────────────────────────────────
 // Flow: google → choice (drill | test code) → [code → confirm] or [drill start]
 function StudentLogin({ onStartTest, onStartDrill, onStartMulDiv, onStartFractions, onBack, prefillCode, prefillCredential, impersonateStudent }) {
+  const [isDark, setIsDark] = useState(() => localStorage.getItem("mr_theme") === "dark");
+  const T = isDark ? DARK_THEME : LIGHT_THEME;
+  const toggleTheme = () => setIsDark(d => { localStorage.setItem("mr_theme", !d ? "dark" : "light"); return !d; });
+
   const [credential, setCredential] = useState(prefillCredential || null);
   const [code,       setCode]       = useState(prefillCode || "");
   const [err,        setErr]        = useState("");
@@ -705,10 +710,14 @@ function StudentLogin({ onStartTest, onStartDrill, onStartMulDiv, onStartFractio
 
   // ── Google Sign-In screen ──
   if (step === "google") return (
-    <div style={S.page}>
+    <div style={{...S.page, background: T.surface}}>
       <div style={{background:T.midnight,width:"100%",padding:"0.85rem 2rem",display:"flex",alignItems:"center",gap:"1rem",flexShrink:0}}>
         {onBack && <button onClick={onBack} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:T.white,borderRadius:T.xs,padding:"6px 14px",cursor:"pointer",fontSize:"0.8rem"}}>← Back</button>}
-        <div style={{color:T.white,fontSize:"0.95rem",fontWeight:700}}>Georgia Milestones Readiness Trainer</div>
+        <div style={{color:T.white,fontSize:"0.95rem",fontWeight:700,flex:1}}>Georgia Milestones Readiness Trainer</div>
+        <button onClick={toggleTheme} title={isDark ? "Light mode" : "Dark mode"}
+          style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.25)",borderRadius:T.full,padding:"0.3rem 0.6rem",cursor:"pointer",fontSize:"1rem",lineHeight:1}}>
+          {isDark ? "☀️" : "🌙"}
+        </button>
       </div>
       <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem 1rem",width:"100%"}}>
         <div style={S.card}>
@@ -776,6 +785,10 @@ function StudentLogin({ onStartTest, onStartDrill, onStartMulDiv, onStartFractio
         }
         <div style={{flex:1,color:T.white,fontSize:"0.95rem",fontWeight:700}}>MilestoneReady</div>
         {student && <div style={{color:"rgba(255,255,255,.7)",fontSize:"0.82rem"}}>{student.name}</div>}
+        <button onClick={toggleTheme} title={isDark ? "Light mode" : "Dark mode"}
+          style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.25)",borderRadius:T.full,padding:"0.3rem 0.6rem",cursor:"pointer",fontSize:"1rem",lineHeight:1}}>
+          {isDark ? "☀️" : "🌙"}
+        </button>
       </div>
 
       <div style={{flex:1,overflow:"auto",padding:"1.25rem",width:"100%"}}>
@@ -1373,7 +1386,10 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
                     <div style={{width:"22px",height:"22px",borderRadius:"4px",border:`1.5px solid ${boxBd}`,background:boxBg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                       {(isChosen || (revealed && isInCorrect)) && <span style={{color:T.white,fontSize:"0.8rem",fontWeight:900}}>✓</span>}
                     </div>
-                    <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color:textColor,flex:1}}><MathText text={choice}/></span>
+                    <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color:textColor,flex:1,display:"flex",flexDirection:"column",gap:"0.3rem"}}>
+                      {choice && <MathText text={choice}/>}
+                      {q.choiceImages?.[i] && <img src={q.choiceImages[i]} alt="" style={{maxHeight:"80px",maxWidth:"220px",borderRadius:2}}/>}
+                    </span>
                   </button>
                 );
               })}
@@ -1406,8 +1422,9 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
                   <div style={{width:"26px",height:"26px",borderRadius:"50%",border:`1.5px solid ${circleBd}`,background:circleBg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                     <span style={{fontSize:"0.72rem",fontWeight:700,color:circleColor}}>{circleLabel}</span>
                   </div>
-                  <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color:textColor,flex:1}}>
-                    <MathText text={choice}/>
+                  <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color:textColor,flex:1,display:"flex",flexDirection:"column",gap:"0.3rem"}}>
+                    {choice && <MathText text={choice}/>}
+                    {q.choiceImages?.[i] && <img src={q.choiceImages[i]} alt="" style={{maxHeight:"80px",maxWidth:"220px",borderRadius:2}}/>}
                   </span>
                 </button>
               );
@@ -1564,6 +1581,10 @@ function normalizeQuestion(q) {
 }
 
 function StudentTest({ studentName, studentId, testCode, questions: initialQuestions, adaptive, onFinish, untimed=false, timeLimitSecs=1800, warnSecs=300, onReturnToTeacher=null, initialDraft=null, gated=false, testSubject="math" }) {
+  const [isDark, setIsDark] = useState(() => localStorage.getItem("mr_theme") === "dark");
+  const T = isDark ? DARK_THEME : LIGHT_THEME;
+  const toggleTheme = () => setIsDark(d => { localStorage.setItem("mr_theme", !d ? "dark" : "light"); return !d; });
+
   // ── Session persistence key ──
   const sessionKey = testCode && studentId ? `mathready_test_${testCode}_${studentId}` : null;
 
@@ -2190,6 +2211,10 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
             <div style={{fontSize:"0.75rem",opacity:.6,letterSpacing:"0.08em"}}>STUDENT</div>
             <div style={{fontSize:"0.78rem",fontWeight:600}}>{studentName}</div>
           </div>
+          <button onClick={toggleTheme} title={isDark?"Light mode":"Dark mode"}
+            style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.25)",borderRadius:"9999px",padding:"0.3rem 0.55rem",cursor:"pointer",fontSize:"0.9rem",lineHeight:1}}>
+            {isDark?"☀️":"🌙"}
+          </button>
         </div>
       }/>
 
@@ -2311,7 +2336,8 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
               <>
                 <div style={{fontSize:"0.78rem",color:"rgba(255,255,255,0.45)",marginBottom:"0.75rem",fontStyle:"italic"}}>Select all that apply.</div>
                 <div style={{display:"flex",flexDirection:"column",gap:"0.55rem"}}>
-                  {(q.choices||[]).filter(c=>c).map((choice,i)=>{
+                  {(q.choices||[]).map((choice,i)=>{
+                    if (!choice && !q.choiceImages?.[i]) return null;
                     const selArr = (() => { try { return sel ? JSON.parse(sel) : []; } catch { return []; } })();
                     const chosen = selArr.includes(choice);
                     function toggleChoice() {
@@ -2325,7 +2351,10 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
                       <div style={{width:"22px",height:"22px",borderRadius:T.xs,border:`2px solid ${chosen?"#5b9bd5":"rgba(255,255,255,0.3)"}`,background:chosen?"#5b9bd5":"rgba(255,255,255,0.07)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                         {chosen && <span style={{color:"#fff",fontSize:"0.8rem",fontWeight:900}}>✓</span>}
                       </div>
-                      <span style={{fontSize:"0.95rem",fontFamily:"Georgia,serif",color:"#e8f0f8"}}><MathText text={choice}/></span>
+                      <span style={{fontSize:"0.95rem",fontFamily:"Georgia,serif",color:"#e8f0f8",display:"flex",flexDirection:"column",gap:"0.3rem"}}>
+                        {choice && <MathText text={choice}/>}
+                        {q.choiceImages?.[i] && <img src={q.choiceImages[i]} alt="" style={{maxHeight:"80px",maxWidth:"220px",borderRadius:2}}/>}
+                      </span>
                     </label>;
                   })}
                 </div>
@@ -2333,18 +2362,22 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
             ) : (
               <>
                 <div style={{display:"flex",flexDirection:"column",gap:"0.55rem"}}>
-                  {(q.choices||[]).filter(c=>c).length === 0 ? (
+                  {!(q.choices||[]).some((c,i) => c || q.choiceImages?.[i]) ? (
                     <div style={{color:"rgba(255,255,255,0.45)",fontSize:"0.85rem",padding:"1rem",textAlign:"center",border:"1px dashed rgba(255,255,255,0.2)",borderRadius:"4px"}}>
                       ⚠ This question has no answer choices. Contact your teacher.
                     </div>
                   ) : (q.choices||[]).map((choice,i)=>{
+                    if (!choice && !q.choiceImages?.[i]) return null;
                     const chosen = sel===choice;
                     return <label key={i} onClick={()=>{ setAns(p=>({...p,[q.id]:choice})); handleAdaptiveAnswer(q.id, choice); }}
                       style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.75rem 1rem",border:`2px solid ${chosen?"#5b9bd5":"rgba(255,255,255,0.15)"}`,borderRadius:T.xs,background:chosen?"rgba(91,155,213,0.2)":"rgba(255,255,255,0.04)",cursor:"pointer",transition:"border-color .12s,background .12s"}}>
                       <div style={{width:"26px",height:"26px",borderRadius:"50%",border:`2px solid ${chosen?"#5b9bd5":"rgba(255,255,255,0.3)"}`,background:chosen?"#5b9bd5":"rgba(255,255,255,0.07)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                         <span style={{fontSize:"0.7rem",fontWeight:700,color:"#fff"}}>{LETTERS[i]}</span>
                       </div>
-                      <span style={{fontSize:"0.95rem",fontFamily:"Georgia,serif",color:"#e8f0f8"}}><MathText text={choice}/></span>
+                      <span style={{fontSize:"0.95rem",fontFamily:"Georgia,serif",color:"#e8f0f8",display:"flex",flexDirection:"column",gap:"0.3rem"}}>
+                        {choice && <MathText text={choice}/>}
+                        {q.choiceImages?.[i] && <img src={q.choiceImages[i]} alt="" style={{maxHeight:"80px",maxWidth:"220px",borderRadius:2}}/>}
+                      </span>
                     </label>;
                   })}
                 </div>
@@ -3323,10 +3356,16 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
 
 // ── Student Results ────────────────────────────────────────
 function StudentResults({ session, questions, subject, onReset }) {
+  const [isDark, setIsDark] = useState(() => localStorage.getItem("mr_theme") === "dark");
+  const T = isDark ? DARK_THEME : LIGHT_THEME;
+  const toggleTheme = () => setIsDark(d => { localStorage.setItem("mr_theme", !d ? "dark" : "light"); return !d; });
   const p = session.pct;
   return (
-    <div style={{minHeight:"100vh",background:"#e8edf2",fontFamily:T.font,display:"flex",flexDirection:"column"}}>
-      <TopBar title={`Grade 5 ${subject === "science" ? "Science" : "Mathematics"} — Results`}/>
+    <div style={{minHeight:"100vh",background:T.surface,fontFamily:T.font,display:"flex",flexDirection:"column"}}>
+      <TopBar title={`Grade 5 ${subject === "science" ? "Science" : "Mathematics"} — Results`}
+        right={<button onClick={toggleTheme} title={isDark?"Light mode":"Dark mode"}
+          style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.25)",borderRadius:"9999px",padding:"0.3rem 0.6rem",cursor:"pointer",fontSize:"1rem",lineHeight:1}}>
+          {isDark?"☀️":"🌙"}</button>}/>
       <div style={{flex:1,display:"flex",justifyContent:"center",padding:"2rem 1rem"}}>
         <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:"4px",width:"100%",maxWidth:"640px",boxShadow:"0 2px 12px rgba(0,0,0,.07)",overflow:"hidden"}}>
           <div style={{background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,padding:"1.25rem 1.5rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>

@@ -74,7 +74,7 @@ export const now     = () => {
 };
 
 // ── Bold Modern Design Tokens ────────────────────────────
-export const T = {
+export const LIGHT_THEME = {
   // Colors
   midnight:    "#0f172a",
   slate:       "#1e293b",
@@ -110,6 +110,40 @@ export const T = {
   rl:          "12px",
   full:        "9999px",
   // Font
+  font:        "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+};
+
+export const T = LIGHT_THEME; // default (used by teacher views and any component that doesn't override)
+
+export const DARK_THEME = {
+  midnight:    "#0f172a",
+  slate:       "#1e293b",
+  teal:        "#2dd4bf",
+  tealDark:    "#14b8a6",
+  tealLight:   "#134e4a",
+  tealMuted:   "#0f766e",
+  white:       "#1e293b",   // card surfaces → dark
+  surface:     "#0f172a",   // page bg → very dark
+  surfaceAlt:  "#1e293b",
+  border:      "#334155",
+  borderDark:  "#475569",
+  text:        "#f1f5f9",
+  textSecondary: "#94a3b8",
+  textMuted:   "#64748b",
+  success:     "#34d399",
+  successBg:   "#064e3b",
+  successBd:   "#065f46",
+  warning:     "#fbbf24",
+  warningBg:   "#451a03",
+  warningBd:   "#78350f",
+  danger:      "#f87171",
+  dangerBg:    "#450a0a",
+  dangerBd:    "#7f1d1d",
+  dangerText:  "#f87171",
+  sm:          "0 1px 2px rgba(0,0,0,.4)",
+  md:          "0 4px 12px rgba(0,0,0,.5)",
+  lg:          "0 8px 30px rgba(0,0,0,.6)",
+  xs: "4px", r: "8px", rl: "12px", full: "9999px",
   font:        "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
 };
 

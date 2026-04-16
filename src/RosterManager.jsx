@@ -967,6 +967,40 @@ export default function RosterManager({ teacher, readOnly, onUpdateClassIds }) {
                       <option value={300}>5 min</option>
                     </select>
                   </label>
+                  <label style={{display:"flex",alignItems:"center",gap:"0.4rem",fontSize:"0.88rem",color:T.textSecondary}}>
+                    <span>Questions per session</span>
+                    <select value={activeClassData.practiceQuestionCount || 20} onChange={async (e) => {
+                      const n = parseInt(e.target.value);
+                      try {
+                        await fetch(`${API}/roster/class/${activeClassData.id}`, {
+                          method:"PUT", headers:teacherHeaders(),
+                          body: JSON.stringify({ practiceQuestionCount: n })
+                        });
+                        load();
+                      } catch (err) { console.warn("Failed to update practiceQuestionCount:", err); }
+                    }} style={{padding:"5px 8px",fontSize:"0.88rem",borderRadius:4,
+                      border:`1px solid ${T.borderDark}`,background:T.white,cursor:"pointer"}}>
+                      <option value={10}>10</option>
+                      <option value={15}>15</option>
+                      <option value={20}>20</option>
+                    </select>
+                  </label>
+                  <label style={{display:"flex",alignItems:"center",gap:"0.4rem",fontSize:"0.88rem",color:T.textSecondary}}>
+                    <span>Mastery goal</span>
+                    <select value={activeClassData.practiceMasteryGoal || 80} onChange={async (e) => {
+                      const n = parseInt(e.target.value);
+                      try {
+                        await fetch(`${API}/roster/class/${activeClassData.id}`, {
+                          method:"PUT", headers:teacherHeaders(),
+                          body: JSON.stringify({ practiceMasteryGoal: n })
+                        });
+                        load();
+                      } catch (err) { console.warn("Failed to update practiceMasteryGoal:", err); }
+                    }} style={{padding:"5px 8px",fontSize:"0.88rem",borderRadius:4,
+                      border:`1px solid ${T.borderDark}`,background:T.white,cursor:"pointer"}}>
+                      {[70,75,80,85,90,95,100].map(v => <option key={v} value={v}>{v}%</option>)}
+                    </select>
+                  </label>
                   <label style={{display:"flex",alignItems:"center",gap:"0.5rem",fontSize:"0.82rem",color:T.textSecondary}}>
                     ⏰ Period starts:
                     <input type="time" value={activeClassData.periodStartTime || ''} onChange={async (e) => {
