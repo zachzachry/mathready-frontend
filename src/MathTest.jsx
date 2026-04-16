@@ -1581,7 +1581,7 @@ function normalizeQuestion(q) {
   return { ...q, type, answer };
 }
 
-function StudentTest({ studentName, studentId, testCode, questions: initialQuestions, adaptive, onFinish, untimed=false, timeLimitSecs=1800, warnSecs=300, onReturnToTeacher=null, initialDraft=null, gated=false, testSubject="math" }) {
+function StudentTest({ studentName, studentId, testCode, questions: initialQuestions, adaptive, onFinish, untimed=false, timeLimitSecs=1800, warnSecs=300, onReturnToTeacher=null, initialDraft=null, gated=false, testSubject="math", cls=null }) {
   const [isDark, setIsDark] = useState(() => localStorage.getItem("mr_theme") === "dark");
   const T = isDark ? DARK_THEME : LIGHT_THEME;
   const toggleTheme = () => setIsDark(d => { localStorage.setItem("mr_theme", !d ? "dark" : "light"); return !d; });
@@ -1649,10 +1649,23 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
   const [modal, setModal] = useState(false);
   const [nav,   setNav]   = useState(window.innerWidth > 640);
 
-  const qTimeRef    = useRef({});   // {questionId: accumulatedMs}
-  const prevCurRef  = useRef(cur);
-  const qEnteredRef = useRef(Date.now());
-  const draftSaveRef = useRef(null);  // debounce timer for server draft saves
+  const qTimeRef      = useRef({});   // {questionId: accumulatedMs}
+  const prevCurRef    = useRef(cur);
+  const qEnteredRef   = useRef(Date.now());
+  const draftSaveRef  = useRef(null);  // debounce timer for server draft saves
+  const periodTimerRef = useRef(null); // auto-submit at period end
+
+  // Period-end auto-submit: fire doSubmit() when the class period ends
+  useEffect(() => {
+    if (!cls?.periodEndTime || phase !== "testing") return;
+    const [hh, mm] = cls.periodEndTime.split(':').map(Number);
+    const now = new Date(), end = new Date(now);
+    end.setHours(hh, mm, 0, 0);
+    const ms = end - now;
+    if (ms <= 0) return; // period already over
+    periodTimerRef.current = setTimeout(() => { doSubmit(); }, ms);
+    return () => clearTimeout(periodTimerRef.current);
+  }, [phase, cls?.periodEndTime]); // eslint-disable-line
 
   // Auto-submit if restored endTime is already in the past
   useEffect(() => {
@@ -3788,7 +3801,7 @@ export default function MathTest({ onBack, prefillCode, directPracticeClassId, d
               }}/>;
 
   if (screen === "test")
-    return <StudentTest studentName={student?.name || ""} studentId={student?.id || ""} testCode={testCode} questions={questions} adaptive={isAdaptive} onFinish={handleFinishTest} untimed={untimed} timeLimitSecs={timeLimitSecs} warnSecs={warnSecs} onReturnToTeacher={impersonateStudent ? onBack : null} initialDraft={initialDraft} gated={testGated} testSubject={testSubject}/>;
+    return <StudentTest studentName={student?.name || ""} studentId={student?.id || ""} testCode={testCode} questions={questions} adaptive={isAdaptive} onFinish={handleFinishTest} untimed={untimed} timeLimitSecs={timeLimitSecs} warnSecs={warnSecs} onReturnToTeacher={impersonateStudent ? onBack : null} initialDraft={initialDraft} gated={testGated} testSubject={testSubject} cls={cls}/>;
 
   if (screen === "results")
     return <StudentResults session={finalSession} questions={questions} subject={testSubject} onReset={()=>{ reset(); onBack(); }}/>;
