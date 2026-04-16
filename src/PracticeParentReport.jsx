@@ -1,4 +1,5 @@
 import { T } from "./shared/constants";
+import MathText from "./shared/MathText";
 
 const TIER_PTS  = { easy: 1, medium: 2, hard: 3 };
 const BANDS = [
@@ -244,15 +245,15 @@ export default function PracticeParentReport({ session, classAvgScore, todayInCl
                       borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '0.35rem 0.5rem', color: '#94a3b8', fontWeight: 600 }}>{i + 1}</td>
                       <td style={{ padding: '0.35rem 0.5rem', color: '#1e293b' }}>
-                        <span style={{ fontFamily: 'Georgia, serif' }}>{q.question}</span>
+                        <MathText text={q.question}/>
                         {!ok && (
                           <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: '#dc2626' }}>
-                            (correct: {q.correct})
+                            (correct: <MathText text={q.correct}/>)
                           </span>
                         )}
                       </td>
                       <td style={{ padding: '0.35rem 0.5rem', color: ok ? '#059669' : '#dc2626',
-                        fontWeight: 600 }}>{q.chosen || '—'}</td>
+                        fontWeight: 600 }}><MathText text={q.chosen || '—'}/></td>
                       <td style={{ padding: '0.35rem 0.5rem', textAlign: 'center',
                         fontWeight: 700, fontSize: '1rem', color: ok ? '#059669' : '#dc2626' }}>
                         {ok ? '✓' : '✗'}
