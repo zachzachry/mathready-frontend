@@ -33,7 +33,7 @@ export default function MathText({ text, style }) {
           const latex = part.slice(1,-1);
           if (/[\\^_{}]|frac|sqrt|times|cdot|pi/.test(latex)) {
             try {
-              const html = window.katex.renderToString(latex, { throwOnError:false, displayMode:false });
+              const html = window.katex.renderToString("\\displaystyle " + latex, { throwOnError:false, displayMode:false });
               return <span key={i} dangerouslySetInnerHTML={{ __html: html }} />;
             } catch {
               return <span key={i}>{latex}</span>;

@@ -402,7 +402,7 @@ export function HotspotAnswer({ questionImage, snapPoints=[], assets=[], assetTy
                   <span style={{fontSize:"0.5rem",color:T.success,fontWeight:700}}>✓</span>
                 </div>
               ) : (
-                <span style={{fontSize:"0.82rem",fontFamily:"Georgia,serif",color:T.success,fontWeight:700,background:"#d1fae5",padding:"1px 6px",borderRadius:"3px",border:`1px solid ${T.successBd}`}}>
+                <span style={{fontSize:"0.82rem",fontFamily:T.font,color:T.success,fontWeight:700,background:"#d1fae5",padding:"1px 6px",borderRadius:"3px",border:`1px solid ${T.successBd}`}}>
                   {correctMap[sp.id]}
                 </span>
               )}
@@ -1287,7 +1287,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
 
           {/* Question card */}
           <div style={{background:T.white,border:`1px solid ${T.border}`,borderTop:`4px solid ${T.midnight}`,borderRadius:"6px",padding:"1.5rem 1.75rem",boxShadow:"0 2px 8px rgba(0,0,0,.05)"}}>
-            <p style={{fontSize:"1.08rem",fontFamily:"Georgia,serif",color:"#0f0f0f",lineHeight:1.75,margin:0}}>
+            <p style={{fontSize:"1.08rem",fontFamily:T.font,color:"#0f0f0f",lineHeight:1.75,margin:0}}>
               <MathText text={q.question}/>
             </p>
           </div>
@@ -1387,7 +1387,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
                     <div style={{width:"22px",height:"22px",borderRadius:"4px",border:`1.5px solid ${boxBd}`,background:boxBg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                       {(isChosen || (revealed && isInCorrect)) && <span style={{color:T.white,fontSize:"0.8rem",fontWeight:900}}>✓</span>}
                     </div>
-                    <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color:textColor,flex:1,display:"flex",flexDirection:"column",gap:"0.3rem"}}>
+                    <span style={{fontSize:"1rem",fontFamily:T.font,color:textColor,flex:1,display:"flex",flexDirection:"column",gap:"0.3rem"}}>
                       {choice && <MathText text={choice}/>}
                       {q.choiceImages?.[i] && <img src={q.choiceImages[i]} alt="" style={{maxHeight:"80px",maxWidth:"220px",borderRadius:2}}/>}
                     </span>
@@ -1423,7 +1423,7 @@ function PracticeMode({ student, cls, onFinish, onQuit }) {
                   <div style={{width:"26px",height:"26px",borderRadius:"50%",border:`1.5px solid ${circleBd}`,background:circleBg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                     <span style={{fontSize:"0.72rem",fontWeight:700,color:circleColor}}>{circleLabel}</span>
                   </div>
-                  <span style={{fontSize:"1rem",fontFamily:"Georgia,serif",color:textColor,flex:1,display:"flex",flexDirection:"column",gap:"0.3rem"}}>
+                  <span style={{fontSize:"1rem",fontFamily:T.font,color:textColor,flex:1,display:"flex",flexDirection:"column",gap:"0.3rem"}}>
                     {choice && <MathText text={choice}/>}
                     {q.choiceImages?.[i] && <img src={q.choiceImages[i]} alt="" style={{maxHeight:"80px",maxWidth:"220px",borderRadius:2}}/>}
                   </span>
@@ -1502,7 +1502,7 @@ function PracticeResults({ session, history, onReset }) {
             <div>
               <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"4px"}}>PRACTICE SCORE</div>
               <div style={{fontSize:"1rem",fontWeight:700,color:T.text}}>{session.studentName}</div>
-              <div style={{fontSize:"2rem",fontWeight:700,color:lvlC(p),fontFamily:"Georgia,serif",marginTop:"4px"}}>{session.score}/{session.total} <span style={{fontSize:"1rem",opacity:.6}}>({p}%)</span></div>
+              <div style={{fontSize:"2rem",fontWeight:700,color:lvlC(p),fontFamily:T.font,marginTop:"4px"}}>{session.score}/{session.total} <span style={{fontSize:"1rem",opacity:.6}}>({p}%)</span></div>
             </div>
             <div style={{textAlign:"right"}}>
               <div style={{fontSize:"0.62rem",color:T.textSecondary,marginBottom:"4px"}}>TIME</div>
@@ -1523,7 +1523,7 @@ function PracticeResults({ session, history, onReset }) {
                   </div>
                   <div style={{flex:1,fontSize:"0.82rem"}}>
                     <div style={{color:T.textSecondary,fontSize:"0.63rem",letterSpacing:"0.08em",marginBottom:"2px"}}>{q.standard}{item.timeSecs ? ` · ${item.timeSecs}s` : ""}</div>
-                    <div style={{color:T.text,fontFamily:"Georgia,serif",marginBottom:isCorrect?0:"4px"}}><MathText text={q.question}/></div>
+                    <div style={{color:T.text,fontFamily:T.font,marginBottom:isCorrect?0:"4px"}}><MathText text={q.question}/></div>
                     {q.type==="plotpoint" && !isCorrect && (
                       <div style={{margin:"6px 0"}}>
                         <PlotGrid answer={q.answer} placed={chosen?(()=>{try{return JSON.parse(chosen);}catch{return null;}})():null} revealed readOnly size={180}/>
@@ -1582,9 +1582,7 @@ function normalizeQuestion(q) {
 }
 
 function StudentTest({ studentName, studentId, testCode, questions: initialQuestions, adaptive, onFinish, untimed=false, timeLimitSecs=1800, warnSecs=300, onReturnToTeacher=null, initialDraft=null, gated=false, testSubject="math", cls=null }) {
-  const [isDark, setIsDark] = useState(() => localStorage.getItem("mr_theme") === "dark");
-  const T = isDark ? DARK_THEME : LIGHT_THEME;
-  const toggleTheme = () => setIsDark(d => { localStorage.setItem("mr_theme", !d ? "dark" : "light"); return !d; });
+  // Test view is always light — no dark-mode toggle
 
   // ── Session persistence key ──
   const sessionKey = testCode && studentId ? `mathready_test_${testCode}_${studentId}` : null;
@@ -1648,6 +1646,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
   const submittedRef  = useRef(false);
   const [modal, setModal] = useState(false);
   const [nav,   setNav]   = useState(window.innerWidth > 640);
+  const [enlargedImg, setEnlargedImg] = useState(null);
 
   const qTimeRef      = useRef({});   // {questionId: accumulatedMs}
   const prevCurRef    = useRef(cur);
@@ -2030,17 +2029,17 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
   // ── Waiting room (teacher has launched but not yet clicked Begin Testing) ──
   if (phase === "waiting_room") {
     return (
-      <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100vh",background:"linear-gradient(155deg,#0d1b2a 0%,#0f2d4a 55%,#133a5e 100%)",fontFamily:T.font,padding:"1.5rem"}}>
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100vh",background:T.surface,fontFamily:T.font,padding:"1.5rem"}}>
         <style>{`@keyframes waitPulse{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
-        <div style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:T.r,maxWidth:"440px",width:"100%",padding:"2.5rem",textAlign:"center"}}>
+        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.r,maxWidth:"440px",width:"100%",padding:"2.5rem",textAlign:"center",boxShadow:T.md}}>
           <div style={{fontSize:"2.5rem",marginBottom:"1rem",animation:"waitPulse 2s ease-in-out infinite"}}>🟡</div>
-          <div style={{fontWeight:700,color:"#fff",fontSize:"1.15rem",marginBottom:"0.5rem"}}>
+          <div style={{fontWeight:700,color:T.text,fontSize:"1.15rem",marginBottom:"0.5rem"}}>
             Waiting for your teacher to start the test…
           </div>
-          <div style={{color:"rgba(255,255,255,0.55)",fontSize:"0.85rem",lineHeight:1.5,marginBottom:"1.75rem"}}>
+          <div style={{color:T.textSecondary,fontSize:"0.85rem",lineHeight:1.5,marginBottom:"1.75rem"}}>
             Stay on this screen. Your teacher will release everyone at the same time.
           </div>
-          <div style={{fontSize:"0.72rem",color:"rgba(255,255,255,0.3)",borderTop:"1px solid rgba(255,255,255,0.1)",paddingTop:"1rem"}}>
+          <div style={{fontSize:"0.72rem",color:T.textMuted,borderTop:`1px solid ${T.border}`,paddingTop:"1rem"}}>
             {studentName}
           </div>
         </div>
@@ -2050,8 +2049,8 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
 
   if (phase === "instructions") {
     return (
-      <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100vh",background:"linear-gradient(155deg,#0d1b2a 0%,#0f2d4a 55%,#133a5e 100%)",fontFamily:T.font,padding:"1.5rem"}}>
-        <div style={{background:T.white,borderRadius:T.r,maxWidth:"480px",width:"100%",overflow:"hidden",boxShadow:"0 8px 40px rgba(0,0,0,.5)"}}>
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100vh",background:T.surface,fontFamily:T.font,padding:"1.5rem"}}>
+        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.r,maxWidth:"480px",width:"100%",overflow:"hidden",boxShadow:T.md}}>
           <div style={{background:T.midnight,color:T.white,padding:"1.25rem 1.5rem"}}>
             <div style={{fontSize:"0.75rem",opacity:0.7,marginBottom:"2px",letterSpacing:"0.05em",textTransform:"uppercase"}}>Get Ready</div>
             <div style={{fontWeight:700,fontSize:"1.15rem"}}>{testCode || "Test"}</div>
@@ -2059,29 +2058,29 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
           <div style={{padding:"1.5rem"}}>
             <div style={{display:"flex",gap:"2rem",marginBottom:"1.25rem",flexWrap:"wrap"}}>
               <div style={{textAlign:"center"}}>
-                <div style={{fontSize:"1.75rem",fontWeight:700,color:T.midnight}}>{TOTAL}</div>
-                <div style={{fontSize:"0.78rem",color:"#666"}}>Questions</div>
+                <div style={{fontSize:"1.75rem",fontWeight:700,color:T.text}}>{TOTAL}</div>
+                <div style={{fontSize:"0.78rem",color:T.textSecondary}}>Questions</div>
               </div>
               {!untimed && (
                 <div style={{textAlign:"center"}}>
-                  <div style={{fontSize:"1.75rem",fontWeight:700,color:T.midnight}}>{Math.round(timeLimitSecs/60)}</div>
-                  <div style={{fontSize:"0.78rem",color:"#666"}}>Minutes</div>
+                  <div style={{fontSize:"1.75rem",fontWeight:700,color:T.text}}>{Math.round(timeLimitSecs/60)}</div>
+                  <div style={{fontSize:"0.78rem",color:T.textSecondary}}>Minutes</div>
                 </div>
               )}
               {untimed && (
                 <div style={{textAlign:"center"}}>
                   <div style={{fontSize:"1.75rem",fontWeight:700,color:T.teal}}>∞</div>
-                  <div style={{fontSize:"0.78rem",color:"#666"}}>Untimed</div>
+                  <div style={{fontSize:"0.78rem",color:T.textSecondary}}>Untimed</div>
                 </div>
               )}
             </div>
 
             {typesInTest.length > 0 && (
               <div style={{marginBottom:"1.25rem"}}>
-                <div style={{fontSize:"0.78rem",fontWeight:600,color:"#888",marginBottom:"0.5rem",textTransform:"uppercase",letterSpacing:"0.05em"}}>Question Types</div>
+                <div style={{fontSize:"0.78rem",fontWeight:600,color:T.textMuted,marginBottom:"0.5rem",textTransform:"uppercase",letterSpacing:"0.05em"}}>Question Types</div>
                 <div style={{display:"flex",flexWrap:"wrap",gap:"0.4rem"}}>
                   {typesInTest.map(t => (
-                    <span key={t} style={{background:"#f0f4f8",border:"1px solid #dde3ea",borderRadius:"20px",padding:"0.25rem 0.7rem",fontSize:"0.82rem",color:"#444"}}>
+                    <span key={t} style={{background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:"20px",padding:"0.25rem 0.7rem",fontSize:"0.82rem",color:T.text}}>
                       {questionTypeLabels[t].icon} {questionTypeLabels[t].label}
                     </span>
                   ))}
@@ -2089,7 +2088,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
               </div>
             )}
 
-            <div style={{fontSize:"0.83rem",color:"#555",lineHeight:1.6,marginBottom:"1.5rem"}}>
+            <div style={{fontSize:"0.83rem",color:T.textSecondary,lineHeight:1.6,marginBottom:"1.5rem"}}>
               <div>• You can flag questions to review before submitting</div>
               <div>• You can navigate back to change answers</div>
               {!untimed && <div>• The timer starts when you click <strong>I'm Ready</strong></div>}
@@ -2103,12 +2102,12 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
                 }
                 setPhase("testing");
               }}
-              style={{width:"100%",background:T.midnight,color:T.white,border:"none",borderRadius:"6px",padding:"0.9rem",fontSize:"1rem",fontWeight:700,cursor:"pointer",letterSpacing:"0.03em"}}>
+              style={{width:"100%",background:T.teal,color:T.white,border:"none",borderRadius:"6px",padding:"0.9rem",fontSize:"1rem",fontWeight:700,cursor:"pointer",letterSpacing:"0.03em"}}>
               I'm Ready — Start Test →
             </button>
           </div>
         </div>
-        <div style={{marginTop:"1rem",fontSize:"0.8rem",color:"rgba(255,255,255,0.5)"}}>
+        <div style={{marginTop:"1rem",fontSize:"0.8rem",color:T.textMuted}}>
           {studentName}
         </div>
       </div>
@@ -2116,7 +2115,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
   }
 
   return (
-    <div ref={containerRef} style={{display:"flex",flexDirection:"column",height:"100vh",fontFamily:T.font,background:"linear-gradient(155deg,#0d1b2a 0%,#0f2d4a 55%,#133a5e 100%)",overflow:"hidden",userSelect:"none",WebkitUserSelect:"none"}}>
+    <div ref={containerRef} style={{display:"flex",flexDirection:"column",height:"100vh",fontFamily:T.font,background:T.surface,overflow:"hidden",userSelect:"none",WebkitUserSelect:"none"}}>
 
       {/* Teacher stopped the test */}
       {stopped && (
@@ -2225,10 +2224,6 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
             <div style={{fontSize:"0.75rem",opacity:.6,letterSpacing:"0.08em"}}>STUDENT</div>
             <div style={{fontSize:"0.78rem",fontWeight:600}}>{studentName}</div>
           </div>
-          <button onClick={toggleTheme} title={isDark?"Light mode":"Dark mode"}
-            style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.25)",borderRadius:"9999px",padding:"0.3rem 0.55rem",cursor:"pointer",fontSize:"0.9rem",lineHeight:1}}>
-            {isDark?"☀️":"🌙"}
-          </button>
         </div>
       }/>
 
@@ -2243,40 +2238,40 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
         </div>
       )}
 
-      <div style={{background:"#1b3455",color:"#c8dff0",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 0.85rem",height:"34px",flexShrink:0,fontSize:"0.72rem",borderBottom:"1px solid #2a4870"}}>
+      <div style={{background:T.white,color:T.text,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 0.85rem",height:"34px",flexShrink:0,fontSize:"0.72rem",borderBottom:`1px solid ${T.border}`}}>
         <div style={{display:"flex",gap:"0.6rem",alignItems:"center"}}>
-          <button onClick={()=>setNav(o=>!o)} style={{background:"none",border:"1px solid rgba(255,255,255,0.18)",borderRadius:"3px",color:"#c8dff0",cursor:"pointer",fontSize:"0.65rem",padding:"2px 7px",letterSpacing:"0.05em"}}>{nav?"◀ Collapse":"▶ Nav"}</button>
-          <span style={{opacity:.3}}>|</span>
-          <span style={{opacity:.75}}>Question {cur+1} <span style={{opacity:.5}}>of</span> {TOTAL}</span>
+          <button onClick={()=>setNav(o=>!o)} style={{background:"none",border:`1px solid ${T.borderDark}`,borderRadius:"3px",color:T.textSecondary,cursor:"pointer",fontSize:"0.65rem",padding:"2px 7px",letterSpacing:"0.05em"}}>{nav?"◀ Collapse":"▶ Nav"}</button>
+          <span style={{color:T.border}}>|</span>
+          <span style={{color:T.text,fontWeight:600}}>Question {cur+1} <span style={{color:T.textMuted}}>of</span> {TOTAL}</span>
         </div>
-        <span style={{opacity:.55,letterSpacing:"0.06em",fontSize:"0.65rem"}}>NO CALCULATOR</span>
+        <span style={{color:T.textMuted,letterSpacing:"0.06em",fontSize:"0.65rem"}}>NO CALCULATOR</span>
       </div>
 
       <div style={{display:"flex",flex:1,overflow:"hidden"}}>
         {nav&&(
-          <div style={{width:"156px",background:"rgba(0,0,0,0.3)",borderRight:"1px solid rgba(255,255,255,0.1)",display:"flex",flexDirection:"column",flexShrink:0,overflowY:"auto"}}>
-            <div style={{padding:"0.65rem 0.9rem",background:"rgba(0,0,0,0.2)",borderBottom:"1px solid rgba(255,255,255,0.08)",fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.14em",color:"rgba(255,255,255,0.45)"}}>QUESTIONS</div>
+          <div style={{width:"130px",background:T.white,borderRight:`1px solid ${T.border}`,display:"flex",flexDirection:"column",flexShrink:0,overflowY:"auto"}}>
+            <div style={{padding:"0.65rem 0.9rem",background:T.surface,borderBottom:`1px solid ${T.border}`,fontSize:"0.65rem",fontWeight:700,letterSpacing:"0.14em",color:T.textMuted}}>QUESTIONS</div>
             <div style={{padding:"0.5rem",display:"flex",flexWrap:"wrap",gap:"4px"}}>
               {questions.map((item,i)=>{
                 const isAns=!!ans[item.id]; const isCur=i===cur; const isFg=!!flg[item.id];
-                let bg="rgba(255,255,255,0.05)", border="rgba(255,255,255,0.15)", color="rgba(255,255,255,0.5)";
-                if (isCur)       { bg="#1e4d8c"; border="#5b9bd5"; color="#fff"; }
-                else if (isFg)   { bg="rgba(251,191,36,0.15)"; border="#fbbf24"; color="#fbbf24"; }
-                else if (isAns)  { bg="rgba(52,211,153,0.15)"; border="#34d399"; color="#34d399"; }
+                let bg=T.surface, border=T.border, color=T.textSecondary;
+                if (isCur)       { bg="#e0f2fe"; border=T.teal; color=T.teal; }
+                else if (isFg)   { bg=T.warningBg; border=T.warningBd; color=T.warning; }
+                else if (isAns)  { bg=T.successBg; border=T.successBd; color=T.success; }
                 return <button key={item.id} onClick={()=>setCur(i)}
-                  style={{width:"44px",height:"44px",borderRadius:T.xs,border:`2px solid ${border}`,background:bg,color,fontSize:"0.75rem",fontWeight:700,cursor:"pointer",position:"relative",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  style={{width:"40px",height:"40px",borderRadius:T.xs,border:`2px solid ${border}`,background:bg,color,fontSize:"0.75rem",fontWeight:700,cursor:"pointer",position:"relative",display:"flex",alignItems:"center",justifyContent:"center"}}>
                   {isFg && !isCur ? <span style={{position:"absolute",top:"-4px",right:"-4px",fontSize:"0.55rem",lineHeight:1}}>⚑</span> : null}
                   {i+1}
                 </button>;
               })}
             </div>
-            <div style={{padding:"0.65rem 0.9rem",borderTop:"1px solid rgba(255,255,255,0.08)",marginTop:"auto"}}>
+            <div style={{padding:"0.65rem 0.9rem",borderTop:`1px solid ${T.border}`,marginTop:"auto"}}>
               {[
-                ["rgba(52,211,153,0.15)","#34d399","Answered"],
-                ["rgba(251,191,36,0.15)","#fbbf24","Flagged"],
-                ["rgba(255,255,255,0.05)","rgba(255,255,255,0.15)","Not Answered"],
+                [T.successBg,T.successBd,"Answered"],
+                [T.warningBg,T.warningBd,"Flagged"],
+                [T.surface,T.border,"Not Answered"],
               ].map(([bg,bd,lbl])=>(
-                <div key={lbl} style={{display:"flex",alignItems:"center",gap:"6px",marginBottom:"4px",fontSize:"0.72rem",color:"rgba(255,255,255,0.45)"}}>
+                <div key={lbl} style={{display:"flex",alignItems:"center",gap:"6px",marginBottom:"4px",fontSize:"0.68rem",color:T.textSecondary}}>
                   <div style={{width:"13px",height:"13px",background:bg,border:`2px solid ${bd}`,borderRadius:"2px",flexShrink:0}}/>{lbl}
                 </div>
               ))}
@@ -2284,19 +2279,19 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
           </div>
         )}
 
-        <div style={{flex:1,overflowY:"auto",padding:window.innerWidth>640?"1.25rem 1.75rem":"0.75rem",display:"flex",flexDirection:"column",gap:"0.75rem"}}>
+        <div style={{flex:1,overflowY:"auto",padding:window.innerWidth>640?"1rem 1.25rem":"0.6rem",display:"flex",flexDirection:"column",gap:"0.6rem"}}>
           <div style={{display:"flex",alignItems:"center",gap:"0.6rem"}}>
-            <span style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:"#93c5fd",background:"rgba(147,197,253,0.12)",padding:"2px 7px",borderRadius:"2px",border:"1px solid rgba(147,197,253,0.25)"}}>{q.standard}</span>
-            {isFl&&<span style={{fontSize:"0.6rem",fontWeight:700,color:"#fbbf24",background:"rgba(251,191,36,0.12)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:"2px",padding:"2px 7px"}}>⚑ Flagged for Review</span>}
+            <span style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.1em",color:T.teal,background:T.tealLight,padding:"2px 7px",borderRadius:"2px",border:`1px solid ${T.tealMuted}`}}>{q.standard}</span>
+            {isFl&&<span style={{fontSize:"0.6rem",fontWeight:700,color:T.warning,background:T.warningBg,border:`1px solid ${T.warningBd}`,borderRadius:"2px",padding:"2px 7px"}}>⚑ Flagged for Review</span>}
           </div>
-          <div style={{background:"rgba(255,255,255,0.06)",borderTop:"3px solid #5b9bd5",border:"1px solid rgba(255,255,255,0.12)",borderRadius:T.xs,padding:"1.1rem 1.4rem"}}>
-            <p style={{fontSize:"0.95rem",fontFamily:"Georgia,serif",color:"#e8f0f8",lineHeight:1.7,margin:0}}><MathText text={q.question}/></p>
-            {q.questionImage&&q.type!=="hotspot"&&<img src={q.questionImage} alt="diagram" style={{maxWidth:"100%",maxHeight:"200px",marginTop:"0.75rem",borderRadius:T.xs,display:"block"}}/>}
+          <div style={{background:T.white,borderTop:`3px solid ${T.teal}`,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"1.1rem 1.4rem",boxShadow:T.sm}}>
+            <p style={{fontSize:"1.25rem",fontFamily:T.font,color:T.text,lineHeight:1.7,margin:0}}><MathText text={q.question}/></p>
+            {q.questionImage&&q.type!=="hotspot"&&<img onClick={()=>setEnlargedImg(q.questionImage)} src={q.questionImage} alt="diagram" style={{maxWidth:"100%",maxHeight:"min(320px,30vh)",marginTop:"0.75rem",borderRadius:T.xs,display:"block",cursor:"zoom-in"}}/>}
           </div>
-          <div style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.10)",borderRadius:T.xs,padding:"1.1rem 1.5rem"}}>
+          <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"1.1rem 1.5rem",boxShadow:T.sm}}>
             {q.type === "plotpoint" ? (
               <>
-                <div style={{fontSize:"0.78rem",color:"rgba(255,255,255,0.45)",marginBottom:"0.65rem",fontStyle:"italic"}}>Plot your answer on the grid below.</div>
+                <div style={{fontSize:"0.78rem",color:T.textSecondary,marginBottom:"0.65rem",fontStyle:"italic"}}>Plot your answer on the grid below.</div>
                 <div style={{display:"flex",justifyContent:"center"}}>
                   <PlotGrid
                     placed={sel ? (() => { try { return JSON.parse(sel); } catch { return null; } })() : null}
@@ -2311,14 +2306,14 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
               </>
             ) : q.type === "keypad" ? (
               <>
-                <div style={{fontSize:"0.78rem",color:"rgba(255,255,255,0.45)",marginBottom:"0.65rem",fontStyle:"italic"}}>Enter your answer in the box below.</div>
+                <div style={{fontSize:"0.78rem",color:T.textSecondary,marginBottom:"0.65rem",fontStyle:"italic"}}>Enter your answer in the box below.</div>
                 <div style={{display:"flex",flexDirection:"column",gap:"0.65rem",alignItems:"flex-start"}}>
                   <input
                     type="text" inputMode="decimal"
                     value={sel ?? ""}
                     onChange={e => { setAns(p=>({...p,[q.id]:e.target.value})); handleAdaptiveAnswer(q.id, e.target.value); }}
                     placeholder="Enter your answer…"
-                    style={{width:"100%",maxWidth:"260px",padding:"0.8rem 1rem",fontSize:"1.3rem",fontFamily:"monospace",fontWeight:700,border:"2px solid #5b9bd5",borderRadius:"4px",outline:"none",background:"rgba(255,255,255,0.07)",color:"#e8f0f8",letterSpacing:"0.05em"}}
+                    style={{width:"100%",maxWidth:"260px",padding:"0.8rem 1rem",fontSize:"1.3rem",fontFamily:"monospace",fontWeight:700,border:`2px solid ${T.teal}`,borderRadius:"4px",outline:"none",background:T.white,color:T.text,letterSpacing:"0.05em"}}
                   />
                   {sel && <div style={{fontSize:"0.72rem",color:T.textSecondary}}>Your answer: <strong>{sel}</strong></div>}
                 </div>
@@ -2348,7 +2343,7 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
               />
             ) : q.type === "multiselect" ? (
               <>
-                <div style={{fontSize:"0.78rem",color:"rgba(255,255,255,0.45)",marginBottom:"0.75rem",fontStyle:"italic"}}>Select all that apply.</div>
+                <div style={{fontSize:"0.78rem",color:T.textSecondary,marginBottom:"0.75rem",fontStyle:"italic"}}>Select all that apply.</div>
                 <div style={{display:"flex",flexDirection:"column",gap:"0.55rem"}}>
                   {(q.choices||[]).map((choice,i)=>{
                     if (!choice && !q.choiceImages?.[i]) return null;
@@ -2360,16 +2355,21 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
                       setAns(p=>({...p,[q.id]: next.length ? v : null}));
                       handleAdaptiveAnswer(q.id, next.length ? v : null);
                     }
-                    return <label key={i} onClick={toggleChoice}
-                      style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.75rem 1rem",border:`2px solid ${chosen?"#5b9bd5":"rgba(255,255,255,0.15)"}`,borderRadius:T.xs,background:chosen?"rgba(91,155,213,0.2)":"rgba(255,255,255,0.04)",cursor:"pointer",transition:"border-color .12s,background .12s"}}>
-                      <div style={{width:"22px",height:"22px",borderRadius:T.xs,border:`2px solid ${chosen?"#5b9bd5":"rgba(255,255,255,0.3)"}`,background:chosen?"#5b9bd5":"rgba(255,255,255,0.07)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    return <div key={i} onClick={toggleChoice}
+                      style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.75rem 1rem",border:`2px solid ${chosen?T.teal:T.border}`,borderRadius:T.xs,background:chosen?T.tealLight:T.white,cursor:"pointer",transition:"border-color .12s,background .12s"}}>
+                      <div style={{width:"22px",height:"22px",borderRadius:T.xs,border:`2px solid ${chosen?T.teal:T.borderDark}`,background:chosen?T.teal:T.surface,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                         {chosen && <span style={{color:"#fff",fontSize:"0.8rem",fontWeight:900}}>✓</span>}
                       </div>
-                      <span style={{fontSize:"0.95rem",fontFamily:"Georgia,serif",color:"#e8f0f8",display:"flex",flexDirection:"column",gap:"0.3rem"}}>
+                      <span style={{fontSize:"1.1rem",fontFamily:T.font,color:T.text,display:"flex",flexDirection:"column",gap:"0.3rem"}}>
                         {choice && <MathText text={choice}/>}
-                        {q.choiceImages?.[i] && <img src={q.choiceImages[i]} alt="" style={{maxHeight:"80px",maxWidth:"220px",borderRadius:2}}/>}
+                        {q.choiceImages?.[i] && (
+                          <span onClick={e=>{e.stopPropagation();setEnlargedImg(q.choiceImages[i]);}} style={{display:"inline-block",cursor:"zoom-in"}}>
+                            <img src={q.choiceImages[i]} alt="" style={{maxHeight:"min(180px,18vh)",maxWidth:"min(320px,38vw)",borderRadius:2,display:"block"}}/>
+                            <span style={{fontSize:"0.6rem",color:T.textMuted,display:"block",marginTop:"2px"}}>🔍 tap to enlarge</span>
+                          </span>
+                        )}
                       </span>
-                    </label>;
+                    </div>;
                   })}
                 </div>
               </>
@@ -2377,22 +2377,27 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
               <>
                 <div style={{display:"flex",flexDirection:"column",gap:"0.55rem"}}>
                   {!(q.choices||[]).some((c,i) => c || q.choiceImages?.[i]) ? (
-                    <div style={{color:"rgba(255,255,255,0.45)",fontSize:"0.85rem",padding:"1rem",textAlign:"center",border:"1px dashed rgba(255,255,255,0.2)",borderRadius:"4px"}}>
+                    <div style={{color:T.textSecondary,fontSize:"0.85rem",padding:"1rem",textAlign:"center",border:`1px dashed ${T.border}`,borderRadius:"4px"}}>
                       ⚠ This question has no answer choices. Contact your teacher.
                     </div>
                   ) : (q.choices||[]).map((choice,i)=>{
                     if (!choice && !q.choiceImages?.[i]) return null;
                     const chosen = sel===choice;
-                    return <label key={i} onClick={()=>{ setAns(p=>({...p,[q.id]:choice})); handleAdaptiveAnswer(q.id, choice); }}
-                      style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.75rem 1rem",border:`2px solid ${chosen?"#5b9bd5":"rgba(255,255,255,0.15)"}`,borderRadius:T.xs,background:chosen?"rgba(91,155,213,0.2)":"rgba(255,255,255,0.04)",cursor:"pointer",transition:"border-color .12s,background .12s"}}>
-                      <div style={{width:"26px",height:"26px",borderRadius:"50%",border:`2px solid ${chosen?"#5b9bd5":"rgba(255,255,255,0.3)"}`,background:chosen?"#5b9bd5":"rgba(255,255,255,0.07)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                        <span style={{fontSize:"0.7rem",fontWeight:700,color:"#fff"}}>{LETTERS[i]}</span>
+                    return <div key={i} onClick={()=>{ setAns(p=>({...p,[q.id]:choice})); handleAdaptiveAnswer(q.id, choice); }}
+                      style={{display:"flex",alignItems:"center",gap:"0.9rem",padding:"0.75rem 1rem",border:`2px solid ${chosen?T.teal:T.border}`,borderRadius:T.xs,background:chosen?T.tealLight:T.white,cursor:"pointer",transition:"border-color .12s,background .12s"}}>
+                      <div style={{width:"26px",height:"26px",borderRadius:"50%",border:`2px solid ${chosen?T.teal:T.borderDark}`,background:chosen?T.teal:T.surface,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <span style={{fontSize:"0.7rem",fontWeight:700,color:chosen?"#fff":T.textSecondary}}>{LETTERS[i]}</span>
                       </div>
-                      <span style={{fontSize:"0.95rem",fontFamily:"Georgia,serif",color:"#e8f0f8",display:"flex",flexDirection:"column",gap:"0.3rem"}}>
+                      <span style={{fontSize:"1.1rem",fontFamily:T.font,color:T.text,display:"flex",flexDirection:"column",gap:"0.3rem"}}>
                         {choice && <MathText text={choice}/>}
-                        {q.choiceImages?.[i] && <img src={q.choiceImages[i]} alt="" style={{maxHeight:"80px",maxWidth:"220px",borderRadius:2}}/>}
+                        {q.choiceImages?.[i] && (
+                          <span onClick={e=>{e.stopPropagation();setEnlargedImg(q.choiceImages[i]);}} style={{display:"inline-block",cursor:"zoom-in"}}>
+                            <img src={q.choiceImages[i]} alt="" style={{maxHeight:"min(180px,18vh)",maxWidth:"min(320px,38vw)",borderRadius:2,display:"block"}}/>
+                            <span style={{fontSize:"0.6rem",color:T.textMuted,display:"block",marginTop:"2px"}}>🔍 tap to enlarge</span>
+                          </span>
+                        )}
                       </span>
-                    </label>;
+                    </div>;
                   })}
                 </div>
               </>
@@ -2400,6 +2405,17 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
           </div>
         </div>
       </div>
+
+      {/* ── Image zoom modal ── */}
+      {enlargedImg && (
+        <div onClick={()=>setEnlargedImg(null)}
+          style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center",cursor:"zoom-out"}}>
+          <img src={enlargedImg} alt="enlarged" style={{maxWidth:"94vw",maxHeight:"90vh",borderRadius:"6px",boxShadow:"0 8px 40px rgba(0,0,0,0.7)"}}/>
+          <button onClick={e=>{e.stopPropagation();setEnlargedImg(null);}}
+            style={{position:"absolute",top:"1rem",right:"1.25rem",background:"rgba(255,255,255,0.18)",border:"none",color:"#fff",fontSize:"1.5rem",lineHeight:1,cursor:"pointer",borderRadius:"50%",width:"40px",height:"40px"}}>✕</button>
+          <div style={{position:"absolute",bottom:"1.5rem",color:"rgba(255,255,255,0.5)",fontSize:"0.8rem"}}>tap anywhere to close</div>
+        </div>
+      )}
 
       {/* ── Navigation toolbar — styled like a standardized test platform ── */}
       <div style={{background:"#1b3455",borderTop:"1px solid #2a4870",display:"flex",alignItems:"center",padding:"0 0.75rem",height:"46px",flexShrink:0,gap:"4px"}}>
@@ -3052,7 +3068,7 @@ function DrillSession({ student, cls, testCode, onDone, priorHistory = [], drill
                   <div>
                     <div style={sectionLabel}>3-MIN FACT FLUENCY</div>
                     <div style={{color:T.white,fontWeight:900,fontSize:"3.8rem",
-                      lineHeight:1,fontFamily:"Georgia,serif",letterSpacing:"-2px"}}>
+                      lineHeight:1,fontFamily:T.font,letterSpacing:"-2px"}}>
                       {accuracy}<span style={{fontSize:"2rem",letterSpacing:0}}>%</span>
                     </div>
                     <div style={{color:"rgba(255,255,255,0.45)",fontSize:"0.68rem",marginTop:"2px"}}>Accuracy</div>
@@ -3386,7 +3402,7 @@ function StudentResults({ session, questions, subject, onReset }) {
             <div>
               <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.1em",color:T.textSecondary,marginBottom:"4px"}}>STUDENT</div>
               <div style={{fontSize:"1rem",fontWeight:700,color:T.text}}>{session.name}</div>
-              <div style={{fontSize:"1.8rem",fontWeight:700,color:lvlC(p),fontFamily:"Georgia,serif",marginTop:"4px"}}>{session.score}/{session.total} <span style={{fontSize:"1rem",opacity:.6}}>({p}%)</span></div>
+              <div style={{fontSize:"1.8rem",fontWeight:700,color:lvlC(p),fontFamily:T.font,marginTop:"4px"}}>{session.score}/{session.total} <span style={{fontSize:"1rem",opacity:.6}}>({p}%)</span></div>
             </div>
             <div style={{textAlign:"right"}}>
               <div style={{fontSize:"0.62rem",color:T.textSecondary,marginBottom:"4px"}}>PERFORMANCE LEVEL</div>
@@ -3439,7 +3455,7 @@ function StudentResults({ session, questions, subject, onReset }) {
                 </div>
                 <div style={{flex:1,fontSize:"0.82rem"}}>
                   <div style={{color:T.textSecondary,fontSize:"0.63rem",letterSpacing:"0.08em",marginBottom:"2px"}}>{q.standard}</div>
-                  <div style={{color:T.text,fontFamily:"Georgia,serif",marginBottom:ok?0:"4px"}}><MathText text={q.question}/></div>
+                  <div style={{color:T.text,fontFamily:T.font,marginBottom:ok?0:"4px"}}><MathText text={q.question}/></div>
                   {!ok&&<div style={{fontSize:"0.78rem"}}>
                     <span style={{color:T.success}}>Correct: <strong>{correctDisplay}</strong></span>
                     {studentDisplay&&<span style={{color:T.dangerText}}> · Your answer: {studentDisplay}</span>}
@@ -3510,7 +3526,7 @@ function GoogleSignIn({ mode, codeOrClassId, onSuccess, onBack }) {
         <div style={{fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.18em",color:T.textSecondary,marginBottom:"6px"}}>
           GEORGIA MILESTONES READINESS TRAINER
         </div>
-        <div style={{fontSize:"1.6rem",fontWeight:700,color:mode==="practice"?T.success:T.midnight,fontFamily:"Georgia,serif"}}>
+        <div style={{fontSize:"1.6rem",fontWeight:700,color:mode==="practice"?T.success:T.midnight,fontFamily:T.font}}>
           {mode === "practice" ? "🎯 Practice Mode" : "📝 Take a Test"}
         </div>
         <div style={{fontSize:"0.85rem",color:T.textSecondary,marginTop:"4px"}}>
