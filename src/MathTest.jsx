@@ -1582,7 +1582,9 @@ function normalizeQuestion(q) {
 }
 
 function StudentTest({ studentName, studentId, testCode, questions: initialQuestions, adaptive, onFinish, untimed=false, timeLimitSecs=1800, warnSecs=300, onReturnToTeacher=null, initialDraft=null, gated=false, testSubject="math", cls=null }) {
-  // Test view is always light — no dark-mode toggle
+  const [isDark, setIsDark] = useState(() => localStorage.getItem("mr_theme") === "dark");
+  const T = isDark ? DARK_THEME : LIGHT_THEME;
+  const toggleTheme = () => setIsDark(d => { localStorage.setItem("mr_theme", !d ? "dark" : "light"); return !d; });
 
   // ── Session persistence key ──
   const sessionKey = testCode && studentId ? `mathready_test_${testCode}_${studentId}` : null;
@@ -2224,6 +2226,10 @@ function StudentTest({ studentName, studentId, testCode, questions: initialQuest
             <div style={{fontSize:"0.75rem",opacity:.6,letterSpacing:"0.08em"}}>STUDENT</div>
             <div style={{fontSize:"0.78rem",fontWeight:600}}>{studentName}</div>
           </div>
+          <button onClick={toggleTheme} title={isDark?"Light mode":"Dark mode"}
+            style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.25)",borderRadius:"9999px",padding:"0.3rem 0.55rem",cursor:"pointer",fontSize:"0.9rem",lineHeight:1}}>
+            {isDark?"☀️":"🌙"}
+          </button>
         </div>
       }/>
 
