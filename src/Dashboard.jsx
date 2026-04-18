@@ -1809,21 +1809,27 @@ export default function Dashboard({ teacher, readOnly }) {
     }
 
     if (tab === "gradebook") {
-      // ── Build test columns: unique codes from test sessions, sorted by first submission ──
       const gbSessions = testSessions.filter(s => s.mode !== "drill" && s.mode !== "practice");
-      // Class filter
       const gbClasses = roster.length > 0 ? roster : [];
       const gbFiltered = gbClass === "all" ? gbSessions : gbSessions.filter(s => s.classId === gbClass || s.className === gbClass);
 
-      // Unique test codes ordered by earliest submission
-      const codeOrder = [];
-      const codeSeen = new Set();
+      // Resolve name for a code
+      const codeToName = c => testCodeNames[c] || c;
+
+      // Group codes by resolved test name, ordered by first submission
+      const nameOrder = [];       // ordered unique test names
+      const nameToCodesMap = {};  // testName → Set of codes
+      const nameSeen = new Set();
       [...gbFiltered].sort((a,b) => new Date(a.submittedAt||0) - new Date(b.submittedAt||0)).forEach(s => {
-        const c = s.testCode || s.code || "";
-        if (c && !codeSeen.has(c)) { codeSeen.add(c); codeOrder.push(c); }
+        const code = s.testCode || s.code || "";
+        if (!code) return;
+        const name = codeToName(code);
+        if (!nameToCodesMap[name]) nameToCodesMap[name] = new Set();
+        nameToCodesMap[name].add(code);
+        if (!nameSeen.has(name)) { nameSeen.add(name); nameOrder.push(name); }
       });
 
-      // Student rows: prefer roster, fall back to unique students in sessions
+      // Student rows: prefer roster, fall back to sessions
       let gbStudents = [];
       if (gbClass !== "all") {
         const cls = gbClasses.find(c => c.id === gbClass || c.name === gbClass);
@@ -1837,7 +1843,7 @@ export default function Dashboard({ teacher, readOnly }) {
       }
       gbStudents.sort((a,b) => a.name.localeCompare(b.name));
 
-      // score lookup: studentId → testCode → pct (most recent)
+      // score lookup: studentId → testCode → pct (most recent attempt per code)
       const scoreMap = {};
       [...gbFiltered].sort((a,b) => new Date(a.submittedAt||0) - new Date(b.submittedAt||0)).forEach(s => {
         const sid = s.studentId || s.studentName || "";
@@ -1846,24 +1852,36 @@ export default function Dashboard({ teacher, readOnly }) {
         scoreMap[sid][code] = s.pct ?? Math.round((s.score||0)/(s.total||1)*100);
       });
 
-      // Per-column class average
+      // For a student × test name: collect all pct values across all codes for that name
+      const getScores = (sid, name) => {
+        const codes = [...(nameToCodesMap[name] || [])];
+        return codes.map(c => scoreMap[sid]?.[c]).filter(v => v !== undefined);
+      };
+
+      // Per-column class average (average of each student's average for that name)
       const colAvg = {};
-      codeOrder.forEach(code => {
-        const vals = gbStudents.map(st => scoreMap[st.id]?.[code]).filter(v => v !== undefined);
-        colAvg[code] = vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : null;
+      nameOrder.forEach(name => {
+        const vals = gbStudents.map(st => {
+          const scores = getScores(st.id, name);
+          return scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : undefined;
+        }).filter(v => v !== undefined);
+        colAvg[name] = vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : null;
       });
 
-      // Color helper
+      // Color helper (uses highest score for coloring when multiple)
       const cellBg   = p => p >= 80 ? T.successBg  : p >= 60 ? T.warningBg  : T.dangerBg;
       const cellBd   = p => p >= 80 ? T.successBd  : p >= 60 ? T.warningBd  : T.dangerBd;
       const cellText = p => p >= 80 ? T.success     : p >= 60 ? T.warning    : T.danger;
 
       // CSV export
       function exportCSV() {
-        const header = ["Student", ...codeOrder.map(c => testCodeNames[c] || c)];
+        const header = ["Student", ...nameOrder];
         const rows = gbStudents.map(st => [
           st.name,
-          ...codeOrder.map(c => scoreMap[st.id]?.[c] !== undefined ? scoreMap[st.id][c] + "%" : ""),
+          ...nameOrder.map(name => {
+            const scores = getScores(st.id, name);
+            return scores.length ? scores.map(p => p + "%").join(" / ") : "";
+          }),
         ]);
         const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
         const a = document.createElement("a");
@@ -1872,7 +1890,7 @@ export default function Dashboard({ teacher, readOnly }) {
         a.click();
       }
 
-      if (codeOrder.length === 0) return (
+      if (nameOrder.length === 0) return (
         <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"3rem",textAlign:"center",color:T.textMuted,maxWidth:"600px"}}>
           <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>📒</div>
           <div style={{fontSize:"1rem",fontWeight:600,color:T.textSecondary,marginBottom:"4px"}}>No test data yet</div>
@@ -1880,8 +1898,7 @@ export default function Dashboard({ teacher, readOnly }) {
         </div>
       );
 
-      const COL_W = 80;
-      const NAME_W = 160;
+      const NAME_W = 200;
 
       return (
         <div style={{display:"flex",flexDirection:"column",gap:"1rem",maxWidth:"100%"}}>
@@ -1899,7 +1916,7 @@ export default function Dashboard({ teacher, readOnly }) {
               ⬇ Export CSV
             </button>
             <span style={{fontSize:"0.78rem",color:T.textMuted,marginLeft:"auto"}}>
-              {gbStudents.length} students · {codeOrder.length} tests
+              {gbStudents.length} students · {nameOrder.length} tests
             </span>
           </div>
 
@@ -1907,17 +1924,20 @@ export default function Dashboard({ teacher, readOnly }) {
           <div style={{overflowX:"auto",background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,boxShadow:T.sm}}>
             <table style={{borderCollapse:"collapse",width:"max-content",minWidth:"100%",fontFamily:T.font,fontSize:"0.82rem"}}>
               <thead>
-                {/* Test names row */}
                 <tr>
                   <th style={{position:"sticky",left:0,zIndex:2,background:T.midnight,color:T.white,padding:"0.6rem 0.85rem",textAlign:"left",fontWeight:700,minWidth:NAME_W,borderRight:`2px solid ${T.borderDark}`}}>
                     Student
                   </th>
-                  {codeOrder.map(code => (
-                    <th key={code} style={{background:T.midnight,color:T.white,padding:"0.5rem 0.4rem",textAlign:"center",minWidth:COL_W,maxWidth:COL_W,fontWeight:600,borderRight:`1px solid rgba(255,255,255,0.1)`}}>
-                      <div style={{fontSize:"0.65rem",opacity:0.6,marginBottom:"2px",letterSpacing:"0.05em"}}>{code}</div>
-                      <div style={{fontSize:"0.75rem",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:COL_W-8}}>
-                        {testCodeNames[code] || code}
+                  {nameOrder.map(name => (
+                    <th key={name} style={{background:T.midnight,color:T.white,padding:"0.6rem 0.75rem",textAlign:"center",minWidth:140,fontWeight:600,borderRight:`1px solid rgba(255,255,255,0.1)`,verticalAlign:"bottom"}}>
+                      <div style={{fontSize:"0.82rem",whiteSpace:"normal",wordBreak:"break-word",lineHeight:1.3}}>
+                        {name}
                       </div>
+                      {nameToCodesMap[name]?.size > 1 && (
+                        <div style={{fontSize:"0.6rem",opacity:0.5,marginTop:"3px"}}>
+                          {nameToCodesMap[name].size} versions
+                        </div>
+                      )}
                     </th>
                   ))}
                 </tr>
@@ -1926,10 +1946,10 @@ export default function Dashboard({ teacher, readOnly }) {
                   <td style={{position:"sticky",left:0,zIndex:2,background:T.surfaceAlt,padding:"0.45rem 0.85rem",fontWeight:700,fontSize:"0.72rem",letterSpacing:"0.07em",color:T.textSecondary,borderRight:`2px solid ${T.borderDark}`,borderBottom:`2px solid ${T.borderDark}`}}>
                     CLASS AVG
                   </td>
-                  {codeOrder.map(code => {
-                    const avg = colAvg[code];
+                  {nameOrder.map(name => {
+                    const avg = colAvg[name];
                     return (
-                      <td key={code} style={{padding:"0.45rem 0.4rem",textAlign:"center",borderRight:`1px solid ${T.border}`,borderBottom:`2px solid ${T.borderDark}`,fontWeight:700,color:avg !== null ? cellText(avg) : T.textMuted}}>
+                      <td key={name} style={{padding:"0.45rem 0.75rem",textAlign:"center",borderRight:`1px solid ${T.border}`,borderBottom:`2px solid ${T.borderDark}`,fontWeight:700,color:avg !== null ? cellText(avg) : T.textMuted}}>
                         {avg !== null ? avg + "%" : "—"}
                       </td>
                     );
@@ -1942,13 +1962,14 @@ export default function Dashboard({ teacher, readOnly }) {
                     <td style={{position:"sticky",left:0,zIndex:1,background: i%2===0 ? T.white : T.surface,padding:"0.45rem 0.85rem",fontWeight:600,color:T.text,borderRight:`2px solid ${T.borderDark}`,whiteSpace:"nowrap"}}>
                       {st.name}
                     </td>
-                    {codeOrder.map(code => {
-                      const pct = scoreMap[st.id]?.[code];
+                    {nameOrder.map(name => {
+                      const scores = getScores(st.id, name);
+                      const best = scores.length ? Math.max(...scores) : undefined;
                       return (
-                        <td key={code} style={{padding:"0.3rem 0.4rem",textAlign:"center",borderRight:`1px solid ${T.border}`}}>
-                          {pct !== undefined ? (
-                            <span style={{display:"inline-block",padding:"2px 8px",borderRadius:"3px",background:cellBg(pct),border:`1px solid ${cellBd(pct)}`,color:cellText(pct),fontWeight:700,fontSize:"0.8rem"}}>
-                              {pct}%
+                        <td key={name} style={{padding:"0.3rem 0.75rem",textAlign:"center",borderRight:`1px solid ${T.border}`}}>
+                          {scores.length > 0 ? (
+                            <span style={{display:"inline-block",padding:"2px 8px",borderRadius:"3px",background:cellBg(best),border:`1px solid ${cellBd(best)}`,color:cellText(best),fontWeight:700,fontSize:"0.8rem",whiteSpace:"nowrap"}}>
+                              {scores.map(p => p + "%").join(" / ")}
                             </span>
                           ) : (
                             <span style={{color:T.textMuted,fontSize:"0.75rem"}}>—</span>
