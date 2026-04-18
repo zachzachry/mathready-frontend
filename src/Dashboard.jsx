@@ -14,6 +14,7 @@ const ALL_TABS = [
   ["growth",    "📈 Growth",         false, false],
   ["drills",    "🎯 Drills",         false, false],
   ["profile",   "📋 Class Profile",  false, false],
+  ["gradebook", "📒 Gradebook",      false, false],
   ["controls",  "🎛 Test Controls",  true,  false],  // writeOnly
   ["admin",     "🏫 School Overview", false, true],   // adminOnly
 ];
@@ -392,6 +393,8 @@ export default function Dashboard({ teacher, readOnly }) {
   const [regradeResult,  setRegradeResult]  = useState(null);
   const [regradeModalQ,     setRegradeModalQ]     = useState(null);
   const [regradeModalError, setRegradeModalError] = useState("");
+
+  const [gbClass, setGbClass] = useState("all"); // gradebook class filter
 
   // Growth filters
   const [growthClass,      setGrowthClass]      = useState("all");
@@ -1801,6 +1804,163 @@ export default function Dashboard({ teacher, readOnly }) {
               ))}
             </div>
           )}
+        </div>
+      );
+    }
+
+    if (tab === "gradebook") {
+      // ── Build test columns: unique codes from test sessions, sorted by first submission ──
+      const gbSessions = testSessions.filter(s => s.mode !== "drill" && s.mode !== "practice");
+      // Class filter
+      const gbClasses = roster.length > 0 ? roster : [];
+      const gbFiltered = gbClass === "all" ? gbSessions : gbSessions.filter(s => s.classId === gbClass || s.className === gbClass);
+
+      // Unique test codes ordered by earliest submission
+      const codeOrder = [];
+      const codeSeen = new Set();
+      [...gbFiltered].sort((a,b) => new Date(a.submittedAt||0) - new Date(b.submittedAt||0)).forEach(s => {
+        const c = s.testCode || s.code || "";
+        if (c && !codeSeen.has(c)) { codeSeen.add(c); codeOrder.push(c); }
+      });
+
+      // Student rows: prefer roster, fall back to unique students in sessions
+      let gbStudents = [];
+      if (gbClass !== "all") {
+        const cls = gbClasses.find(c => c.id === gbClass || c.name === gbClass);
+        gbStudents = cls ? (cls.students || []).map(s => ({ id: s.id, name: s.name })) : [];
+      } else {
+        const seen = new Set();
+        gbFiltered.forEach(s => {
+          const id = s.studentId || s.studentName || "";
+          if (!seen.has(id)) { seen.add(id); gbStudents.push({ id, name: s.studentName || id }); }
+        });
+      }
+      gbStudents.sort((a,b) => a.name.localeCompare(b.name));
+
+      // score lookup: studentId → testCode → pct (most recent)
+      const scoreMap = {};
+      [...gbFiltered].sort((a,b) => new Date(a.submittedAt||0) - new Date(b.submittedAt||0)).forEach(s => {
+        const sid = s.studentId || s.studentName || "";
+        const code = s.testCode || s.code || "";
+        if (!scoreMap[sid]) scoreMap[sid] = {};
+        scoreMap[sid][code] = s.pct ?? Math.round((s.score||0)/(s.total||1)*100);
+      });
+
+      // Per-column class average
+      const colAvg = {};
+      codeOrder.forEach(code => {
+        const vals = gbStudents.map(st => scoreMap[st.id]?.[code]).filter(v => v !== undefined);
+        colAvg[code] = vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : null;
+      });
+
+      // Color helper
+      const cellBg   = p => p >= 80 ? T.successBg  : p >= 60 ? T.warningBg  : T.dangerBg;
+      const cellBd   = p => p >= 80 ? T.successBd  : p >= 60 ? T.warningBd  : T.dangerBd;
+      const cellText = p => p >= 80 ? T.success     : p >= 60 ? T.warning    : T.danger;
+
+      // CSV export
+      function exportCSV() {
+        const header = ["Student", ...codeOrder.map(c => testCodeNames[c] || c)];
+        const rows = gbStudents.map(st => [
+          st.name,
+          ...codeOrder.map(c => scoreMap[st.id]?.[c] !== undefined ? scoreMap[st.id][c] + "%" : ""),
+        ]);
+        const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+        a.download = `gradebook${gbClass !== "all" ? "_" + gbClass : ""}.csv`;
+        a.click();
+      }
+
+      if (codeOrder.length === 0) return (
+        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,padding:"3rem",textAlign:"center",color:T.textMuted,maxWidth:"600px"}}>
+          <div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>📒</div>
+          <div style={{fontSize:"1rem",fontWeight:600,color:T.textSecondary,marginBottom:"4px"}}>No test data yet</div>
+          <div style={{fontSize:"0.82rem"}}>Gradebook populates once students submit tests.</div>
+        </div>
+      );
+
+      const COL_W = 80;
+      const NAME_W = 160;
+
+      return (
+        <div style={{display:"flex",flexDirection:"column",gap:"1rem",maxWidth:"100%"}}>
+          {/* Toolbar */}
+          <div style={{display:"flex",gap:"0.75rem",alignItems:"center",flexWrap:"wrap"}}>
+            {gbClasses.length > 1 && (
+              <select value={gbClass} onChange={e=>setGbClass(e.target.value)}
+                style={{padding:"0.4rem 0.65rem",border:`1px solid ${T.border}`,borderRadius:T.xs,fontSize:"0.85rem",color:T.text,background:T.white}}>
+                <option value="all">All Classes</option>
+                {gbClasses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            )}
+            <button onClick={exportCSV}
+              style={{background:T.teal,color:T.white,border:"none",borderRadius:T.xs,padding:"0.4rem 0.9rem",fontSize:"0.82rem",fontWeight:700,cursor:"pointer"}}>
+              ⬇ Export CSV
+            </button>
+            <span style={{fontSize:"0.78rem",color:T.textMuted,marginLeft:"auto"}}>
+              {gbStudents.length} students · {codeOrder.length} tests
+            </span>
+          </div>
+
+          {/* Matrix */}
+          <div style={{overflowX:"auto",background:T.white,border:`1px solid ${T.border}`,borderRadius:T.xs,boxShadow:T.sm}}>
+            <table style={{borderCollapse:"collapse",width:"max-content",minWidth:"100%",fontFamily:T.font,fontSize:"0.82rem"}}>
+              <thead>
+                {/* Test names row */}
+                <tr>
+                  <th style={{position:"sticky",left:0,zIndex:2,background:T.midnight,color:T.white,padding:"0.6rem 0.85rem",textAlign:"left",fontWeight:700,minWidth:NAME_W,borderRight:`2px solid ${T.borderDark}`}}>
+                    Student
+                  </th>
+                  {codeOrder.map(code => (
+                    <th key={code} style={{background:T.midnight,color:T.white,padding:"0.5rem 0.4rem",textAlign:"center",minWidth:COL_W,maxWidth:COL_W,fontWeight:600,borderRight:`1px solid rgba(255,255,255,0.1)`}}>
+                      <div style={{fontSize:"0.65rem",opacity:0.6,marginBottom:"2px",letterSpacing:"0.05em"}}>{code}</div>
+                      <div style={{fontSize:"0.75rem",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:COL_W-8}}>
+                        {testCodeNames[code] || code}
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+                {/* Class average row */}
+                <tr style={{background:T.surfaceAlt}}>
+                  <td style={{position:"sticky",left:0,zIndex:2,background:T.surfaceAlt,padding:"0.45rem 0.85rem",fontWeight:700,fontSize:"0.72rem",letterSpacing:"0.07em",color:T.textSecondary,borderRight:`2px solid ${T.borderDark}`,borderBottom:`2px solid ${T.borderDark}`}}>
+                    CLASS AVG
+                  </td>
+                  {codeOrder.map(code => {
+                    const avg = colAvg[code];
+                    return (
+                      <td key={code} style={{padding:"0.45rem 0.4rem",textAlign:"center",borderRight:`1px solid ${T.border}`,borderBottom:`2px solid ${T.borderDark}`,fontWeight:700,color:avg !== null ? cellText(avg) : T.textMuted}}>
+                        {avg !== null ? avg + "%" : "—"}
+                      </td>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {gbStudents.map((st, i) => (
+                  <tr key={st.id} style={{background: i%2===0 ? T.white : T.surface}}>
+                    <td style={{position:"sticky",left:0,zIndex:1,background: i%2===0 ? T.white : T.surface,padding:"0.45rem 0.85rem",fontWeight:600,color:T.text,borderRight:`2px solid ${T.borderDark}`,whiteSpace:"nowrap"}}>
+                      {st.name}
+                    </td>
+                    {codeOrder.map(code => {
+                      const pct = scoreMap[st.id]?.[code];
+                      return (
+                        <td key={code} style={{padding:"0.3rem 0.4rem",textAlign:"center",borderRight:`1px solid ${T.border}`}}>
+                          {pct !== undefined ? (
+                            <span style={{display:"inline-block",padding:"2px 8px",borderRadius:"3px",background:cellBg(pct),border:`1px solid ${cellBd(pct)}`,color:cellText(pct),fontWeight:700,fontSize:"0.8rem"}}>
+                              {pct}%
+                            </span>
+                          ) : (
+                            <span style={{color:T.textMuted,fontSize:"0.75rem"}}>—</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       );
     }
